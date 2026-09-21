@@ -1,0 +1,9 @@
+declare module "*.png" {
+  const value: import("expo-image").ImageSourcePropType;
+  export default value;
+}
+
+declare module "*.jpg" {
+  const value: import("expo-image").ImageSourcePropType;
+  export default value;
+}

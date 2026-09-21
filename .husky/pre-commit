@@ -1,0 +1,7 @@
+echo '🏗️👷 Linting, testing and building your project before committing'
+
+echo '🏗️👷 Running linting'
+yarn lint
+
+# # If everything passes... Now we can commit
+echo '✅✅✅✅ Committing this now. ✅✅✅✅'
