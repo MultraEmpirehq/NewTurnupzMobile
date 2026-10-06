@@ -1,3 +1,5 @@
+import { reportEvent } from "@/screens/live/live-api";
+
 export type TEventReportPayload = {
   eventId: string;
   reason: string;
@@ -14,8 +16,9 @@ export type TOrganizerConversationDraft = {
   kind: "private";
 };
 
+// The web's event page; "/events/:id" doesn't exist there.
 export const getEventPublicUrl = (eventId: string) =>
-  `https://turnupz.com/events/${encodeURIComponent(eventId)}`;
+  `https://turnupz.com/explore/event/${encodeURIComponent(eventId)}`;
 
 export const createOrganizerConversationDraft = ({
   eventId,
@@ -36,8 +39,30 @@ export const createOrganizerConversationDraft = ({
   kind: "private"
 });
 
-export const submitEventReport = async (_payload: TEventReportPayload) => {
-  // Frontend boundary for the report endpoint. Replace this resolved promise
-  // with the existing API client call when the backend endpoint is available.
-  await Promise.resolve();
+/**
+ * The feed menu offers more specific reasons than the API keeps, so each maps to
+ * the closest API reason and its own wording goes in the details for moderators.
+ */
+const REASON_TO_API: Record<string, string> = {
+  "Spam or misleading content": "misleading",
+  "Scam or suspected fraud": "scam",
+  "Inappropriate content": "inappropriate",
+  "False event information": "misleading",
+  "Duplicate event": "duplicate",
+  "Safety concern": "other",
+  "Harassment or discrimination": "inappropriate",
+  "Event does not exist": "scam",
+  Other: "other"
+};
+
+export const submitEventReport = async (payload: TEventReportPayload) => {
+  const reason = REASON_TO_API[payload.reason] ?? "other";
+  const details = [payload.reason !== "Other" ? payload.reason : null, payload.comment]
+    .filter(Boolean)
+    .join(": ")
+    .slice(0, 1000);
+  await reportEvent(payload.eventId, {
+    reason,
+    details: details || undefined
+  });
 };

@@ -15,6 +15,12 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    // A session the API no longer accepts (signed out elsewhere, or the account
+    // was suspended) sends the person back to sign-in instead of failing quietly.
+    const sentToken = !!error?.config?.headers?.Authorization;
+    if (error?.response?.status === 401 && sentToken) {
+      useUserStore.getState().clearUserStore();
+    }
     return Promise.reject(error);
   }
 );
@@ -22,7 +28,6 @@ api.interceptors.response.use(
 api.interceptors.request.use(
   (config) => {
     const token = useUserStore.getState().userToken;
-    console.log("token", token, "token from store");
     if (token) {
       config.headers = config.headers ?? {};
       config.headers.Authorization = `Bearer ${token}`;
