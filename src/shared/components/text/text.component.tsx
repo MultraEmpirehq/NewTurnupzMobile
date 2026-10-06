@@ -3,7 +3,8 @@ import React, { forwardRef, memo } from "react";
 import { cva } from "class-variance-authority";
 import { cn } from "@/shared/utils/classnames";
 import { useAccessibilityStore } from "@/shared/stores/accessibility.store";
-const getTextClassName = cva(["text-text font-inter"], {
+import { brandFontStyle } from "@/shared/utils/fonts";
+const getTextClassName = cva(["text-text"], {
   variants: {
     size: {
       small: "text-xs",
@@ -47,15 +48,16 @@ const TextComponent = forwardRef<
                         ? 21
                         : 18
     : undefined;
+  const textStyle = [
+    style,
+    accessibleFontSize ? { fontSize: accessibleFontSize } : undefined,
+    highContrast ? { fontWeight: "700" as const } : undefined
+  ];
   return (
     <Text
       className={cn(getTextClassName({ size }), className)}
       ref={ref}
-      style={[
-        style,
-        accessibleFontSize ? { fontSize: accessibleFontSize } : undefined,
-        highContrast ? { fontWeight: "700" } : undefined
-      ]}
+      style={[textStyle, brandFontStyle(className, textStyle)]}
       {...props}
     >
       {children}

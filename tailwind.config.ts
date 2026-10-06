@@ -3,10 +3,22 @@ module.exports = {
   // NOTE: Update this to include the paths to all files that contain Nativewind classes.
   content: ["./App.tsx", "./src/**/*.{js,jsx,ts,tsx}"],
   presets: [require("nativewind/preset")],
+  // The app is light-only (app.json), so NativeWind sets the scheme itself; with
+  // the default "media" mode that throws on web and the page renders blank.
+  darkMode: "class",
   theme: {
     extend: {
       spacing: {
         horizontal: "20px"
+      },
+      // Avenir cuts (loaded in App.tsx) for a plain Text/TextInput that doesn't
+      // go through TextComponent, which picks the cut from the weight itself.
+      fontFamily: {
+        sans: ["Avenir-Book"],
+        "avenir-light": ["Avenir-Light"],
+        "avenir-book": ["Avenir-Book"],
+        "avenir-roman": ["Avenir-Roman"],
+        "avenir-black": ["Avenir-Black"]
       },
       colors: {
         text: {

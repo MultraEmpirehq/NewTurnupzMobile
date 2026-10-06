@@ -2,7 +2,15 @@ module.exports = function (api) {
   api.cache(true);
   return {
     presets: [
-      ["babel-preset-expo", { jsxImportSource: "nativewind" }],
+      [
+        "babel-preset-expo",
+        {
+          jsxImportSource: "nativewind",
+          // zustand's ESM middleware reads import.meta.env, which a classic
+          // (non-module) web bundle can't parse — the page would load blank.
+          unstable_transformImportMeta: true
+        }
+      ],
       "nativewind/babel"
     ],
     plugins: [

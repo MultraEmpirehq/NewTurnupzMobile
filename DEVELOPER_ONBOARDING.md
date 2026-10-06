@@ -2,335 +2,184 @@
 
 ## Purpose
 
-This document is for new developers joining the TurnUp project.
-
-It exists to prevent wasted time during onboarding and to answer the common questions:
+This document is for new developers joining the TurnUp project. It answers:
 
 - Which repository should I use?
-- Which codebase is current and which one is old?
 - Do I need the backend running locally?
-- How do I view my frontend changes?
 - What environment variables do I need?
+- How do I run the mobile app and see my changes?
 - What access do I need on day one?
-
-This guide is based on the current team understanding captured from the Slack thread and local project inspection.
 
 ## Project Overview
 
-TurnUp currently has separate repositories for:
+TurnUp has separate repositories for web, mobile and backend. The backend powers both the web app and the mobile app.
 
-- Web frontend
-- Mobile frontend
-- Backend
+| Area            | Repository                                            | Notes                         |
+| --------------- | ----------------------------------------------------- | ----------------------------- |
+| Mobile frontend | `https://github.com/MultraEmpirehq/NewTurnupzMobile`  | This repo                     |
+| Web frontend    | `https://github.com/MultraEmpirehq/Re-TurnupWeb`      | Latest web codebase           |
+| Backend         | `https://github.com/Multra-Empire/TurnUpAppBE`        | Shared backend for web/mobile |
 
-The backend powers both the web app and the mobile app.
+Note that the repos are split across two GitHub organizations (`MultraEmpirehq` and `Multra-Empire`). Make sure you have access to both.
 
-## Active Repositories
+### Legacy repositories
 
-Use these repositories as the current working set:
+Older repos exist and should be treated as legacy unless the lead says otherwise:
 
-- Web frontend: `https://github.com/MultraEmpirehq/Re-TurnupWeb`
-  Latest TurnUp web codebase
-- Mobile frontend: `https://github.com/Multra-Empire/TurnUpMobileApp`
-  TurnUp mobile app frontend codebase
-- Backend: `https://github.com/Multra-Empire/TurnUpAppBE`
-  Shared backend for web and mobile
+- `TurnUpMobileApp` (the previous mobile app; replaced by `NewTurnupzMobile`)
+- `RE-turnupzweb` (older web codebase; replaced by `Re-TurnupWeb`)
 
-## Old Code / Archive Note
-
-There is mention of another older `RE-turnupzweb` codebase that should have been archived or deleted but was left around "just in case".
-
-Important:
-
-- Do not assume every repo or link shared historically is current
-- The active web repo is `Re-TurnupWeb`
-- If you find another similarly named older web repo, treat it as legacy until the lead confirms otherwise
-- When in doubt, ask which repo is the source of truth before building on top of it
-
-## Source Of Truth
-
-For current development, use:
-
-- `Re-TurnupWeb` for web frontend work
-- `TurnUpMobileApp` for mobile frontend work
-- `TurnUpAppBE` for backend/API behavior
-
-If a link or repo conflicts with these, assume it is outdated until confirmed.
+Do not build on a repo or link that conflicts with the table above. Ask first.
 
 ## Access Checklist
 
-A new developer should be granted access to all of the following:
+A new developer should be granted access to:
 
-- Web frontend repository
-- Mobile frontend repository
-- Backend repository
-- Deployment or hosting dashboards if needed
-- Shared environment variable values for frontend
-- Backend access if they need to inspect how data is collected or shaped
+- All three repositories above (backend access is useful even for frontend work, to read API contracts and validation rules)
+- The Expo / EAS project, if you need to make device builds
+- The shared `.env` values for the mobile app
+- Deployment or hosting dashboards, if your role needs them
 
-Notes:
+If you cannot clone a repo, you are probably not added yet, or you are signed into the wrong GitHub account. Don't create a new repo to work around it. Ask to be added.
 
-- Even if a developer is primarily working on frontend, backend repository access is still useful for understanding API contracts and data flow
-- Access to the correct GitHub organization and repository matters more than trying to recreate a repo locally from a random old link
+## Backend / API
 
-## GitHub Access Notes
+The shared staging backend is live at `https://api.staging.turnupz.com/api/v1`. Both the web and mobile apps use it for development.
 
-If you cannot clone or open a repository:
+- You do not need to run the backend locally for frontend work
+- Run it locally only if you are changing backend code or debugging backend behaviour. It listens on port `3111` (`http://localhost:3111/api/v1`)
+- The mobile app never talks to a database directly; everything goes through the API
 
-- You may not have been added as a collaborator yet
-- You may be logged into the wrong GitHub account
-- The repository may belong to a different GitHub organization than expected
+The old `https://turnupappbe.onrender.com/api/v1` URL from Slack no longer responds. Don't use it.
 
-Do not create a new repository to work around missing access.
+## Mobile App
 
-The correct fix is:
+### Stack
 
-- Get added to the existing repository as a collaborator or team member
-- Confirm you are using the correct GitHub account
-- Confirm whether access is via HTTPS credentials, a personal access token, or SSH keys
+- Expo SDK 54, React Native 0.81 (New Architecture enabled), React 19, TypeScript
+- React Navigation 7 (native stack)
+- Zustand for state, persisted with `react-native-mmkv`
+- TanStack React Query + axios for data fetching
+- NativeWind 4 (Tailwind) for styling
+- react-hook-form + joi for forms
+- Jest (`jest-expo`) + React Testing Library for tests
 
-## Backend / API Reality
+### Environment variables
 
-The backend is live.
-
-Current team understanding:
-
-- You do not need to run the backend locally just to work on frontend
-- Frontend development can use the live backend API
-- Backend local setup is optional unless you are actively changing backend code
-
-Frontend developers may still want backend access to:
-
-- Inspect endpoints
-- Understand request and response shapes
-- Trace where data is coming from
-- Check validation rules and business logic
-
-## Known Frontend Environment Variables
-
-Shared in Slack:
+Variables are loaded from a `.env` file in the project root through `react-native-dotenv` and imported from `@env` (types live in `env.d.ts`). `.env` is gitignored, so get the values from the team.
 
 ```env
-EXPO_PUBLIC_API_BASE_URL="https://turnupappbe.onrender.com/api/v1"
-
-NEXT_PUBLIC_BASE_URL=http://localhost:3333/api
-NEXT_PUBLIC_API_VERSION=v1
-```
-
-Interpretation:
-
-- `EXPO_PUBLIC_API_BASE_URL` is for the mobile frontend
-- `NEXT_PUBLIC_BASE_URL` and `NEXT_PUBLIC_API_VERSION` are for the web frontend
-
-Important:
-
-- `NEXT_PUBLIC_BASE_URL=http://localhost:3333/api` implies the web frontend may expect a local backend-style base URL in some setups
-- If web is actually meant to hit live backend in your environment, confirm the correct current value with the lead before changing anything
-- Do not assume old Slack snippets are still the full production truth
-
-## Mobile App Notes
-
-This repository is the mobile frontend:
-
-- `TurnUpMobileApp`
-
-From local inspection, this is an Expo + React Native + TypeScript app.
-
-It uses:
-
-- Expo
-- React Native
-- TypeScript
-- React Navigation
-- Zustand
-- React Query
-- NativeWind
-
-## Does Mobile Connect Directly To A Database?
-
-No.
-
-The mobile app does not connect directly to a database from the frontend code.
-It talks to the backend API, and the backend is responsible for database access.
-
-## Do I Need To Run Backend Locally?
-
-Usually no, if your task is frontend-only.
-
-Use the live backend unless:
-
-- You are changing backend code
-- You need to test backend-only fixes locally
-- The live API is unavailable
-- You need local debugging for backend behavior
-
-## How To View Frontend Changes
-
-### Mobile App
-
-To view changes in the mobile app:
-
-1. Install dependencies
-2. Add the required environment variables
-3. Start the Expo app
-4. Open it on web, emulator, or device
-
-Typical commands:
-
-```powershell
-npm install
-npm start
-```
-
-Then from Expo:
-
-- Press `w` for web
-- Press `a` for Android
-- Press `i` for iOS if on a supported macOS setup
-- Or scan the QR code with Expo Go / a dev client
-
-### Web App
-
-Use the web frontend repository and run its local dev server according to that repo's scripts and env setup.
-
-## Mobile Environment Setup
-
-This mobile app expects environment variables through `@env`.
-
-From local code inspection, the mobile app expects:
-
-```env
-BASE_URL=
-USER_AUTH_STORAGE_ID=
-USER_AUTH_STORAGE_KEY=
-```
-
-Important:
-
-- This is the variable naming used by the local mobile source code
-- It does not currently match the Slack variable name `EXPO_PUBLIC_API_BASE_URL`
-- Before onboarding others, the team should standardize and document which variable format is actually correct for this repo
-
-## Recommended Mobile `.env` Example
-
-Use this only as a starting point and confirm with the lead:
-
-```env
-BASE_URL=https://turnupappbe.onrender.com/api/v1
+BASE_URL=https://api.staging.turnupz.com/api/v1
 USER_AUTH_STORAGE_ID=turnup-user-store
-USER_AUTH_STORAGE_KEY=replace-with-team-value
+USER_AUTH_STORAGE_KEY=<ask the team>
 ```
 
-## Mobile Run Steps
+| Variable                | Used in                          | Purpose                                                   |
+| ----------------------- | -------------------------------- | --------------------------------------------------------- |
+| `BASE_URL`              | `src/api/index.ts`               | axios base URL for every API call                         |
+| `USER_AUTH_STORAGE_ID`  | `src/shared/stores/user.store.ts` | MMKV storage id for the persisted user session            |
+| `USER_AUTH_STORAGE_KEY` | `src/shared/stores/user.store.ts` | MMKV encryption key (falls back to a default if empty; not used on web) |
 
-Inside `TurnUpMobileApp`:
+Things to know:
 
-```powershell
-npm install
-npm start
+- The names are `BASE_URL` etc., **not** `EXPO_PUBLIC_API_BASE_URL`. The `EXPO_PUBLIC_*` name shared in Slack isn't read by this repo.
+- `allowUndefined` is `false`, so the bundle fails if a variable is missing from `.env`.
+- Env values are inlined by Babel and cached. After editing `.env`, restart with a cleared cache: `npx expo start -c`.
+
+### Running the app
+
+```bash
+npm install          # .npmrc sets legacy-peer-deps=true
+npm start            # expo start (dev server)
 ```
 
-If the app fails on startup:
+This project uses `expo-dev-client` and native modules (`react-native-mmkv` / Nitro), so **Expo Go won't work**. Choose one of these:
 
-- Check whether `.env` exists
-- Check whether `BASE_URL` is defined
-- Check whether you are in the correct repo
-- Check whether dependencies were installed
+- **Web (fastest for UI work):** `npm run web`, or press `w` in the Expo terminal. MMKV runs unencrypted on web.
+- **Android emulator/device:** `npm run android` (`expo run:android`). This builds the native app locally and needs Android Studio / SDK.
+- **iOS simulator/device:** `npm run ios` (`expo run:ios`). Needs macOS + Xcode.
+- **Shared dev build:** install a development-client build from EAS (the `preview3` profile in `eas.json` has `developmentClient: true`), then run `npm start` and open the app on your device.
 
-## How Screen Display Works In Mobile
+Other EAS profiles in `eas.json`: `preview` (internal APK), `preview2` (Android release build), `production`.
 
-The mobile app shows different screens based on auth state.
+### Tests
 
-High level:
+```bash
+npx jest             # run once
+npm test             # jest --watchAll
+```
 
-- If no authenticated user exists, the app shows unauthenticated screens
-- If a user is already in the local auth store, the app shows authenticated tabs
+The live-ticketing rules are covered in `src/screens/live/live-rules.test.ts`.
 
-### Unauthenticated Flow
+### Project structure
 
-Screens include:
+```
+App.tsx                      # Providers: gesture handler, React Query, safe area, flash messages
+src/
+  api/                       # axios instance (auth header + 401 handling), API functions and types
+  navigation/
+    navigator-wrapper/       # Picks the authenticated or unauthenticated navigator from the user store
+    unauthenticated-navigator/
+    authenticated-navigator/
+    tab-navigator/           # Older bottom-tab navigator (not currently mounted)
+  screens/<feature>/         # One folder per feature: screen/, components/, stores/, service/, ...
+    live/                    # Event detail, ticket checkout, my tickets, report event (live API)
+  shared/
+    assets/  components/  hooks/  stores/  utils/
+```
 
-- Landing
-- Verification
-- Forgot Password
-- Create Password
-- Onboarding
+Path aliases (from `tsconfig.json`): `@/*` → `src/*`, plus `@screens/*`, `@components/*`, `@utils/*`, `@stores/*`, `@api/*`, `@assets/*`, `@icons/*`, `@images/*`, `@styles/*`, `@svg/*`, `@hooks/*`, `@navigation/*`, `@types/*`.
 
-### Authenticated Flow
+### How screens are shown
 
-Screens include:
+`NavigationWrapper` reads `user` from the persisted user store:
 
-- Home
-- Tickets
-- Messages
-- Favorites
-- Profile
-- Search
+- **No user → unauthenticated stack:** Landing, Verification, Forgot Password, Create Password, Onboarding
+- **User present → authenticated stack:**
+  - `tab`: the home feed (`refined-home-feed-design.screen.tsx`). It draws its own bottom bar and tabs, and it opens the live-ticketing screens (event detail, checkout, my tickets).
+  - `search`: the search screen.
 
-## How To Quickly Preview Screens
+The older `TabNavigator` (Home / Tickets / Messages / Favorites / Profile) is still in the repo but isn't mounted. The home feed replaced it.
 
-If you are working on frontend and only want to preview screens:
+Auth: the session token is stored in the user store, and an axios interceptor attaches it as `Bearer` on every request. A `401` on an authenticated request clears the store, which sends the user back to sign-in.
 
-- Start the mobile app
-- Use the normal navigation flow where possible
-- If auth state blocks you, temporarily seed or clear the local user store for development
-- For focused UI work, a developer can temporarily change the initial route or navigator rendering locally
+### Previewing screens quickly
 
-Do not commit temporary screen-forcing hacks unless the team agrees on a proper dev-only preview pattern.
+- Use the normal flow where you can. Sign in once and the session persists.
+- To force a sign-out during development, the commented-out `clearUserStore()` call in `App.tsx` can be enabled temporarily.
+- Do not commit temporary screen-forcing hacks.
 
-## When A New Developer Gets Stuck
+### Git workflow
 
-Before spending hours jumping between broken links, verify these in order:
+- Default branch: `main`. Work on feature branches (e.g. `feat/live-ticketing`) and open PRs into `main`.
+- There are Husky hook scripts in `.husky/`, but they aren't active: Husky isn't installed, and the scripts reference `yarn lint` (no `lint` script exists) and an `origin dev` branch (which doesn't exist). Ignore them until they're fixed.
+- Formatting follows `.prettierrc`. The `.eslintrc.js` config is present, but ESLint isn't installed as a dependency yet.
 
-1. Am I in the correct repository?
-2. Is this the current codebase or old code?
-3. Do I actually need backend local setup for my task?
-4. Do I have the correct `.env` values?
-5. Do I have access to the correct GitHub organization and repository?
-6. Am I supposed to use the live backend instead of running one locally?
+## When You Get Stuck
 
-## Recommended Onboarding Flow
+Check these in order:
 
-Every new developer should be given the following on day one:
+1. Am I in `NewTurnupzMobile` (not the old `TurnUpMobileApp`)?
+2. Does `.env` exist, with all three variables set?
+3. Did I restart with `npx expo start -c` after changing `.env`?
+4. Am I using a dev build or web rather than Expo Go?
+5. Is `BASE_URL` pointing at staging (`https://api.staging.turnupz.com/api/v1`)?
+6. Do I have access to the right GitHub org and repo?
 
-1. A list of the active repositories
-2. A note identifying any old or legacy repositories
-3. The minimum required environment variables
-4. Clear instructions on whether backend is live or needs local setup
-5. Instructions for viewing frontend changes locally
-6. GitHub access to all relevant repositories
-7. One team contact for unresolved setup issues
+## Open Items
 
-## Current Gaps In Documentation
+These still need to be confirmed or fixed:
 
-These areas should still be confirmed and documented more formally:
-
-- Which old repository is officially archived
-- The exact correct mobile `.env` variable names
-- The correct current web API base URL for local development
-- Backend local setup steps for developers who need BE access
-- Deployment environments and ownership
-- Where shared credentials or passkeys are stored
-
-## Recommended Team Decision
-
-To avoid repeated onboarding pain, the team should maintain one short source-of-truth document per repository that includes:
-
-- What this repo is for
-- Whether it is current or legacy
-- How to run it
-- Required environment variables
-- External services it depends on
-- Who to ask when blocked
+- Official archive status of `TurnUpMobileApp` and `RE-turnupzweb`
+- Where shared credentials and `.env` values are stored
+- Correct API base URL for local web development
+- Backend local setup steps
+- Fix or remove the Husky hooks; add ESLint + a `lint` script
+- Rename the package (`package.json` `name` is still `to-do-app`)
 
 ## Summary
 
-If you are new to TurnUp, start here:
-
-- Web latest code: `Re-TurnupWeb`
-- Mobile latest code: `TurnUpMobileApp`
-- Backend for both: `TurnUpAppBE`
-- The backend is live, so frontend work usually does not require local backend setup
-- Do not trust old links or similarly named repos without confirmation
-- Ask for access to all active repositories early
-
+- Mobile: `NewTurnupzMobile` · Web: `Re-TurnupWeb` · Backend: `TurnUpAppBE`
+- The backend is live, so frontend work doesn't need a local backend
+- Create `.env` with `BASE_URL`, `USER_AUTH_STORAGE_ID` and `USER_AUTH_STORAGE_KEY`, then run `npm install && npm start`
+- Use web or a dev-client build; Expo Go isn't supported
