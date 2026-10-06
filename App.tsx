@@ -6,11 +6,26 @@ import { View } from "react-native";
 import { themes } from "@/shared/utils/colors";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import RefinedHomeFeedDesignScreen from "@/screens/home/screen/refined-home-feed-design.screen";
+import FlashMessage from "react-native-flash-message";
+import NavigationWrapper from "@/navigation/navigator-wrapper/navigator-wrapper";
+import { useFonts } from "expo-font";
+import { BRAND_FONTS } from "@/shared/utils/fonts";
+import BrandIntro from "@/shared/components/brand-intro/brand-intro.component";
+import { useCallback, useState } from "react";
 
 const queryClient = new QueryClient();
 
 export default function App() {
+  // Hold the first frame until Avenir is ready so text doesn't flash in the
+  // system font; if loading fails, carry on with the system font. The wait uses
+  // the intro's base colour, so splash → intro reads as one piece.
+  const [fontsLoaded, fontError] = useFonts(BRAND_FONTS);
+  const [introDone, setIntroDone] = useState(false);
+  const finishIntro = useCallback(() => setIntroDone(true), []);
+  if (!fontsLoaded && !fontError) {
+    return <View style={{ flex: 1, backgroundColor: "#fbf9ff" }} />;
+  }
+
   // const clearUserStore = useUserStore((state) => state.clearUserStore);
   // useEffect(() => {
   //   clearUserStore();
@@ -20,9 +35,13 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <View className="flex-1" style={themes["light"]}>
           <SafeAreaProvider className="flex-1">
+            {/* Sign-in comes first; once signed in, the home feed is the app. */}
             <ContainerComponent>
-              <RefinedHomeFeedDesignScreen />
+              <NavigationWrapper />
             </ContainerComponent>
+            <FlashMessage position="top" />
+            {/* Plays over the app, which loads underneath in the meantime. */}
+            {!introDone && <BrandIntro onFinish={finishIntro} />}
           </SafeAreaProvider>
         </View>
       </QueryClientProvider>

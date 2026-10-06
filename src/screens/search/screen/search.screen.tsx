@@ -17,7 +17,8 @@ import SearchListComponent from "../components/search-list/search-list.component
 const searchEvents = async (searchText: string, pageParam: number) => {
   if (!searchText) return null;
   const { data } = await getData<TEventDetailsType[]>(
-    `/events?search=${searchText}&page=${pageParam}`
+    // The API filters on `q`; the search text is encoded so "&" or "#" can't break the query.
+    `/events?q=${encodeURIComponent(searchText)}&page=${pageParam}`
   );
   return data;
 };

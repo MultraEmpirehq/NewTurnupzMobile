@@ -65,6 +65,16 @@ import {
   getEventPublicUrl,
   submitEventReport
 } from "@/screens/home/service/event-actions.service";
+import { constructErrorMessage } from "@/api/functions";
+import { formatEventClock, formatEventDay } from "@/shared/utils/event-time";
+import LiveEventDetailScreen from "@/screens/live/event-detail.screen";
+import LiveTicketCheckoutScreen from "@/screens/live/ticket-checkout.screen";
+import LiveMyTicketsScreen from "@/screens/live/my-tickets.screen";
+import {
+  eventPlace,
+  TLiveEvent,
+  useLiveEvents
+} from "@/screens/live/live-api";
 
 type TFeedMediaKind = "image" | "video";
 type TMediaSource = string | number | ImageSource;
@@ -86,6 +96,8 @@ type TFeedEvent = Omit<TEventDetailsType, "date"> & {
   venueName: string;
   venueAddress: string;
   mediaKind?: TFeedMediaKind;
+  /** Set on live events; times then read on the venue's clock. */
+  timezone?: string;
 };
 
 type TBottomNavId =
@@ -1175,7 +1187,11 @@ const BOTTOM_NAV_ITEMS: TBottomNavItem[] = [
   }
 ];
 
-const formatEventDate = (date: Date) => {
+const formatEventDate = (date: Date, timezone?: string) => {
+  // Live events carry their zone, so they read on the venue's clock.
+  if (timezone) {
+    return `${formatEventDay(date, timezone, { withYear: false })} at ${formatEventClock(date, timezone)}`;
+  }
   const weekday = date.toLocaleDateString("en-US", { weekday: "short" });
   const month = date.toLocaleDateString("en-US", { month: "short" });
   const day = date.getDate();
@@ -1301,6 +1317,29 @@ const toFeedMediaEvent = (event: TPerformerEvent): TFeedEvent => ({
     address: event.location,
     totalAvailableSeat: 200,
     images: [event.image]
+  }
+});
+
+/** A live event in the shape the feed card draws. */
+const toLiveFeedEvent = (event: TLiveEvent): TFeedEvent => ({
+  id: event.id,
+  name: event.name,
+  date: new Date(event.date),
+  image: event.image ?? "",
+  medias: [event.image, ...(event.medias ?? [])].filter(Boolean) as string[],
+  totalTickets: 0,
+  organizerName: event.organizerName ?? "",
+  venueName: eventPlace(event),
+  venueAddress: event.venue?.address ?? "",
+  mediaKind: "image",
+  timezone: event.timezone,
+  description: event.description,
+  venue: {
+    id: event.venue?.id ?? `${event.id}-venue`,
+    name: event.venue?.name ?? eventPlace(event),
+    address: event.venue?.address ?? "",
+    totalAvailableSeat: 0,
+    images: event.image ? [event.image] : []
   }
 });
 
@@ -7210,7 +7249,7 @@ const PrivateChatScreen = ({
             </TextComponent>
             <TextComponent className="mt-1 text-xs text-zinc-500">
               {contextualEvent
-                ? `${formatEventDate(contextualEvent.date)} · ${contextualEvent.venueName}`
+                ? `${formatEventDate(contextualEvent.date, contextualEvent.timezone)} · ${contextualEvent.venueName}`
                 : isEventGroup
                   ? "Official event group after booking"
                   : "Saturday, Aug 12 - 8:00 PM"}
@@ -13319,7 +13358,7 @@ const FeedCard = ({
             {event.name}
           </TextComponent>
           <TextComponent numberOfLines={1} className="text-xs text-zinc-700">
-            {event.venueName} - {formatEventDate(event.date)}
+            {event.venueName} - {formatEventDate(event.date, event.timezone)}
           </TextComponent>
         </Pressable>
         <MoreButton onPress={() => onOpenSettings(event)} />
@@ -13427,7 +13466,7 @@ const SettingsSheet = ({
   const isSaved = savedEvents.some((savedEvent) => savedEvent.id === event.id);
   const isHidden = hiddenEventIds.includes(event.id);
   const eventUrl = getEventPublicUrl(event.id);
-  const shareMessage = `${event.name}\n${formatEventDate(event.date)} · ${event.venueName}\n${eventUrl}`;
+  const shareMessage = `${event.name}\n${formatEventDate(event.date, event.timezone)} · ${event.venueName}\n${eventUrl}`;
   const reportReasons = [
     "Spam or misleading content",
     "Scam or suspected fraud",
@@ -13493,9 +13532,14 @@ const SettingsSheet = ({
       onSuccess("Report submitted. Thank you.");
       setShowReport(false);
       onClose();
-    } catch {
+    } catch (reportError) {
       setReportState("error");
-      onError("Unable to submit the report. Please try again.");
+      onError(
+        constructErrorMessage(
+          reportError as TApiErrorResponseType,
+          "Unable to submit the report. Please try again."
+        )
+      );
     }
   };
 
@@ -13789,14 +13833,19 @@ const RefinedHomeFeedDesignScreen = () => {
     );
     return () => clearTimeout(timer);
   }, [reduceMotion]);
+  // The home feed is live: published events from the API, newest pages as you scroll.
+  const liveEvents = useLiveEvents();
   const feedEvents = useMemo(
     () =>
-      [
-        ...FEED_EVENTS,
-        ...PERFORMER_EVENTS.map(toFeedMediaEvent),
-        ...VENUE_EVENTS.map(toFeedEvent)
-      ].filter((event) => !hiddenEventIds.includes(event.id)),
-    [hiddenEventIds]
+      (liveEvents.data?.pages ?? [])
+        .flatMap((page) => page.events)
+        .map(toLiveFeedEvent)
+        .filter((event) => !hiddenEventIds.includes(event.id)),
+    [hiddenEventIds, liveEvents.data]
+  );
+  const [liveEventId, setLiveEventId] = useState<string | null>(null);
+  const [liveBookingEvent, setLiveBookingEvent] = useState<TLiveEvent | null>(
+    null
   );
   const isExploreTab = activeTab === "search";
   const isTicketsTab = activeTab === "tickets";
@@ -13804,8 +13853,13 @@ const RefinedHomeFeedDesignScreen = () => {
   const isNotificationsTab = activeTab === "favorites";
   const isProfileTab = activeTab === "profile";
   const openHomeEventDetails = (event: TFeedEvent) => {
-    setSelectedHomeEvent(toBookingEvent(event));
-    setHomeBookingMode("detail");
+    setLiveEventId(event.id);
+  };
+  const openLiveTickets = () => {
+    setLiveBookingEvent(null);
+    setLiveEventId(null);
+    setTicketsReturnTab("home");
+    setActiveTab("tickets");
   };
   const openOrganizerChat = (event: TFeedEvent) => {
     setEventShareIntent("organizer");
@@ -13881,6 +13935,40 @@ const RefinedHomeFeedDesignScreen = () => {
     );
   }
 
+  if (liveBookingEvent) {
+    return (
+      <ContainerComponent isSafeAreaView className="bg-white" edges={["top"]}>
+        <View
+          className="flex-1 w-full self-center bg-white"
+          style={{ maxWidth: 430 }}
+        >
+          <LiveTicketCheckoutScreen
+            event={liveBookingEvent}
+            onBack={() => setLiveBookingEvent(null)}
+            onViewTickets={openLiveTickets}
+          />
+        </View>
+      </ContainerComponent>
+    );
+  }
+
+  if (liveEventId) {
+    return (
+      <ContainerComponent isSafeAreaView className="bg-white" edges={["top"]}>
+        <View
+          className="flex-1 w-full self-center bg-white"
+          style={{ maxWidth: 430 }}
+        >
+          <LiveEventDetailScreen
+            eventId={liveEventId}
+            onBack={() => setLiveEventId(null)}
+            onBook={setLiveBookingEvent}
+          />
+        </View>
+      </ContainerComponent>
+    );
+  }
+
   if (!isExploreTab && selectedHomeEvent && homeBookingMode === "ticket") {
     return (
       <ContainerComponent isSafeAreaView className="bg-white" edges={["top"]}>
@@ -13950,19 +14038,7 @@ const RefinedHomeFeedDesignScreen = () => {
             onShareWithCommunity={shareEventWithCommunity}
           />
         ) : isTicketsTab ? (
-          <TicketsContent
-            bookings={bookings}
-            transfers={transfers}
-            onTransfer={(transfer) =>
-              setTransfers((current) => [transfer, ...current])
-            }
-            onOpenEvent={(event) => {
-              setSelectedHomeEvent(event);
-              setHomeBookingMode("detail");
-              setActiveTab("home");
-            }}
-            onBack={() => setActiveTab(ticketsReturnTab)}
-          />
+          <LiveMyTicketsScreen onBack={() => setActiveTab(ticketsReturnTab)} />
         ) : isMessagesTab ? (
           <ChatContent
             sharedEvent={sharedChatEvent}
@@ -14024,6 +14100,31 @@ const RefinedHomeFeedDesignScreen = () => {
                   onOpenDetails={openHomeEventDetails}
                 />
               )}
+              refreshing={liveEvents.isRefetching}
+              onRefresh={() => void liveEvents.refetch()}
+              onEndReached={() =>
+                liveEvents.hasNextPage &&
+                !liveEvents.isFetchingNextPage &&
+                void liveEvents.fetchNextPage()
+              }
+              ListEmptyComponent={
+                <View className="mt-24 items-center gap-2 px-8">
+                  <TextComponent className="text-center text-lg font-bold text-zinc-950">
+                    {liveEvents.isLoading
+                      ? "Finding events..."
+                      : liveEvents.error
+                        ? "We couldn't load events"
+                        : "No events yet"}
+                  </TextComponent>
+                  {!liveEvents.isLoading && (
+                    <TextComponent className="text-center text-sm text-zinc-500">
+                      {liveEvents.error
+                        ? "Pull down to try again."
+                        : "New events will show up here."}
+                    </TextComponent>
+                  )}
+                </View>
+              }
               showsVerticalScrollIndicator={false}
               contentContainerClassName="pb-4"
             />

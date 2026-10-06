@@ -72,7 +72,9 @@ const LandingScreen = () => {
     resolver: joiResolver(canLogin ? authSchema : checkIfEmailExistsSchema)
   });
   const onSubmit = useCallback(
-    async (body: TAuthBodyType) => {
+    async (formBody: TAuthBodyType) => {
+      // One spelling per address, as on the web, so capitals can't split an account.
+      const body = { ...formBody, email: formBody.email.trim().toLowerCase() };
       try {
         if (!canLogin) {
           const { data } = await getData<TUserCheckResponseType>(
@@ -118,7 +120,6 @@ const LandingScreen = () => {
           body
         );
         performAuthOperations(data?.data?.accessToken, true);
-        console.log("data", data);
         await performAuthVerificationCheck();
         onSuccess("Login successful");
       } catch (error) {

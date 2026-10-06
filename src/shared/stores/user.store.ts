@@ -1,12 +1,17 @@
+import { Platform } from "react-native";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { createMMKV } from "react-native-mmkv";
 import { USER_AUTH_STORAGE_ID, USER_AUTH_STORAGE_KEY } from "@env";
 import { DEFAULT_STORAGE_ENCRYPTION_KEY } from "../utils/constant";
 
+// MMKV can't encrypt in a browser, so the web preview stores without it; phones
+// keep the session encrypted.
 const storage = createMMKV({
   id: USER_AUTH_STORAGE_ID,
-  encryptionKey: USER_AUTH_STORAGE_KEY || DEFAULT_STORAGE_ENCRYPTION_KEY
+  ...(Platform.OS === "web"
+    ? {}
+    : { encryptionKey: USER_AUTH_STORAGE_KEY || DEFAULT_STORAGE_ENCRYPTION_KEY })
 });
 
 const zustandStorage = createJSONStorage(() => ({

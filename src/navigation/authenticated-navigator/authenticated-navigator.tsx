@@ -1,7 +1,9 @@
 import { StyleSheet, Text, View } from "react-native";
 import React, { memo } from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import TabNavigator from "../tab-navigator/tab-navigator";
+// The home feed screen carries its own bottom bar and tabs, so it's the whole
+// signed-in app; the old tab navigator would draw a second bar under it.
+import RefinedHomeFeedDesignScreen from "@/screens/home/screen/refined-home-feed-design.screen";
 import SearchScreen from "@screens/search/screen/search.screen";
 
 export type AuthenticatedStackParamList = {
@@ -24,7 +26,7 @@ const AuthenticatedNavigator = () => {
       }}
       initialRouteName="tab"
     >
-      <Stack.Screen name="tab" component={TabNavigator} />
+      <Stack.Screen name="tab" component={RefinedHomeFeedDesignScreen} />
       <Stack.Screen
         name="search"
         options={{ animation: "fade_from_bottom" }}

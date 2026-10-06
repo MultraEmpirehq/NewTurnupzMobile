@@ -24,6 +24,7 @@ import EyeOpenOutlineIcon from "@icons/eye-open-outline.icon";
 import EyeSlashOutlineIcon from "@icons/eye-slash-outline.icon";
 import LabelComponent from "../label/label.component";
 import { cn } from "@/shared/utils/classnames";
+import { brandFontStyle } from "@/shared/utils/fonts";
 import TextComponent from "../../text/text.component";
 
 type TInputFieldProps = {
@@ -165,6 +166,10 @@ const InputField = forwardRef<
             className={textInputClassName}
             // {...(IS_IOS && { inputAccessoryViewID: generatedInputViewId })}
             {...props}
+            style={[
+              props.style,
+              brandFontStyle(textInputClassName, props.style)
+            ]}
           />
           {rightIcon && (
             <TouchableOpacity
