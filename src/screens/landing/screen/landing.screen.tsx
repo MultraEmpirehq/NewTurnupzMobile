@@ -13,6 +13,7 @@ import joi from "joi";
 import { joiResolver } from "@hookform/resolvers/joi";
 import { getData, postData } from "@/api";
 import useUserStore, { TUser } from "@/shared/stores/user.store";
+import { useIntroStore } from "@/shared/stores/intro.store";
 import useApp from "@/shared/hooks/use-app.hook";
 import { onError, onSuccess } from "@/shared/components/status/toast";
 import {
@@ -61,6 +62,10 @@ const LandingScreen = () => {
   const { performAuthOperations } = useApp();
   const setUserDetails = useUserStore((state) => state.setUser);
   const { performAuthVerificationCheck } = useAuth();
+  // The email field auto-focuses only once the launch intro is out of the way,
+  // so the keyboard doesn't come up over it. Keying it on that remounts the
+  // field (still empty: the intro covers it) with autoFocus on.
+  const introDone = useIntroStore((state) => state.introDone);
   const {
     control,
     handleSubmit,
@@ -159,13 +164,14 @@ const LandingScreen = () => {
                 fieldState: { error }
               }) => (
                 <InputFieldComponent
+                  key={introDone ? "email-ready" : "email-waiting"}
+                  autoFocus={introDone}
                   placeholder="E.G example@gmail.com"
                   inputMode="email"
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoComplete="email"
                   autoCorrect={false}
-                  autoFocus={true}
                   returnKeyType="next"
                   onSubmitEditing={() => {
                     handleSubmit(onSubmit)();

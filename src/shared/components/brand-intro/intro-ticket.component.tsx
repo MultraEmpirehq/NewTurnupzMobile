@@ -36,7 +36,9 @@ import {
  * of every booking in the reel behind it.
  *
  * Two faces turned in 3D, with each hidden once it faces away; a soft shadow
- * underneath narrows as the ticket turns edge-on.
+ * underneath narrows as the ticket turns edge-on. The faces aren't cached as
+ * bitmaps (unlike the rest of the intro): iOS smears rasterized layers while
+ * they turn in 3D.
  */
 
 // The web ticket's 7×7 code.
@@ -137,7 +139,6 @@ const IntroTicket: React.FC<TTicketProps> = ({ t, width }) => {
 
       {/* Front: the brand gradient, the logo, and the stub. */}
       <Animated.View
-        {...RASTERIZE}
         style={[styles.face, { borderRadius: 22 * k }, frontStyle]}
       >
         <LinearGradient
@@ -198,7 +199,6 @@ const IntroTicket: React.FC<TTicketProps> = ({ t, width }) => {
 
       {/* Back: the code, ready at the door. */}
       <Animated.View
-        {...RASTERIZE}
         style={[
           styles.face,
           styles.back,

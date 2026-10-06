@@ -102,6 +102,38 @@ This project uses `expo-dev-client` and native modules (`react-native-mmkv` / Ni
 
 Other EAS profiles in `eas.json`: `preview` (internal APK), `preview2` (Android release build), `production`.
 
+#### iOS with Xcode 27
+
+Xcode 27 has no Simulator app. Simulators open in **DeviceHub** instead (`Xcode.app/Contents/Applications/DeviceHub.app`). Expo CLI still looks for the old Simulator app, so `npm run ios` stops with "Can't determine id of Simulator app". Until Expo supports DeviceHub, build and install by hand:
+
+```bash
+npx expo prebuild -p ios            # once, or after native config changes
+xcrun simctl list devices available # pick a simulator UDID
+xcrun simctl boot <UDID>
+open /Applications/Xcode.app/Contents/Applications/DeviceHub.app
+
+cd ios
+xcodebuild -workspace Turnup.xcworkspace -scheme Turnup \
+  -configuration Release -sdk iphonesimulator \
+  -destination "id=<UDID>" -derivedDataPath build/dd build
+xcrun simctl install <UDID> build/dd/Build/Products/Release-iphonesimulator/Turnup.app
+xcrun simctl launch <UDID> com.turnup.mobile
+```
+
+A Release build bundles the JavaScript, so it runs without `npm start`. After a JS-only change, rerun `xcodebuild` and `install` (about 1–2 minutes).
+
+Xcode 27 also refuses any target below iOS 15, and a few pods still declare 9.0 / 12.4. The `plugins/with-pod-deployment-target.js` config plugin (registered in `app.json`) raises them to 15.1 on every prebuild, so don't hand-edit `ios/Podfile` for this.
+
+### Launch intro
+
+On launch, a 5-second branded intro (`src/shared/components/brand-intro/`) plays over the app while it loads underneath:
+
+- The web loader writes the wordmark.
+- Behind it, empty "story" cards of the booking flow glide past.
+- It ends on the web's flip ticket.
+
+Every timing lives in `intro-timeline.ts`. `useIntroStore` (`src/shared/stores/intro.store.ts`) reports when the intro has finished. Screens use it to hold back anything that would show over the intro: the sign-in email field only auto-focuses after it, so the keyboard doesn't cover it. With Reduce Motion on, the intro shortens to a brief fade.
+
 ### Tests
 
 ```bash
