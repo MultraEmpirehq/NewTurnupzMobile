@@ -34,7 +34,8 @@
         {
           "launchMode": "most-recent"
         }
-      ]
+      ],
+      "./plugins/with-pod-deployment-target"
     ]
   }
 }

@@ -1,7 +1,6 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import AuthTicketLayout from "@/shared/components/auth-ticket/auth-ticket.layout";
+import { StyleSheet, View } from "react-native";
 import React, { memo, useCallback } from "react";
-import ContainerComponent from "@/shared/components/container/container.component";
-import KeyboardViewLayout from "@/shared/components/keyboard-view/keyboard-view.layout";
 import TextComponent from "@/shared/components/text/text.component";
 import InputFieldComponent from "@/shared/components/form/input-field/input-field.component";
 import ButtonComponent from "@/shared/components/button/button.component";
@@ -89,66 +88,62 @@ const CreatePasswordScreen = () => {
     [performAuthVerificationCheck]
   );
   return (
-    <ContainerComponent isSafeAreaView>
-      <KeyboardViewLayout className="flex-1" contentContainerClassName="flex-1">
-        <ScrollView
-          contentContainerClassName="flex-1 py-20 pt-40 gap-20 px-horizontal"
-          showsVerticalScrollIndicator={false}
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <TextComponent className="font-bold text-center">
-            Create Password
-          </TextComponent>
-          <View className="gap-6">
-            <View className="gap-2">
-              <Controller
-                control={control}
-                name="password"
-                render={({
-                  field: { onChange, value, ref },
-                  fieldState: { error }
-                }) => (
-                  <InputFieldComponent
-                    placeholder="Enter your password"
-                    secureTextEntry
-                    onChangeText={onChange}
-                    value={value}
-                    error={error?.message}
-                    ref={ref}
-                  />
-                )}
+    <AuthTicketLayout
+      eyebrow="Almost there"
+      title="Create your password"
+      subtitle="You'll use it with your email to log in from now on."
+    >
+      <View className="gap-5">
+        <View className="gap-2">
+          <Controller
+            control={control}
+            name="password"
+            render={({
+              field: { onChange, value, ref },
+              fieldState: { error }
+            }) => (
+              <InputFieldComponent
+                label="Password"
+                placeholder="Enter your password"
+                secureTextEntry
+                autoFocus
+                onChangeText={onChange}
+                value={value}
+                error={error?.message}
+                ref={ref}
               />
-              <CheckPasswordValidityComponent password={password} />
-            </View>
-            <Controller
-              control={control}
-              name="confirmPassword"
-              render={({
-                field: { onChange, value, ref },
-                fieldState: { error }
-              }) => (
-                <InputFieldComponent
-                  placeholder="Confirm your password"
-                  secureTextEntry
-                  onChangeText={onChange}
-                  value={value}
-                  error={error?.message}
-                  ref={ref}
-                />
-              )}
+            )}
+          />
+          <CheckPasswordValidityComponent password={password} />
+        </View>
+        <Controller
+          control={control}
+          name="confirmPassword"
+          render={({
+            field: { onChange, value, ref },
+            fieldState: { error }
+          }) => (
+            <InputFieldComponent
+              label="Confirm password"
+              placeholder="Enter it again"
+              secureTextEntry
+              onChangeText={onChange}
+              value={value}
+              error={error?.message}
+              ref={ref}
             />
-          </View>
-          <ButtonComponent
-            onPress={handleSubmit(onSubmit)}
-            disabled={isSubmitting || !isValid}
-            isLoading={isSubmitting}
-          >
-            Continue
-          </ButtonComponent>
-        </ScrollView>
-      </KeyboardViewLayout>
-    </ContainerComponent>
+          )}
+        />
+        <ButtonComponent
+          onPress={handleSubmit(onSubmit)}
+          disabled={isSubmitting || !isValid}
+          isLoading={isSubmitting}
+          className="h-12 rounded-full bg-[#00b2ff] py-0"
+        >
+          Create password
+        </ButtonComponent>
+      </View>
+    </AuthTicketLayout>
   );
 };
 

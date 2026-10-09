@@ -2,12 +2,19 @@ import useUserStore from "@/shared/stores/user.store";
 import { BASE_URL } from "@env";
 // import { onInfo } from "@utils/toast";
 import axios, { AxiosRequestConfig } from "axios";
+import Constants from "expo-constants";
+import { Platform } from "react-native";
 
 const controller = new AbortController();
 
 const api = axios.create({
   baseURL: BASE_URL,
-  signal: controller.signal
+  signal: controller.signal,
+  // Names this phone in the account's signed-in devices list.
+  headers:
+    Platform.OS === "web"
+      ? undefined
+      : { "X-Device-Name": Constants.deviceName ?? `${Platform.OS} phone` }
 });
 
 api.interceptors.response.use(

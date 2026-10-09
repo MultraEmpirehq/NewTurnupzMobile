@@ -97,3 +97,63 @@ describe("feed reports", () => {
     });
   });
 });
+
+describe("sending tickets", () => {
+  const { canTransfer } = jest.requireActual<typeof import("./live-api")>("./live-api");
+  const base = {
+    id: "ut1",
+    status: "UN_USED",
+    ticket: { id: "t1", name: "VIP", price: { amount: 0 }, transferable: true }
+  };
+
+  it("offers sending only when the category allows it", () => {
+    expect(canTransfer(base as never)).toBe(true);
+    expect(
+      canTransfer({ ...base, ticket: { ...base.ticket, transferable: false } } as never)
+    ).toBe(false);
+  });
+
+  it("never offers a used ticket or one already on its way", () => {
+    expect(canTransfer({ ...base, status: "USED" } as never)).toBe(false);
+    expect(
+      canTransfer({
+        ...base,
+        transfer: { id: "tr", status: "PENDING", toEmail: "a@b.co", createdAt: "" }
+      } as never)
+    ).toBe(false);
+  });
+
+  it("lets a received ticket (its old transfer claimed) be sent on", () => {
+    expect(
+      canTransfer({
+        ...base,
+        transfer: { id: "tr", status: "CLAIMED", toEmail: "a@b.co", createdAt: "" }
+      } as never)
+    ).toBe(true);
+  });
+});
+
+describe("transfer recipient", () => {
+  const { parseRecipient, recipientBody } = jest.requireActual<
+    typeof import("@/shared/utils/transfer-recipient")
+  >("@/shared/utils/transfer-recipient");
+
+  it("reads an email, lowercased", () => {
+    expect(parseRecipient(" Bo@Example.com ")).toEqual({ kind: "email", email: "bo@example.com" });
+  });
+
+  it("reads a username with or without the @", () => {
+    expect(parseRecipient("@ada_obi")).toEqual({ kind: "username", username: "ada_obi" });
+    expect(parseRecipient("ada.obi")).toEqual({ kind: "username", username: "ada.obi" });
+  });
+
+  it("rejects what is neither", () => {
+    expect(parseRecipient("not an email")).toBeNull();
+    expect(parseRecipient("@")).toBeNull();
+  });
+
+  it("sends the matching field", () => {
+    expect(recipientBody({ kind: "username", username: "ada" })).toEqual({ recipientUsername: "ada" });
+    expect(recipientBody({ kind: "email", email: "a@b.co" })).toEqual({ recipientEmail: "a@b.co" });
+  });
+});

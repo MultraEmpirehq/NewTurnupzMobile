@@ -26,6 +26,7 @@ import useUserStore, { TUser } from "@/shared/stores/user.store";
 import { DateOfBirthSVG } from "@/shared/assets/svg";
 import { format } from "date-fns";
 import DateModalComponent from "../date-modal/date-modal.component";
+import { adultAgeMessage, isAdultBirthDate } from "@/shared/utils/age";
 
 const DateOfBirthComponent = () => {
   const [isDateModalVisible, setIsDateModalVisible] = useState(false);
@@ -53,12 +54,15 @@ const DateOfBirthComponent = () => {
   }, [inputRef]);
 
   const handleContinueButtonClicked = useCallback(async () => {
-    setIsLoading(true);
     if (!dateOfBirth) {
       onError("Please select your date of birth");
       return;
     }
-    console.log("dateOfBirth", dateOfBirth);
+    if (!isAdultBirthDate(dateOfBirth)) {
+      onError(adultAgeMessage);
+      return;
+    }
+    setIsLoading(true);
     try {
       const { data } = await patchData<{ dateOfBirth: Date }, TUser>("/user", {
         dateOfBirth

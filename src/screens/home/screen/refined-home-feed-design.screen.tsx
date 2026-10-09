@@ -3,7 +3,6 @@ import {
   FlatList,
   Linking,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -13,10 +12,8 @@ import {
 } from "react-native";
 import { ImageSource } from "expo-image";
 import { StatusBar } from "expo-status-bar";
-import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import * as LocalAuthentication from "expo-local-authentication";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Circle, Path, Rect, Svg } from "react-native-svg";
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
@@ -31,8 +28,6 @@ import SearchIcon from "@/shared/assets/icons/search.icon";
 import CopyIcon from "@/shared/assets/icons/copy.icon";
 import CircleExclamationIcon from "@/shared/assets/icons/circle-exclamation.icon";
 import CheckIcon from "@/shared/assets/icons/check.icon";
-import EyeOutlineIcon from "@/shared/assets/icons/eye-open-outline.icon";
-import EyeSlashOutlineIcon from "@/shared/assets/icons/eye-slash-outline.icon";
 import ChevronLeftIcon from "@/shared/assets/icons/chevron-left.icon";
 import LocationIcon from "@/shared/assets/icons/location.icon";
 import GlobalChartImage from "@/shared/assets/images/Top Charts/Global/Global.png";
@@ -44,14 +39,8 @@ import SouthAmericanChartImage from "@/shared/assets/images/Top Charts/South Ame
 import AustralianChartImage from "@/shared/assets/images/Top Charts/Australian/Australian.png";
 import { TEventDetailsType } from "@/shared/utils/types";
 import { create } from "zustand";
-import TurnupzLogo from "@/shared/assets/images/turnupz-logo.png";
 import TurnupzWordmark from "@/shared/assets/images/turnupz.png blue.png";
 import GalleryActionIcon from "@/shared/assets/images/gallery-action-icon.png";
-import PrivacySecurityBanner from "@/shared/assets/images/privacy-security-banner.png";
-import BiometricLoginHero from "@/shared/assets/images/biometric-login-hero.png";
-import TwoFactorAuthHero from "@/shared/assets/images/two-factor-auth-hero.png";
-import VerificationCodeHero from "@/shared/assets/images/verification-code-hero.png";
-import VerificationSuccessHero from "@/shared/assets/images/verification-success-hero.png";
 import ContactAccessHero from "@/shared/assets/images/contact-access-hero.png";
 import EmptyChatHero from "@/shared/assets/images/empty-chat-hero.png";
 import EmptyWalletHero from "@/shared/assets/images/empty-wallet-hero.png";
@@ -62,14 +51,30 @@ import { useAccessibilityStore } from "@/shared/stores/accessibility.store";
 import { useWalletStore } from "@/shared/stores/wallet.store";
 import {
   createOrganizerConversationDraft,
-  getEventPublicUrl,
-  submitEventReport
+  getEventPublicUrl
 } from "@/screens/home/service/event-actions.service";
-import { constructErrorMessage } from "@/api/functions";
-import { formatEventClock, formatEventDay } from "@/shared/utils/event-time";
+import {
+  formatEventClock,
+  formatEventDay
+} from "@/shared/utils/event-time";
 import LiveEventDetailScreen from "@/screens/live/event-detail.screen";
 import LiveTicketCheckoutScreen from "@/screens/live/ticket-checkout.screen";
 import LiveMyTicketsScreen from "@/screens/live/my-tickets.screen";
+import LiveExploreScreen from "@/screens/live/explore.screen";
+import ProfileScreen from "@/screens/profile/profile.screen";
+import EventOptionsSheet, {
+  TEventOptionsTarget
+} from "@/screens/live/event-options.sheet";
+import { useHiddenEventsStore } from "@/shared/stores/hidden-events.store";
+import useUserStore from "@/shared/stores/user.store";
+import { PerformerProfileScreen as LivePerformerProfileScreen } from "@/screens/live/explore-details";
+import BrandRefreshList, {
+  TBrandRefreshListHandle
+} from "@/shared/components/brand-refresh/brand-refresh-list.component";
+import BrandLoader from "@/shared/components/brand-loader/brand-loader.component";
+import EventTicketCard, {
+  TICKET_LIST_BACKGROUND
+} from "@/screens/live/event-ticket-card";
 import {
   eventPlace,
   TLiveEvent,
@@ -98,6 +103,10 @@ type TFeedEvent = Omit<TEventDetailsType, "date"> & {
   mediaKind?: TFeedMediaKind;
   /** Set on live events; times then read on the venue's clock. */
   timezone?: string;
+  /** The event's category name, shown as a tag on the card's poster. */
+  category?: string;
+  /** Saved by the signed-in person (live events). */
+  isFavorite?: boolean;
 };
 
 type TBottomNavId =
@@ -363,7 +372,7 @@ type TVenue = {
 const FEED_EVENTS: TFeedEvent[] = [
   {
     id: "nexus-club-summer-set",
-    name: "Nexus Club Summer Set",
+    name: "Lagos Summer Concert Series",
     date: new Date("2026-10-01T20:00:00"),
     image:
       "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1200&q=80",
@@ -371,7 +380,7 @@ const FEED_EVENTS: TFeedEvent[] = [
       "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1200&q=80"
     ],
     totalTickets: 800,
-    organizerName: "Nexus Club",
+    organizerName: "Nexus Live",
     venueName: "The Arena",
     venueAddress: "Downtown",
     mediaKind: "image",
@@ -417,12 +426,12 @@ const FEED_EVENTS: TFeedEvent[] = [
     totalTickets: 240,
     organizerName: "Neon Sky",
     venueName: "Skyline Terrace",
-    venueAddress: "Rooftop District",
+    venueAddress: "Marina District",
     mediaKind: "video",
     venue: {
       id: "skyline-terrace",
       name: "Skyline Terrace",
-      address: "Rooftop District",
+      address: "Marina District",
       totalAvailableSeat: 240,
       images: []
     }
@@ -491,10 +500,10 @@ const EXPLORE_EVENTS_BY_CATEGORY: Record<string, TExploreEvent[]> = {
     },
     {
       id: "neon-pulse",
-      title: "Neon Pulse: Warehouse Rave",
-      venue: "District 9 Industrial Stage",
-      location: "Warehouse Row",
-      time: "Today, 11:00 PM",
+      title: "Lagos Startup Summit",
+      venue: "Landmark Centre",
+      location: "Victoria Island",
+      time: "Today, 10:00 AM",
       badge: "Live Now",
       image:
         "https://images.unsplash.com/photo-1505236858219-8359eb29e329?auto=format&fit=crop&w=900&q=80"
@@ -575,7 +584,7 @@ const EXPLORE_EVENTS_BY_CATEGORY: Record<string, TExploreEvent[]> = {
     },
     {
       id: "court-night",
-      title: "Hoops After Dark",
+      title: "City Hoops Finals",
       venue: "Arena Court",
       location: "Surulere",
       time: "Today, 08:00 PM",
@@ -586,7 +595,7 @@ const EXPLORE_EVENTS_BY_CATEGORY: Record<string, TExploreEvent[]> = {
     {
       id: "beach-volley",
       title: "Beach Volley Social",
-      venue: "Shoreline Club",
+      venue: "Shoreline Courts",
       location: "Oniru",
       time: "Today, 03:00 PM",
       image:
@@ -692,7 +701,7 @@ const PERFORMER_FILTER_LIBRARY: Record<
 > = {
   "All Performers": {
     names: [
-      "DJ Vector",
+      "Kemi Adé",
       "Elena Rose",
       "Marcus K.",
       "Zara Moon",
@@ -703,7 +712,7 @@ const PERFORMER_FILTER_LIBRARY: Record<
       "Kairo Flux",
       "Maya Vale"
     ],
-    roles: ["DJ", "Soul Artist", "Electronic", "Live Band", "Vocalist"],
+    roles: ["Vocalist", "Soul Artist", "Live Band", "Comedian", "Speaker"],
     avatars: [
       "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=180&q=80",
       "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=180&q=80",
@@ -894,7 +903,7 @@ const EVENT_PLANNERS: TEventPlanner[] = [
     id: "pulse-experiences",
     name: "Pulse Experiences",
     location: "Lagos, Nigeria",
-    specialty: "Concerts & nightlife",
+    specialty: "Concerts & live music",
     events: "24 upcoming events",
     image:
       "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=900&q=80"
@@ -910,9 +919,9 @@ const EVENT_PLANNERS: TEventPlanner[] = [
   },
   {
     id: "after-dark",
-    name: "After Dark Collective",
+    name: "Open Arts Collective",
     location: "London, UK",
-    specialty: "Music & culture",
+    specialty: "Arts & culture",
     events: "9 upcoming events",
     image:
       "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=900&q=80"
@@ -1014,7 +1023,7 @@ const PERFORMER_EVENTS: TPerformerEvent[] = [
 const MAP_EVENTS = [
   {
     id: "vibe-night",
-    title: "Vibe Night: Neon Pulse",
+    title: "Jazz in the Park",
     venue: "The Glass House",
     image:
       "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=500&q=80",
@@ -1049,7 +1058,7 @@ const MAP_EVENTS = [
 const FILTER_CATEGORIES = [
   "All",
   "Music",
-  "Nightlife",
+  "Comedy",
   "Arts",
   "Food",
   "Tech",
@@ -1086,8 +1095,8 @@ const CHAT_STORIES: TChatContact[] = [
 const CHAT_CONVERSATIONS: TConversation[] = [
   {
     id: "warehouse-rave",
-    title: "Warehouse Rave Crew",
-    subtitle: "Yo, who's bringing the extra lighting gear tonight?",
+    title: "Tech Fest Crew",
+    subtitle: "Who's bringing the extra power banks tomorrow?",
     time: "12:45 PM",
     avatar:
       "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=160&q=80",
@@ -1098,7 +1107,7 @@ const CHAT_CONVERSATIONS: TConversation[] = [
   },
   {
     id: "midnight",
-    title: "Midnight Sessions",
+    title: "Saturday Run Club",
     subtitle: "Alex: See you guys at the main entrance.",
     time: "10:20 AM",
     avatar:
@@ -1110,7 +1119,7 @@ const CHAT_CONVERSATIONS: TConversation[] = [
   {
     id: "sarah",
     title: "Sarah Jenkins",
-    subtitle: "That set was absolutely mental!",
+    subtitle: "That talk was brilliant!",
     time: "Yesterday",
     avatar: CHAT_STORIES[0].avatar,
     unread: 1,
@@ -1118,7 +1127,7 @@ const CHAT_CONVERSATIONS: TConversation[] = [
   },
   {
     id: "sunset",
-    title: "Sunset Rooftop Party",
+    title: "Sunset Food Festival",
     subtitle: "You: Sent a photo",
     time: "Yesterday",
     avatar:
@@ -1157,33 +1166,38 @@ const INVITE_CONTACTS = [
 ];
 
 const ACTIVE_NAV_COLOR = "#00B2FF";
+/** How many events the home feed fetches at a time. */
+const HOME_FEED_BATCH = 10;
 const INACTIVE_NAV_COLOR = "#27272a";
+
+/** The bottom bar is icons only (labels are an accessibility option). */
+const NAV_ICON_SIZE = 27;
 
 const BOTTOM_NAV_ITEMS: TBottomNavItem[] = [
   {
     id: "home",
     label: "Home",
-    renderIcon: (color) => <HomeIcon size={22} color={color} />
+    renderIcon: (color) => <HomeIcon size={NAV_ICON_SIZE} color={color} />
   },
   {
     id: "search",
     label: "Explore",
-    renderIcon: (color) => <SearchIcon size={22} color={color} />
+    renderIcon: (color) => <SearchIcon size={NAV_ICON_SIZE} color={color} />
   },
   {
     id: "messages",
     label: "Messages",
-    renderIcon: (color) => <MessageIcon size={22} color={color} />
+    renderIcon: (color) => <MessageIcon size={NAV_ICON_SIZE} color={color} />
   },
   {
     id: "favorites",
     label: "Notifications",
-    renderIcon: (color) => <HeartOutlineIcon size={22} color={color} />
+    renderIcon: (color) => <HeartOutlineIcon size={NAV_ICON_SIZE} color={color} />
   },
   {
     id: "profile",
     label: "Profile",
-    renderIcon: (color) => <UserOutlineIcon size={22} color={color} />
+    renderIcon: (color) => <UserOutlineIcon size={NAV_ICON_SIZE} color={color} />
   }
 ];
 
@@ -1333,6 +1347,8 @@ const toLiveFeedEvent = (event: TLiveEvent): TFeedEvent => ({
   venueAddress: event.venue?.address ?? "",
   mediaKind: "image",
   timezone: event.timezone,
+  category: event.category?.name,
+  isFavorite: event.isFavorite,
   description: event.description,
   venue: {
     id: event.venue?.id ?? `${event.id}-venue`,
@@ -1360,11 +1376,11 @@ const PreviewBottomNav = ({
       className={
         highContrast
           ? buttonLabels
-            ? "h-[72px] flex-row items-center justify-between border-t-2 border-white bg-black px-3"
-            : "h-[64px] flex-row items-center justify-between border-t-2 border-white bg-black px-5"
+            ? "h-[76px] flex-row items-center justify-between border-t-2 border-white bg-black px-3"
+            : "h-[68px] flex-row items-center justify-around border-t-2 border-white bg-black px-2"
           : buttonLabels
-            ? "h-[72px] flex-row items-center justify-between border-t border-zinc-200 bg-white px-3"
-            : "h-[64px] flex-row items-center justify-between border-t border-zinc-200 bg-white px-5"
+            ? "h-[76px] flex-row items-center justify-between border-t border-zinc-200 bg-white px-3"
+            : "h-[68px] flex-row items-center justify-around border-t border-zinc-200 bg-white px-2"
       }
     >
       {BOTTOM_NAV_ITEMS.map((item) => {
@@ -1390,10 +1406,17 @@ const PreviewBottomNav = ({
             className={
               buttonLabels
                 ? "h-14 min-w-14 items-center justify-center"
-                : "size-11 items-center justify-center"
+                : "size-14 items-center justify-center rounded-full"
             }
           >
             {item.renderIcon(color)}
+            {/* Icons only: a dot marks where you are. */}
+            {!buttonLabels && (
+              <View
+                className="mt-1 size-1.5 rounded-full"
+                style={{ backgroundColor: isActive ? color : "transparent" }}
+              />
+            )}
             {buttonLabels && (
               <TextComponent
                 className={
@@ -4080,7 +4103,7 @@ const ExploreMapScreen = ({ onBack }: { onBack: () => void }) => {
             <View className="ml-3 flex-1">
               <View className="mb-1 self-start rounded bg-primary px-2 py-1">
                 <TextComponent className="text-[10px] font-bold text-white">
-                  TONIGHT
+                  TODAY
                 </TextComponent>
               </View>
               <TextComponent className="text-base font-bold text-zinc-950">
@@ -5498,474 +5521,6 @@ const ExploreDirectoryCard = ({ image, title, subtitle, onPress }: { image: stri
   </Pressable>
 );
 
-const ExploreContent = ({
-  onMessageOrganizer,
-  onShareWithCommunity
-}: {
-  onMessageOrganizer: (event: TFeedEvent) => void;
-  onShareWithCommunity: (event: TFeedEvent) => void;
-}) => {
-  const hiddenEventIds = usePrototypeSocialStore(
-    (state) => state.hiddenEventIds
-  );
-  const [mode, setMode] = useState<TExploreMode>("feed");
-  const [activeCategory, setActiveCategory] = useState("All");
-  const [selectedChart, setSelectedChart] = useState<TTopChart>(TOP_CHARTS[0]);
-  const [selectedVenue, setSelectedVenue] = useState<TVenue>(
-    VENUES_NEAR_YOU[0]
-  );
-  const [selectedPlanner, setSelectedPlanner] = useState<TEventPlanner>(
-    EVENT_PLANNERS[0]
-  );
-  const [query, setQuery] = useState("");
-  const [isSubtabExpanded, setIsSubtabExpanded] = useState(false);
-  const [selectedExploreFeedEvent, setSelectedExploreFeedEvent] =
-    useState<TFeedEvent | null>(null);
-  const [selectedExploreBookingEvent, setSelectedExploreBookingEvent] =
-    useState<TPerformerEvent | null>(null);
-  const [exploreBookingMode, setExploreBookingMode] = useState<
-    "detail" | "ticket" | "register"
-  >("detail");
-  const rawCategoryEvents =
-    EXPLORE_EVENTS_BY_CATEGORY[activeCategory] ||
-    EXPLORE_EVENTS_BY_CATEGORY.All;
-  const categoryEvents = useMemo(
-    () =>
-      rawCategoryEvents.filter(
-        (event) =>
-          !hiddenEventIds.includes(event.id) &&
-          matchesSearch(query, [
-            event.title,
-            event.venue,
-            event.location,
-            event.time,
-            event.badge
-          ])
-      ),
-    [hiddenEventIds, query, rawCategoryEvents]
-  );
-  const venues = useMemo(
-    () =>
-      VENUES_NEAR_YOU.filter((venue) =>
-        matchesSearch(query, [venue.title, venue.location])
-      ),
-    [query]
-  );
-  const featuredEvents = useMemo(
-    () =>
-      FEATURED_EVENTS.filter((event) =>
-        matchesSearch(query, [event.title, event.meta])
-      ),
-    [query]
-  );
-  const isAllCategory = activeCategory === "All";
-
-  const openChartDetail = (chart: TTopChart) => {
-    setSelectedChart(chart);
-    setMode("chart-detail");
-  };
-  const openExploreEventDetails = (event: TExploreEvent, index = 0) => {
-    setSelectedExploreBookingEvent(toBookingEvent(toFeedEvent(event, index)));
-    setExploreBookingMode("detail");
-  };
-
-  if (selectedExploreBookingEvent && exploreBookingMode === "ticket") {
-    return (
-      <TicketSelectionScreen
-        event={selectedExploreBookingEvent}
-        onBack={() => setExploreBookingMode("detail")}
-      />
-    );
-  }
-
-  if (selectedExploreBookingEvent && exploreBookingMode === "register") {
-    return (
-      <RegistrationFormScreen
-        event={selectedExploreBookingEvent}
-        onBack={() => setExploreBookingMode("detail")}
-      />
-    );
-  }
-
-  if (selectedExploreBookingEvent) {
-    return (
-      <EventBookingDetailScreen
-        event={selectedExploreBookingEvent}
-        onBack={() => setSelectedExploreBookingEvent(null)}
-        onTicket={() => setExploreBookingMode("ticket")}
-        onRegister={() => setExploreBookingMode("register")}
-        onShareEvent={onShareWithCommunity}
-        onContactOrganizer={onMessageOrganizer}
-      />
-    );
-  }
-
-  if (mode === "charts") {
-    return (
-      <TopPerformersChartsScreen
-        onBack={() => setMode("feed")}
-        onSelectChart={openChartDetail}
-      />
-    );
-  }
-
-  if (mode === "chart-detail") {
-    return (
-      <TopPerformersDetailScreen
-        chart={selectedChart}
-        onBack={() => setMode("charts")}
-      />
-    );
-  }
-
-  if (mode === "map") {
-    return <ExploreMapScreen onBack={() => setMode("feed")} />;
-  }
-
-  if (mode === "filter") {
-    return (
-      <ExploreFilterScreen
-        onBack={() => setMode("feed")}
-        onApply={(selectedCategories) => {
-          const selected = selectedCategories.find((item) => item !== "All");
-          if (selected && CATEGORIES.includes(selected)) {
-            setActiveCategory(selected as TExploreCategory);
-          } else {
-            setActiveCategory("All");
-          }
-          setQuery("");
-          setMode("feed");
-        }}
-      />
-    );
-  }
-
-  if (mode === "event-list") {
-    return (
-      <EventFeedListScreen
-        title={isAllCategory ? "Happening Today" : "Upcoming Events"}
-        description={
-          isAllCategory
-            ? "Discover the hottest events around you right now."
-            : `Explore upcoming ${activeCategory.toLowerCase()} events around you.`
-        }
-        events={categoryEvents}
-        onBack={() => setMode("feed")}
-        onMessageOrganizer={onMessageOrganizer}
-        onShareWithCommunity={onShareWithCommunity}
-      />
-    );
-  }
-
-  if (mode === "venue-list") {
-    return (
-      <View className="flex-1 bg-zinc-50">
-        <ExploreDirectoryHeader title="Venues Near You" query={query} onQueryChange={setQuery} onBack={() => { setQuery(""); setMode("feed"); }} />
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerClassName="flex-row flex-wrap justify-between px-4 pb-8 pt-2">
-          {venues.map((venue) => (
-            <ExploreDirectoryCard key={venue.id} image={venue.image} title={venue.title} subtitle={`${venue.location} · ${venue.activeEvents} active events`} onPress={() => { setSelectedVenue(venue); setQuery(""); setMode("venue-detail"); }} />
-          ))}
-          {venues.length === 0 && <TextComponent className="w-full py-16 text-center text-sm text-zinc-500">No venues match your search.</TextComponent>}
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (mode === "planner-list") {
-    const visiblePlanners = EVENT_PLANNERS.filter((planner) => matchesSearch(query, [planner.name, planner.location, planner.specialty]));
-    return (
-      <View className="flex-1 bg-zinc-50">
-        <ExploreDirectoryHeader title="Event Planners" query={query} onQueryChange={setQuery} onBack={() => { setQuery(""); setMode("feed"); }} />
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerClassName="flex-row flex-wrap justify-between px-4 pb-8 pt-2">
-          {visiblePlanners.map((planner) => (
-            <ExploreDirectoryCard key={planner.id} image={planner.image} title={planner.name} subtitle={`${planner.location} · ${planner.events}`} onPress={() => { setSelectedPlanner(planner); setQuery(""); setMode("planner-detail"); }} />
-          ))}
-          {visiblePlanners.length === 0 && <TextComponent className="w-full py-16 text-center text-sm text-zinc-500">No event planners match your search.</TextComponent>}
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (mode === "venue-detail") {
-    return (
-      <VenueDetailScreen venue={selectedVenue} onBack={() => setMode("feed")} />
-    );
-  }
-
-  if (mode === "planner-detail") {
-    return (
-      <EventPlannerDetailScreen
-        planner={selectedPlanner}
-        onBack={() => setMode("feed")}
-      />
-    );
-  }
-
-  return (
-    <View className="flex-1 bg-white">
-      <View className="px-4 pb-2 pt-3">
-        <View className="h-10 flex-row items-center rounded-md bg-zinc-100 px-3">
-          <SearchIcon size={16} color="#8a8f98" />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search events, venues..."
-            placeholderTextColor="#8a8f98"
-            className="ml-2 flex-1 p-0 text-xs text-zinc-700 outline-none"
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Open filters"
-            onPress={() => setMode("filter")}
-            className="size-6 items-center justify-center"
-          >
-            <FilterSlidersIcon size={20} />
-          </Pressable>
-        </View>
-      </View>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerClassName="px-4 pb-5"
-      >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerClassName="gap-2 py-2"
-        >
-          {CATEGORIES.map((category) => {
-            const isActive = activeCategory === category;
-
-            return (
-              <Pressable
-                key={category}
-                onPress={() => {
-                  setActiveCategory(category);
-                  setIsSubtabExpanded(false);
-                }}
-                className={
-                  isActive
-                    ? "rounded-full bg-primary px-4 py-2"
-                    : "rounded-full bg-zinc-100 px-4 py-2"
-                }
-              >
-                <TextComponent
-                  className={
-                    isActive
-                      ? "text-xs font-semibold text-white"
-                      : "text-xs font-semibold text-zinc-500"
-                  }
-                >
-                  {category}
-                </TextComponent>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        {isAllCategory ? (
-          <>
-            <View className="mt-2">
-              <SectionHeader
-                title="Happening Today"
-                action="See All"
-                onActionPress={() => setMode("event-list")}
-              />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {categoryEvents.map((event, index) => {
-                  const feedEvent = toFeedEvent(event, index);
-
-                  return (
-                    <View key={event.id} className="mr-3 w-[186px]">
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`Open ${event.title}`}
-                        onPress={() => openExploreEventDetails(event, index)}
-                      >
-                        <CustomImage
-                          className="h-[124px] w-full rounded-md"
-                          imageClassName="size-full rounded-md"
-                          source={{ uri: event.image }}
-                          contentFit="cover"
-                        />
-                      </Pressable>
-                      <View className="mt-2 flex-row items-start">
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`Open details for ${event.title}`}
-                          onPress={() => openExploreEventDetails(event, index)}
-                          className="flex-1"
-                        >
-                          <TextComponent
-                            numberOfLines={1}
-                            className="text-sm font-bold text-zinc-950"
-                          >
-                            {event.title}
-                          </TextComponent>
-                          <TextComponent
-                            numberOfLines={1}
-                            className="text-xs text-zinc-600"
-                          >
-                            {event.venue} - {event.time}
-                          </TextComponent>
-                        </Pressable>
-                        <MoreButton
-                          onPress={() => setSelectedExploreFeedEvent(feedEvent)}
-                        />
-                      </View>
-                    </View>
-                  );
-                })}
-              </ScrollView>
-            </View>
-
-            <View className="mt-4">
-              <SectionHeader
-                title="Top Performers"
-                action="View Charts"
-                onActionPress={() => setMode("charts")}
-              />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {TOP_CHARTS.slice(0, 3).map((chart) => (
-                  <Pressable
-                    key={chart.id}
-                    onPress={() => openChartDetail(chart)}
-                  >
-                    <SmallMediaCard
-                      image={chart.image}
-                      icon={<ChartRegionIcon chartId={chart.id} size={12} />}
-                      title={`${chart.title} Chart`}
-                    />
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-
-            <View className="mt-4">
-              <SectionHeader title="Venues Near You" action="See All" onActionPress={() => { setQuery(""); setMode("venue-list"); }} />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {venues.map((item) => (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => {
-                      setSelectedVenue(item);
-                      setMode("venue-detail");
-                    }}
-                  >
-                    <SmallMediaCard {...item} />
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-
-            <View className="mt-4">
-              <SectionHeader title="Event Planners" action="See All" onActionPress={() => { setQuery(""); setMode("planner-list"); }} />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {EVENT_PLANNERS.map((planner) => (
-                  <Pressable
-                    key={planner.id}
-                    onPress={() => {
-                      setSelectedPlanner(planner);
-                      setMode("planner-detail");
-                    }}
-                  >
-                    <SmallMediaCard
-                      image={planner.image}
-                      title={planner.name}
-                    />
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-
-            <View className="mt-4">
-              <SectionHeader title="Featured Events" />
-              {featuredEvents.map((event) => (
-                <Pressable
-                  key={event.id}
-                  className="overflow-hidden rounded-lg"
-                >
-                  <View className="relative h-[146px]">
-                    <CustomImage
-                      className="size-full"
-                      imageClassName="size-full"
-                      source={{ uri: event.image }}
-                      contentFit="cover"
-                    />
-                    <View className="absolute inset-0 justify-end bg-black/35 p-4">
-                      <View className="mb-2 self-start rounded bg-amber-300 px-2 py-1">
-                        <TextComponent className="text-[10px] font-bold text-amber-950">
-                          EDITOR'S CHOICE
-                        </TextComponent>
-                      </View>
-                      <TextComponent className="text-xl font-bold text-white">
-                        {event.title}
-                      </TextComponent>
-                      <TextComponent className="mt-1 text-xs text-white">
-                        {event.meta}
-                      </TextComponent>
-                    </View>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-          </>
-        ) : (
-          <>
-            <View className="mt-4">
-              <SectionHeader title="Upcoming Events" action="See All" onActionPress={() => setMode("event-list")} />
-              {categoryEvents.slice(0, 2).map((event, index) => (
-                <UpcomingEventSummary
-                  key={event.id}
-                  event={event}
-                  index={index}
-                  onOpenEvent={() => openExploreEventDetails(event, index)}
-                  onMessageOrganizer={() =>
-                    onMessageOrganizer(toFeedEvent(event, index))
-                  }
-                />
-              ))}
-            </View>
-
-            <View className="mt-4">
-              <SectionHeader
-                title="Future Events"
-                action={isSubtabExpanded ? "Collapse" : "See All"}
-                onActionPress={() => setIsSubtabExpanded((current) => !current)}
-              />
-              {isSubtabExpanded ? (
-                <View className="overflow-hidden rounded-xl border border-zinc-100">
-                  {categoryEvents.map((event, index) => (
-                    <FeedCard
-                      key={event.id}
-                      event={toFeedEvent(event, index)}
-                      onOpenSettings={setSelectedExploreFeedEvent}
-                      onOpenDetails={(event) => {
-                        setSelectedExploreBookingEvent(toBookingEvent(event));
-                        setExploreBookingMode("detail");
-                      }}
-                    />
-                  ))}
-                </View>
-              ) : (
-                <EventMosaic
-                  events={categoryEvents}
-                  onOpen={openExploreEventDetails}
-                />
-              )}
-            </View>
-          </>
-        )}
-      </ScrollView>
-      <SettingsSheet
-        event={selectedExploreFeedEvent}
-        onClose={() => setSelectedExploreFeedEvent(null)}
-        onMessageOrganizer={onMessageOrganizer}
-        onShareWithCommunity={onShareWithCommunity}
-      />
-    </View>
-  );
-};
 
 const ChatSearch = ({
   value,
@@ -7103,7 +6658,7 @@ const PrivateChatScreen = ({
           {
             id: "4",
             mine: false,
-            text: "Look at the stage setup from last night. It's going to be insane tonight.",
+            text: "Look at the stage setup they just finished. It's going to be amazing today.",
             time: "10:52 AM"
           }
         ]
@@ -7245,7 +6800,7 @@ const PrivateChatScreen = ({
               {contextualEvent?.name ||
                 (isEventGroup
                   ? "Calabar Carnival 2024"
-                  : "Rooftop Summer Series")}
+                  : "Summer Concert Series")}
             </TextComponent>
             <TextComponent className="mt-1 text-xs text-zinc-500">
               {contextualEvent
@@ -8981,7 +8536,7 @@ const ChatContent = ({
           </View>
           {publicProfileTab === "Following" ? (
             <View className="mt-4 gap-2">
-              {["Neon Pulse Festival", "The Warehouse", "DJ Nova"].map(
+              {["Lagos Tech Fest", "Open Arts Collective", "Kemi Adé"].map(
                 (name) => (
                   <View
                     key={name}
@@ -10453,404 +10008,6 @@ const ProfileStat = ({
   </Pressable>
 );
 
-const WalletContent = ({ onBack }: { onBack: () => void }) => {
-  const allCards = useWalletStore((state) => state.cards);
-  const allTransactions = useWalletStore((state) => state.transactions);
-  const refundCredits = useWalletStore((state) => state.refundCredits);
-  const promotionalCredits = useWalletStore(
-    (state) => state.promotionalCredits
-  );
-  const addCard = useWalletStore((state) => state.addCard);
-  const updateCard = useWalletStore((state) => state.updateCard);
-  const removeCard = useWalletStore((state) => state.removeCard);
-  const [tab, setTab] = useState<"transactions" | "cards">("transactions");
-  const [addingCard, setAddingCard] = useState(false);
-  const [editingCardId, setEditingCardId] = useState<string | null>(null);
-  const [showRefundInfo, setShowRefundInfo] = useState(false);
-  const [walletQuery, setWalletQuery] = useState("");
-  const [holder, setHolder] = useState("");
-  const [number, setNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvv, setCvv] = useState("");
-  const lastFour = number.replace(/\D/g, "").slice(-4) || "0000";
-  const transactions = allTransactions.filter((item) =>
-    matchesSearch(walletQuery, [item.title, item.detail])
-  );
-  const cards = allCards.filter((card) =>
-    matchesSearch(walletQuery, [card.brand, card.lastFour, card.holder])
-  );
-  const submitCard = () => {
-    if (!holder.trim() || number.replace(/\D/g, "").length < 4 || !expiry)
-      return;
-    const card = {
-      id: editingCardId || `wallet-card-${Date.now()}`,
-      brand: "Card",
-      lastFour,
-      expiry,
-      holder: holder.trim()
-    };
-    if (editingCardId) updateCard(card);
-    else addCard(card);
-    setAddingCard(false);
-    setEditingCardId(null);
-    setTab("cards");
-  };
-  const beginAddCard = () => {
-    setEditingCardId(null);
-    setHolder("");
-    setNumber("");
-    setExpiry("");
-    setCvv("");
-    setAddingCard(true);
-  };
-  const beginEditCard = (card: {
-    id: string;
-    holder: string;
-    lastFour: string;
-    expiry: string;
-  }) => {
-    setEditingCardId(card.id);
-    setHolder(card.holder);
-    setNumber(card.lastFour);
-    setExpiry(card.expiry);
-    setCvv("");
-    setAddingCard(true);
-  };
-  const deleteEditingCard = () => {
-    if (!editingCardId) return;
-    removeCard(editingCardId);
-    setEditingCardId(null);
-    setAddingCard(false);
-    setTab("cards");
-  };
-
-  if (addingCard) {
-    return (
-      <View className="flex-1 bg-zinc-50">
-        <View className="h-14 flex-row items-center border-b border-zinc-100 bg-white px-3">
-          <Pressable
-            onPress={() => {
-              setAddingCard(false);
-              setEditingCardId(null);
-            }}
-            className="size-9 items-center justify-center"
-          >
-            <ChevronLeftIcon size={18} color="#52525b" />
-          </Pressable>
-          <TextComponent className="flex-1 text-center font-bold text-zinc-950">
-            {editingCardId ? "Edit Card" : "Add Card"}
-          </TextComponent>
-          <View className="size-9" />
-        </View>
-        <ScrollView contentContainerClassName="p-4 pb-8">
-          <View className="rounded-2xl bg-[#06465a] p-5">
-            <TextComponent className="text-[10px] text-cyan-100">
-              NAME
-            </TextComponent>
-            <TextComponent className="mt-1 font-bold text-white">
-              {holder || "Your Name"}
-            </TextComponent>
-            <TextComponent className="mt-2 text-lg font-bold tracking-widest text-white">
-              **** **** **** {lastFour}
-            </TextComponent>
-            <View className="mt-5 flex-row justify-between">
-              <TextComponent className="text-[10px] text-cyan-100">
-                CVV {cvv ? "***" : "***"}
-              </TextComponent>
-              <TextComponent className="text-xs text-white">
-                {expiry || "MM/YY"}
-              </TextComponent>
-            </View>
-          </View>
-          {[
-            {
-              label: "Name on Card",
-              value: holder,
-              setter: setHolder,
-              placeholder: "Full Name"
-            },
-            {
-              label: "Card Number",
-              value: number,
-              setter: setNumber,
-              placeholder: "0000 0000 0000 0000"
-            },
-            {
-              label: "Expiry Date",
-              value: expiry,
-              setter: setExpiry,
-              placeholder: "MM/YY"
-            },
-            { label: "CVV", value: cvv, setter: setCvv, placeholder: "•••" }
-          ].map((field) => (
-            <View key={field.label} className="mt-4">
-              <TextComponent className="mb-2 text-xs font-bold text-zinc-600">
-                {field.label}
-              </TextComponent>
-              <TextInput
-                value={field.value}
-                onChangeText={field.setter}
-                placeholder={field.placeholder}
-                placeholderTextColor="#c4c7d0"
-                className="h-12 rounded-xl bg-white px-4 text-sm text-zinc-900 outline-none"
-              />
-            </View>
-          ))}
-          <Pressable
-            onPress={submitCard}
-            className="mt-8 h-12 items-center justify-center rounded-lg bg-primary"
-          >
-            <TextComponent className="font-bold text-white">
-              {editingCardId ? "Save Card" : "Add Card"}
-            </TextComponent>
-          </Pressable>
-          {editingCardId && (
-            <Pressable
-              onPress={deleteEditingCard}
-              className="mt-3 h-12 items-center justify-center rounded-lg bg-red-50"
-            >
-              <TextComponent className="font-bold text-red-500">
-                Delete Card
-              </TextComponent>
-            </Pressable>
-          )}
-        </ScrollView>
-      </View>
-    );
-  }
-
-  return (
-    <View className="flex-1 bg-zinc-50">
-      <View className="h-14 flex-row items-center border-b border-zinc-100 bg-white px-3">
-        <Pressable
-          onPress={onBack}
-          className="size-9 items-center justify-center"
-        >
-          <ChevronLeftIcon size={18} color="#52525b" />
-        </Pressable>
-        <TextComponent className="flex-1 text-center font-bold text-zinc-950">
-          Wallet
-        </TextComponent>
-        <View className="size-9" />
-      </View>
-      <ScrollView contentContainerClassName="p-4 pb-24">
-        <View className="flex-row gap-3">
-          <View className="flex-1 rounded-xl bg-primary p-4">
-            <View className="flex-row items-center justify-between">
-              <TextComponent className="text-[10px] uppercase text-white/80">
-                Refund credits
-              </TextComponent>
-              <Pressable
-                onPress={() => setShowRefundInfo((current) => !current)}
-                accessibilityLabel="Refund credit information"
-                className="size-6 items-center justify-center rounded-full border border-white/70"
-              >
-                <TextComponent className="text-xs font-bold text-white">
-                  i
-                </TextComponent>
-              </Pressable>
-            </View>
-            <TextComponent className="mt-4 text-2xl font-bold text-white">
-              ₦{refundCredits.toLocaleString()}
-            </TextComponent>
-            <TextComponent className="mt-1 text-[10px] text-white/70">
-              From eligible refunds
-            </TextComponent>
-          </View>
-          <View className="flex-1 rounded-xl bg-[#06465a] p-4">
-            <TextComponent className="text-[10px] uppercase text-white/80">
-              Turnupz credit
-            </TextComponent>
-            <TextComponent className="mt-4 text-2xl font-bold text-white">
-              ₦{promotionalCredits.toLocaleString()}
-            </TextComponent>
-            <TextComponent className="mt-1 text-[10px] text-white/70">
-              Offers and rewards
-            </TextComponent>
-          </View>
-        </View>
-        <View className="mt-5 h-11 flex-row items-center rounded-xl bg-zinc-100 px-3">
-          <SearchIcon size={15} color="#a1a1aa" />
-          <TextInput
-            value={walletQuery}
-            onChangeText={setWalletQuery}
-            placeholder={
-              tab === "transactions"
-                ? "Search transactions"
-                : "Search saved cards"
-            }
-            placeholderTextColor="#a1a1aa"
-            className="ml-2 flex-1 text-xs outline-none"
-          />
-        </View>
-        <View className="mt-5 flex-row rounded-full bg-zinc-200 p-1">
-          {(["transactions", "cards"] as const).map((item) => (
-            <Pressable
-              key={item}
-              onPress={() => setTab(item)}
-              className={
-                tab === item
-                  ? "h-9 flex-1 items-center justify-center rounded-full bg-primary"
-                  : "h-9 flex-1 items-center justify-center rounded-full"
-              }
-            >
-              <TextComponent
-                className={
-                  tab === item
-                    ? "text-xs font-bold capitalize text-white"
-                    : "text-xs font-semibold capitalize text-zinc-600"
-                }
-              >
-                {item}
-              </TextComponent>
-            </Pressable>
-          ))}
-        </View>
-        {tab === "transactions" ? (
-          transactions.length ? (
-            <View className="mt-5 gap-3">
-              {transactions.map((transaction) => (
-                <View
-                  key={transaction.id}
-                  className="flex-row items-center rounded-xl bg-white p-4"
-                >
-                  <View className="size-10 items-center justify-center rounded-lg bg-blue-50">
-                    <TicketVectorIcon size={18} color={ACTIVE_NAV_COLOR} />
-                  </View>
-                  <View className="ml-3 flex-1">
-                    <TextComponent className="font-bold text-zinc-800">
-                      {transaction.title}
-                    </TextComponent>
-                    <TextComponent className="mt-1 text-[10px] text-zinc-500">
-                      {transaction.detail}
-                    </TextComponent>
-                  </View>
-                  <TextComponent className="font-bold text-red-500">
-                    -₦{Math.abs(transaction.amount).toLocaleString()}
-                  </TextComponent>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View className="items-center px-8 py-16">
-              <CustomImage
-                className="size-40"
-                imageClassName="size-full"
-                source={EmptyWalletHero}
-                contentFit="contain"
-              />
-              <TextComponent className="mt-6 text-lg font-bold text-zinc-900">
-                No transactions yet
-              </TextComponent>
-              <TextComponent className="mt-2 text-center text-xs leading-5 text-zinc-500">
-                Your ticket purchases and activity will appear here once you
-                start using your wallet.
-              </TextComponent>
-            </View>
-          )
-        ) : cards.length ? (
-          <View className="mt-5 gap-3">
-            {cards.map((card) => (
-              <Pressable
-                onPress={() => beginEditCard(card)}
-                key={card.id}
-                className="rounded-xl bg-[#06465a] p-5"
-              >
-                <View className="flex-row justify-between">
-                  <View>
-                    <TextComponent className="text-[10px] text-cyan-100">
-                      NAME
-                    </TextComponent>
-                    <TextComponent className="mt-1 font-bold text-white">
-                      {card.holder}
-                    </TextComponent>
-                  </View>
-                  <TextComponent className="font-bold text-white">
-                    {card.brand}
-                  </TextComponent>
-                </View>
-                <TextComponent className="mt-3 text-lg font-bold tracking-widest text-white">
-                  **** **** **** {card.lastFour}
-                </TextComponent>
-                <View className="mt-4 flex-row justify-between">
-                  <TextComponent className="text-[10px] text-cyan-100">
-                    CVV ***
-                  </TextComponent>
-                  <TextComponent className="text-xs text-white">
-                    {card.expiry}
-                  </TextComponent>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        ) : (
-          <View className="items-center px-8 py-16">
-            <CustomImage
-              className="size-40"
-              imageClassName="size-full"
-              source={EmptyWalletHero}
-              contentFit="contain"
-            />
-            <TextComponent className="mt-6 text-lg font-bold text-zinc-900">
-              No Cards to display.
-            </TextComponent>
-            <TextComponent className="mt-2 text-center text-xs leading-5 text-zinc-500">
-              Use the button below to add your card for future ticket payments.
-            </TextComponent>
-          </View>
-        )}
-      </ScrollView>
-      <Pressable
-        onPress={beginAddCard}
-        accessibilityLabel="Add card"
-        className="absolute bottom-6 right-5 size-14 items-center justify-center rounded-full bg-primary shadow-lg"
-      >
-        <Svg width={24} height={24} viewBox="0 0 24 24">
-          <Path
-            d="M12 5v14M5 12h14"
-            stroke="#ffffff"
-            strokeWidth={2}
-            strokeLinecap="round"
-          />
-        </Svg>
-      </Pressable>
-      {showRefundInfo && (
-        <View className="absolute inset-0 items-center justify-center bg-black/45 px-5">
-          <View className="w-full rounded-2xl bg-white p-5">
-            <View className="flex-row items-center justify-between">
-              <TextComponent className="text-base font-bold text-zinc-950">
-                About Refund Credit
-              </TextComponent>
-              <Pressable
-                onPress={() => setShowRefundInfo(false)}
-                accessibilityLabel="Close refund credit information"
-                className="size-8 items-center justify-center rounded-full bg-zinc-100"
-              >
-                <TextComponent className="text-lg text-zinc-600">
-                  ×
-                </TextComponent>
-              </Pressable>
-            </View>
-            <TextComponent className="mt-4 text-sm leading-6 text-zinc-600">
-              A non-transferable platform credit that may only be applied toward
-              eligible purchases through TurnUpz. It cannot be withdrawn as cash
-              or sent to another user, except where applicable law requires a
-              monetary refund.
-            </TextComponent>
-            <Pressable
-              onPress={() => setShowRefundInfo(false)}
-              className="mt-5 h-11 items-center justify-center rounded-lg bg-primary"
-            >
-              <TextComponent className="font-bold text-white">
-                Got it
-              </TextComponent>
-            </Pressable>
-          </View>
-        </View>
-      )}
-    </View>
-  );
-};
 
 const SettingsSwitch = ({
   enabled,
@@ -10882,2423 +10039,6 @@ const SettingsSwitch = ({
   </Pressable>
 );
 
-const ProfileContent = ({
-  bookings,
-  onOpenTickets,
-  onOpenEvents,
-  onOpenHome,
-  onMessageOrganizer,
-  onShareWithCommunity
-}: {
-  bookings: TBookedEvent[];
-  onOpenTickets: () => void;
-  onOpenEvents: () => void;
-  onOpenHome: () => void;
-  onMessageOrganizer: (event: TFeedEvent) => void;
-  onShareWithCommunity: (event: TFeedEvent) => void;
-}) => {
-  const [mode, setMode] = useState<
-    | "profile"
-    | "settings"
-    | "wallet"
-    | "accessibility"
-    | "edit-profile"
-    | "camera"
-    | "notifications-settings"
-    | "in-app-notifications"
-    | "media"
-    | "privacy"
-    | "blocked-contacts"
-    | "language"
-    | "security"
-    | "change-password"
-    | "forgot-password"
-    | "two-factor"
-    | "two-factor-code"
-    | "two-factor-success"
-    | "biometric"
-    | "login-activity"
-    | "help-center"
-  >("profile");
-  const [notificationSettings, setNotificationSettings] = useState({
-    showNotifications: true,
-    previewMessage: true,
-    readReceipts: true,
-    lastSeen: false,
-    wifiDownload: true
-  });
-  const [mediaQuality, setMediaQuality] = useState<
-    "Auto" | "Data Saver" | "Best Quality"
-  >("Best Quality");
-  const [securitySettings, setSecuritySettings] = useState({
-    twoFactor: true,
-    biometric: false
-  });
-  const [settingsFeedback, setSettingsFeedback] = useState("");
-  const [inAppStyle, setInAppStyle] = useState<"None" | "Banners" | "Alerts">(
-    "Banners"
-  );
-  const [inAppOptions, setInAppOptions] = useState({
-    sound: true,
-    vibrate: true
-  });
-  const [language, setLanguage] = useState("English (Canada)");
-  const [languageQuery, setLanguageQuery] = useState("");
-  const [privacySettings, setPrivacySettings] = useState({
-    privateProfile: false,
-    directMessages: "Everyone",
-    dataSharing: true
-  });
-  const [blockedQuery, setBlockedQuery] = useState("");
-  const [blockedContacts, setBlockedContacts] = useState([
-    {
-      id: "blocked-1",
-      name: "Jordan Blake",
-      username: "@jordanblake",
-      avatar: CHAT_STORIES[0].avatar
-    },
-    {
-      id: "blocked-2",
-      name: "Morgan Lee",
-      username: "@morgan.events",
-      avatar: CHAT_STORIES[1].avatar
-    },
-    {
-      id: "blocked-3",
-      name: "Taylor Smith",
-      username: "@taylorsounds",
-      avatar: CHAT_STORIES[2].avatar
-    },
-    {
-      id: "blocked-4",
-      name: "Chris Adams",
-      username: "@chrisadams",
-      avatar: CHAT_CONVERSATIONS[0].avatar
-    },
-    {
-      id: "blocked-5",
-      name: "Jamie Wilson",
-      username: "@jamiew",
-      avatar: CHAT_CONVERSATIONS[1].avatar
-    },
-    {
-      id: "blocked-6",
-      name: "Casey Brown",
-      username: "@caseybrown",
-      avatar: CHAT_CONVERSATIONS[2].avatar
-    },
-    {
-      id: "blocked-7",
-      name: "Riley Johnson",
-      username: "@rileyj",
-      avatar: CHAT_CONVERSATIONS[3].avatar
-    },
-    {
-      id: "blocked-8",
-      name: "Avery Davis",
-      username: "@averydavis",
-      avatar: CHAT_CONVERSATIONS[4].avatar
-    },
-    {
-      id: "blocked-9",
-      name: "Drew Martinez",
-      username: "@drewmartinez",
-      avatar: CHAT_STORIES[0].avatar
-    },
-    {
-      id: "blocked-10",
-      name: "Skyler Moore",
-      username: "@skylermoore",
-      avatar: CHAT_STORIES[1].avatar
-    },
-    {
-      id: "blocked-11",
-      name: "Parker White",
-      username: "@parkerwhite",
-      avatar: CHAT_STORIES[2].avatar
-    },
-    {
-      id: "blocked-12",
-      name: "Quinn Harris",
-      username: "@quinnharris",
-      avatar: CHAT_CONVERSATIONS[0].avatar
-    }
-  ]);
-  const [twoFactorMethod, setTwoFactorMethod] = useState<
-    "SMS" | "Email" | "Authenticator" | null
-  >(null);
-  const [verificationCode, setVerificationCode] = useState("");
-  const [passwordFields, setPasswordFields] = useState({
-    current: "",
-    next: "",
-    confirm: ""
-  });
-  const [passwordAttempted, setPasswordAttempted] = useState(false);
-  const [mediaItems, setMediaItems] = useState(
-    [
-      FEED_EVENTS[0].image,
-      FEED_EVENTS[1].image,
-      FEED_EVENTS[2].image,
-      PERFORMER_EVENTS[0].image,
-      PERFORMER_EVENTS[1].image,
-      PERFORMER_EVENTS[2].image
-    ].map((image, index) => ({
-      id: `media-${index}`,
-      image,
-      type: index % 3 === 1 ? "Video" : "Image",
-      contact: ["Sarah Jenkins", "Marcus Chen", "Elena Rodriguez"][index % 3]
-    }))
-  );
-  const [sessions, setSessions] = useState([
-    {
-      id: "current",
-      device: "iPhone 15 Pro",
-      place: "Los Angeles, USA",
-      detail: "Current Device",
-      current: true
-    },
-    {
-      id: "mac",
-      device: "MacBook Air",
-      place: "San Francisco, USA",
-      detail: "2 hours ago",
-      current: false
-    },
-    {
-      id: "windows",
-      device: "Windows Desktop",
-      place: "New York, USA",
-      detail: "Yesterday",
-      current: false
-    },
-    {
-      id: "ipad",
-      device: "iPad Pro",
-      place: "London, UK",
-      detail: "Oct 12, 2023",
-      current: false
-    }
-  ]);
-  const [logoutTarget, setLogoutTarget] = useState<"all" | string | null>(null);
-  const [forgotEmail, setForgotEmail] = useState("");
-  const [supportTopic, setSupportTopic] = useState<string | null>(null);
-  const [supportChannel, setSupportChannel] = useState<"chat" | "call" | null>(
-    null
-  );
-  const [supportQueue, setSupportQueue] = useState<3 | 10 | null>(null);
-  const [supportSeconds, setSupportSeconds] = useState(0);
-  const [otherHelpClicks, setOtherHelpClicks] = useState(0);
-  useEffect(() => {
-    if (!supportQueue || supportSeconds <= 0) return;
-    const timer = setInterval(
-      () => setSupportSeconds((seconds) => Math.max(0, seconds - 1)),
-      1000
-    );
-    return () => clearInterval(timer);
-  }, [supportQueue, supportSeconds]);
-  const cameraRef = useRef<CameraView>(null);
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [profileDetails, setProfileDetails] = useState({
-    fullName: "Alex Rivera",
-    username: "@alex_rivera",
-    bio: "Capturing the energy of the night. Event curator, photographer, and music lover.",
-    email: "alex@turnupz.app",
-    phone: "+1 (555) 012-3456",
-    website: "alexrives.com",
-    image: CHAT_STORIES[1].avatar
-  });
-  const [profileDraft, setProfileDraft] = useState(profileDetails);
-  const [showPhotoOptions, setShowPhotoOptions] = useState(false);
-  const selectProfileImage = async () => {
-    try {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        onError("Allow photo-library access to choose a profile image.");
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        quality: 0.9
-      });
-      if (!result.canceled && result.assets[0]?.uri) {
-        setProfileDraft((current) => ({
-          ...current,
-          image: result.assets[0].uri
-        }));
-        setShowPhotoOptions(false);
-      }
-    } catch {
-      onError("Unable to open the photo library.");
-    }
-  };
-  const accessibilityOptions = useAccessibilityStore();
-  const [activePill, setActivePill] = useState("Posts");
-  const followedPerformers = usePrototypeSocialStore(
-    (state) => state.followedPerformers
-  );
-  const followedLocations = usePrototypeSocialStore(
-    (state) => state.followedLocations
-  );
-  const followedPlanners = usePrototypeSocialStore(
-    (state) => state.followedPlanners
-  );
-  const savedEvents = usePrototypeSocialStore((state) => state.savedEvents);
-  const sharedBlockedUserIds = usePrototypeSocialStore(
-    (state) => state.blockedUserIds
-  );
-  const toggleSharedBlockedUser = usePrototypeSocialStore(
-    (state) => state.toggleBlockedUser
-  );
-  const [selectedSavedEvent, setSelectedSavedEvent] =
-    useState<TFeedEvent | null>(null);
-  const [selectedSavedMenuEvent, setSelectedSavedMenuEvent] =
-    useState<TFeedEvent | null>(null);
-  const galleryImages = [
-    FEED_EVENTS[0].image,
-    FEED_EVENTS[1].image,
-    FEED_EVENTS[2].image,
-    PERFORMER_EVENTS[0].image,
-    PERFORMER_EVENTS[1].image,
-    PERFORMER_EVENTS[2].image
-  ];
-
-  if (selectedSavedEvent) {
-    return (
-      <EventBookingDetailScreen
-        event={toBookingEvent(selectedSavedEvent)}
-        onBack={() => setSelectedSavedEvent(null)}
-        onTicket={() => undefined}
-        onRegister={() => undefined}
-      />
-    );
-  }
-
-  const settingsHeader = (
-    title: string,
-    backMode: typeof mode = "settings"
-  ) => (
-    <View className="h-14 flex-row items-center border-b border-zinc-100 bg-white px-3">
-      <Pressable
-        onPress={() => setMode(backMode)}
-        className="size-9 items-center justify-center"
-      >
-        <ChevronLeftIcon size={18} color="#52525b" />
-      </Pressable>
-      <TextComponent className="flex-1 text-center text-sm font-bold text-zinc-950">
-        {title}
-      </TextComponent>
-      <View className="size-9" />
-    </View>
-  );
-
-  if (mode === "media") {
-    return (
-      <View className="flex-1 bg-zinc-50">
-        {settingsHeader("Shared Media", "notifications-settings")}
-        <ScrollView contentContainerClassName="p-4 pb-8">
-          <TextComponent className="mb-4 text-xs text-zinc-500">
-            Images and videos shared by your contacts
-          </TextComponent>
-          {mediaItems.length ? (
-            <View className="flex-row flex-wrap justify-between">
-              {mediaItems.map((item) => (
-                <View
-                  key={item.id}
-                  className="mb-4 w-[48%] overflow-hidden rounded-xl bg-white shadow-sm"
-                >
-                  <CustomImage
-                    className="aspect-square w-full bg-zinc-100"
-                    imageClassName="size-full"
-                    source={item.image}
-                    contentFit="cover"
-                  />
-                  <View className="p-3">
-                    <TextComponent className="text-xs font-bold text-zinc-800">
-                      {item.contact}
-                    </TextComponent>
-                    <View className="mt-1 flex-row items-center justify-between">
-                      <TextComponent className="text-[10px] text-zinc-400">
-                        {item.type}
-                      </TextComponent>
-                      <Pressable
-                        onPress={() =>
-                          setMediaItems((current) =>
-                            current.filter((media) => media.id !== item.id)
-                          )
-                        }
-                        className="rounded-md bg-red-50 px-2 py-1"
-                      >
-                        <TextComponent className="text-[10px] font-bold text-red-500">
-                          Delete
-                        </TextComponent>
-                      </Pressable>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View className="items-center py-20">
-              <TextComponent className="font-bold text-zinc-700">
-                No shared media
-              </TextComponent>
-            </View>
-          )}
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (mode === "in-app-notifications") {
-    return (
-      <View className="flex-1 bg-zinc-50">
-        {settingsHeader("Settings", "notifications-settings")}
-        <ScrollView contentContainerClassName="p-5 pb-8">
-          <TextComponent className="text-xl font-bold text-zinc-900">
-            In-App Notification
-          </TextComponent>
-          <View className="mt-8 flex-row justify-between rounded-xl bg-white p-4">
-            {(["None", "Banners", "Alerts"] as const).map((style) => (
-              <Pressable
-                key={style}
-                onPress={() => setInAppStyle(style)}
-                className="items-center"
-              >
-                <View
-                  className={
-                    inAppStyle === style
-                      ? "h-24 w-14 items-center justify-center rounded-md border-2 border-primary bg-zinc-200"
-                      : "h-24 w-14 items-center justify-center rounded-md border border-zinc-400 bg-zinc-200"
-                  }
-                >
-                  {style !== "None" && (
-                    <View
-                      className={
-                        style === "Banners"
-                          ? "h-7 w-full bg-sky-200"
-                          : "h-10 w-full bg-sky-200"
-                      }
-                    />
-                  )}
-                </View>
-                <TextComponent
-                  className={
-                    inAppStyle === style
-                      ? "mt-2 rounded bg-primary px-1 text-[10px] text-white"
-                      : "mt-2 text-[10px] text-zinc-500"
-                  }
-                >
-                  {style}
-                </TextComponent>
-              </Pressable>
-            ))}
-          </View>
-          <TextComponent className="mt-5 text-[10px] leading-4 text-zinc-500">
-            Alerts require an action before proceeding. Banners appear at the
-            top of the screen and go away automatically.
-          </TextComponent>
-          <View className="mt-10 overflow-hidden rounded-xl bg-white">
-            <View className="flex-row items-center justify-between border-b border-zinc-100 p-4">
-              <TextComponent className="text-xs text-zinc-600">
-                Sound
-              </TextComponent>
-              <SettingsSwitch
-                enabled={inAppOptions.sound}
-                onPress={() =>
-                  setInAppOptions((v) => ({ ...v, sound: !v.sound }))
-                }
-                label="Notification sound"
-              />
-            </View>
-            <View className="flex-row items-center justify-between p-4">
-              <TextComponent className="text-xs text-zinc-600">
-                Vibrate
-              </TextComponent>
-              <SettingsSwitch
-                enabled={inAppOptions.vibrate}
-                onPress={() =>
-                  setInAppOptions((v) => ({ ...v, vibrate: !v.vibrate }))
-                }
-                label="Notification vibration"
-              />
-            </View>
-          </View>
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (mode === "privacy") {
-    return (
-      <View className="flex-1 bg-zinc-50">
-        {settingsHeader("Privacy")}
-        <ScrollView contentContainerClassName="p-4 pb-8">
-          <View className="h-28 overflow-hidden rounded-xl">
-            <CustomImage
-              className="size-full"
-              imageClassName="size-full"
-              source={PrivacySecurityBanner}
-              contentFit="cover"
-            />
-            <View className="absolute inset-x-0 bottom-0 bg-black/35 p-3">
-              <TextComponent className="text-xs font-semibold text-white">
-                Manage your digital footprint and data security.
-              </TextComponent>
-            </View>
-          </View>
-          <TextComponent className="mb-2 mt-5 text-[10px] font-bold uppercase text-zinc-400">
-            Account visibility
-          </TextComponent>
-          <View className="rounded-xl bg-white p-4">
-            <View className="flex-row items-center">
-              <View className="flex-1">
-                <TextComponent className="text-sm font-bold text-zinc-800">
-                  Private Profile
-                </TextComponent>
-                <TextComponent className="mt-1 text-xs text-zinc-500">
-                  Only approved followers can see your content.
-                </TextComponent>
-              </View>
-              <SettingsSwitch
-                enabled={privacySettings.privateProfile}
-                onPress={() =>
-                  setPrivacySettings((v) => ({
-                    ...v,
-                    privateProfile: !v.privateProfile
-                  }))
-                }
-                label="Private profile"
-              />
-            </View>
-          </View>
-          <TextComponent className="mb-2 mt-5 text-[10px] font-bold uppercase text-zinc-400">
-            Communication
-          </TextComponent>
-          <View className="rounded-xl bg-white p-4">
-            <TextComponent className="text-sm font-bold text-zinc-800">
-              Direct Messages
-            </TextComponent>
-            <TextComponent className="mt-1 text-xs text-zinc-500">
-              Choose who can send you messages.
-            </TextComponent>
-            {["Everyone", "Contact List", "No one"].map((option) => (
-              <Pressable
-                key={option}
-                onPress={() =>
-                  setPrivacySettings((v) => ({ ...v, directMessages: option }))
-                }
-                className="mt-3 flex-row items-center justify-between rounded-lg border border-zinc-200 p-3"
-              >
-                <TextComponent className="text-xs text-zinc-700">
-                  {option}
-                </TextComponent>
-                <View
-                  className={
-                    privacySettings.directMessages === option
-                      ? "size-4 rounded-full border-[5px] border-primary"
-                      : "size-4 rounded-full border border-zinc-400"
-                  }
-                />
-              </Pressable>
-            ))}
-          </View>
-          <TextComponent className="mb-2 mt-5 text-[10px] font-bold uppercase text-zinc-400">
-            Restricted
-          </TextComponent>
-          <Pressable
-            onPress={() => {
-              setBlockedQuery("");
-              setMode("blocked-contacts");
-            }}
-            className="flex-row items-center rounded-xl bg-white p-4"
-          >
-            <View className="flex-1">
-              <TextComponent className="text-sm font-bold text-zinc-800">
-                Blocked Contacts
-              </TextComponent>
-              <TextComponent className="text-[10px] text-zinc-500">
-                {blockedContacts.length + sharedBlockedUserIds.length}{" "}
-                {blockedContacts.length + sharedBlockedUserIds.length === 1
-                  ? "account"
-                  : "accounts"}{" "}
-                currently blocked
-              </TextComponent>
-            </View>
-            <ChevronRightVectorIcon size={14} color="#71717a" />
-          </Pressable>
-          <TextComponent className="mb-2 mt-5 text-[10px] font-bold uppercase text-zinc-400">
-            Advanced
-          </TextComponent>
-          <View className="flex-row items-center rounded-xl bg-white p-4">
-            <View className="flex-1">
-              <TextComponent className="text-sm font-bold text-zinc-800">
-                Data Sharing
-              </TextComponent>
-              <TextComponent className="text-[10px] text-zinc-500">
-                Allow anonymous usage data to improve your experience.
-              </TextComponent>
-            </View>
-            <SettingsSwitch
-              enabled={privacySettings.dataSharing}
-              onPress={() =>
-                setPrivacySettings((v) => ({
-                  ...v,
-                  dataSharing: !v.dataSharing
-                }))
-              }
-              label="Data sharing"
-            />
-          </View>
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (mode === "blocked-contacts") {
-    const storyBlockedContacts = CHAT_STORIES.filter((contact) =>
-      sharedBlockedUserIds.includes(contact.id)
-    ).map((contact) => ({
-      id: contact.id,
-      name: contact.name,
-      username: `@${contact.id}.turnupz`,
-      avatar: contact.avatar,
-      shared: true
-    }));
-    const visibleBlockedContacts = [
-      ...blockedContacts.map((contact) => ({ ...contact, shared: false })),
-      ...storyBlockedContacts
-    ].filter((contact) =>
-      `${contact.name} ${contact.username}`
-        .toLowerCase()
-        .includes(blockedQuery.trim().toLowerCase())
-    );
-    return (
-      <View className="flex-1 bg-zinc-50">
-        {settingsHeader("Blocked Contacts", "privacy")}
-        <View className="mx-4 mt-4 h-11 flex-row items-center rounded-xl bg-white px-3">
-          <SearchIcon size={15} color="#a1a1aa" />
-          <TextInput
-            value={blockedQuery}
-            onChangeText={setBlockedQuery}
-            placeholder="Search blocked contacts"
-            placeholderTextColor="#a1a1aa"
-            className="ml-2 flex-1 text-xs outline-none"
-          />
-        </View>
-        <TextComponent className="mx-4 mt-4 text-xs text-zinc-500">
-          Blocked contacts cannot message you, view your profile, or interact
-          with your posts.
-        </TextComponent>
-        <ScrollView contentContainerClassName="p-4 pb-8">
-          {visibleBlockedContacts.length ? (
-            <View className="overflow-hidden rounded-xl bg-white shadow-sm">
-              {visibleBlockedContacts.map((contact) => (
-                <View
-                  key={contact.id}
-                  className="flex-row items-center border-b border-zinc-100 p-4"
-                >
-                  <CustomImage
-                    className="size-11 overflow-hidden rounded-lg bg-zinc-100"
-                    imageClassName="size-full"
-                    source={{ uri: contact.avatar }}
-                    contentFit="cover"
-                  />
-                  <View className="ml-3 flex-1">
-                    <TextComponent className="text-sm font-bold text-zinc-800">
-                      {contact.name}
-                    </TextComponent>
-                    <TextComponent className="mt-1 text-[10px] text-zinc-500">
-                      {contact.username}
-                    </TextComponent>
-                  </View>
-                  <Pressable
-                    onPress={() =>
-                      contact.shared
-                        ? toggleSharedBlockedUser(contact.id)
-                        : setBlockedContacts((contacts) =>
-                            contacts.filter((item) => item.id !== contact.id)
-                          )
-                    }
-                    className="h-9 items-center justify-center rounded-lg border border-primary px-3"
-                  >
-                    <TextComponent className="text-xs font-bold text-primary">
-                      Unblock
-                    </TextComponent>
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View className="items-center py-20">
-              <TextComponent className="font-bold text-zinc-800">
-                No blocked contacts found
-              </TextComponent>
-              <TextComponent className="mt-2 text-xs text-zinc-500">
-                Try another name or username.
-              </TextComponent>
-            </View>
-          )}
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (mode === "language") {
-    const languages = [
-      "English (Canada)",
-      "English (UK)",
-      "French",
-      "Spanish",
-      "German",
-      "Yoruba"
-    ].filter((item) =>
-      item.toLowerCase().includes(languageQuery.toLowerCase())
-    );
-    return (
-      <View className="flex-1 bg-zinc-50">
-        {settingsHeader("Language")}
-        <ScrollView contentContainerClassName="p-5 pb-8">
-          <TextComponent className="mt-2 text-xs text-zinc-500">
-            Choose your preferred language for the application interface.
-          </TextComponent>
-          <View className="mt-5 h-11 flex-row items-center rounded-xl bg-white px-3">
-            <SearchIcon size={15} color="#a1a1aa" />
-            <TextInput
-              value={languageQuery}
-              onChangeText={setLanguageQuery}
-              placeholder="Search languages"
-              placeholderTextColor="#a1a1aa"
-              className="ml-2 flex-1 text-xs outline-none"
-            />
-          </View>
-          <View className="mt-3 gap-3">
-            {languages.map((item) => (
-              <Pressable
-                key={item}
-                onPress={() => setLanguage(item)}
-                className={
-                  language === item
-                    ? "h-14 flex-row items-center rounded-xl border-2 border-primary bg-white px-4"
-                    : "h-14 flex-row items-center rounded-xl border border-zinc-200 bg-white px-4"
-                }
-              >
-                <TextComponent className="flex-1 text-xs font-semibold text-zinc-700">
-                  {item}
-                </TextComponent>
-                <View
-                  className={
-                    language === item
-                      ? "size-5 items-center justify-center rounded-full bg-primary"
-                      : "size-5 rounded-full border border-zinc-500"
-                  }
-                >
-                  {language === item && (
-                    <TextComponent className="text-[10px] text-white">
-                      ✓
-                    </TextComponent>
-                  )}
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (mode === "notifications-settings") {
-    const toggleNotification = (key: keyof typeof notificationSettings) =>
-      setNotificationSettings((current) => ({
-        ...current,
-        [key]: !current[key]
-      }));
-    return (
-      <View className="flex-1 bg-zinc-50">
-        <View className="h-14 flex-row items-center border-b border-zinc-100 bg-white px-3">
-          <Pressable
-            onPress={() => setMode("settings")}
-            className="size-9 items-center justify-center"
-          >
-            <ChevronLeftIcon size={18} color="#52525b" />
-          </Pressable>
-          <TextComponent className="flex-1 text-center font-bold text-zinc-950">
-            Notification
-          </TextComponent>
-          <View className="size-9" />
-        </View>
-        <ScrollView contentContainerClassName="p-4 pb-8">
-          {[
-            {
-              title: "Notifications",
-              rows: [
-                { key: "showNotifications", label: "Show Notifications" },
-                { key: "previewMessage", label: "Preview Message" }
-              ]
-            },
-            {
-              title: "Privacy",
-              rows: [
-                { key: "readReceipts", label: "Read Receipts" },
-                { key: "lastSeen", label: "Last Seen" }
-              ]
-            },
-            {
-              title: "Media & Storage",
-              rows: [{ key: "wifiDownload", label: "Auto-download over Wi-Fi" }]
-            }
-          ].map((section) => (
-            <View key={section.title} className="mb-5">
-              <TextComponent className="mb-2 text-[10px] font-bold uppercase text-zinc-400">
-                {section.title}
-              </TextComponent>
-              <View className="overflow-hidden rounded-xl bg-white shadow-sm">
-                {section.rows.map((row) => {
-                  const key = row.key as keyof typeof notificationSettings;
-                  return (
-                    <View
-                      key={row.key}
-                      className="flex-row items-center justify-between border-b border-zinc-100 px-4 py-4"
-                    >
-                      <TextComponent className="text-sm text-zinc-700">
-                        {row.label}
-                      </TextComponent>
-                      <SettingsSwitch
-                        enabled={notificationSettings[key]}
-                        onPress={() => toggleNotification(key)}
-                        label={row.label}
-                      />
-                    </View>
-                  );
-                })}
-                {section.title === "Notifications" && (
-                  <Pressable
-                    onPress={() => setMode("in-app-notifications")}
-                    className="flex-row items-center justify-between px-4 py-4"
-                  >
-                    <View>
-                      <TextComponent className="text-sm text-zinc-700">
-                        In-App Notifications
-                      </TextComponent>
-                      <TextComponent className="mt-1 text-[10px] text-zinc-400">
-                        {inAppStyle}, Sound, Vibrate
-                      </TextComponent>
-                    </View>
-                    <ChevronRightVectorIcon size={14} color="#71717a" />
-                  </Pressable>
-                )}
-                {section.title === "Media & Storage" && (
-                  <>
-                    <View className="px-4 py-4">
-                      <TextComponent className="mb-3 text-sm text-zinc-700">
-                        Media Quality
-                      </TextComponent>
-                      <View className="flex-row gap-2">
-                        {(["Auto", "Data Saver", "Best Quality"] as const).map(
-                          (quality) => (
-                            <Pressable
-                              key={quality}
-                              onPress={() => setMediaQuality(quality)}
-                              className={
-                                mediaQuality === quality
-                                  ? "h-12 flex-1 items-center justify-center rounded-lg bg-primary px-2"
-                                  : "h-12 flex-1 items-center justify-center rounded-lg bg-zinc-100 px-2"
-                              }
-                            >
-                              <TextComponent
-                                className={
-                                  mediaQuality === quality
-                                    ? "text-center text-xs font-bold text-white"
-                                    : "text-center text-xs text-zinc-600"
-                                }
-                              >
-                                {quality}
-                              </TextComponent>
-                            </Pressable>
-                          )
-                        )}
-                      </View>
-                    </View>
-                    <Pressable
-                      onPress={() => setMode("media")}
-                      className="flex-row items-center justify-between border-t border-zinc-100 px-4 py-4"
-                    >
-                      <View>
-                        <TextComponent className="text-sm text-zinc-700">
-                          View Media
-                        </TextComponent>
-                        <TextComponent className="mt-1 text-[10px] text-zinc-400">
-                          Currently using 1.2 GB
-                        </TextComponent>
-                      </View>
-                      <ChevronRightVectorIcon size={14} color="#71717a" />
-                    </Pressable>
-                  </>
-                )}
-              </View>
-            </View>
-          ))}
-          <View className="mb-5">
-            <TextComponent className="mb-2 text-[10px] font-bold uppercase text-zinc-400">
-              Advanced
-            </TextComponent>
-            <View className="overflow-hidden rounded-xl bg-white shadow-sm">
-              <View className="flex-row items-center justify-between border-b border-zinc-100 px-4 py-4">
-                <TextComponent className="text-sm text-zinc-700">
-                  End-to-End Encryption
-                </TextComponent>
-                <TextComponent className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-500">
-                  Active
-                </TextComponent>
-              </View>
-              <Pressable
-                onPress={() => setSettingsFeedback("All chats archived.")}
-                className="border-b border-zinc-100 px-4 py-4"
-              >
-                <TextComponent className="text-sm text-zinc-700">
-                  Archive All Chats
-                </TextComponent>
-              </Pressable>
-              <Pressable
-                onPress={() => setSettingsFeedback("Cache cleared.")}
-                className="border-b border-zinc-100 px-4 py-4"
-              >
-                <TextComponent className="text-sm text-red-500">
-                  Clear Cache
-                </TextComponent>
-              </Pressable>
-              <Pressable
-                onPress={() =>
-                  setSettingsFeedback(
-                    "Delete all chats requires final confirmation."
-                  )
-                }
-                className="px-4 py-4"
-              >
-                <TextComponent className="text-sm font-bold text-red-500">
-                  Delete All Chats
-                </TextComponent>
-              </Pressable>
-            </View>
-          </View>
-          {!!settingsFeedback && (
-            <View className="rounded-lg bg-blue-50 p-3">
-              <TextComponent className="text-xs text-primary">
-                {settingsFeedback}
-              </TextComponent>
-            </View>
-          )}
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (mode === "change-password") {
-    const mismatch =
-      passwordAttempted &&
-      (!!passwordFields.next || !!passwordFields.confirm) &&
-      passwordFields.next !== passwordFields.confirm;
-    const invalid =
-      passwordAttempted &&
-      (!passwordFields.current || passwordFields.next.length < 12 || mismatch);
-    return (
-      <View className="flex-1 bg-zinc-50">
-        {settingsHeader("Change Password", "security")}
-        <ScrollView contentContainerClassName="p-4 pb-8">
-          <TextComponent className="mt-1 text-xs text-zinc-500">
-            Update your security credentials to keep your account safe and
-            protected.
-          </TextComponent>
-          {(
-            [
-              {
-                key: "current",
-                label: "Current Password",
-                placeholder: "Enter current password"
-              },
-              {
-                key: "next",
-                label: "New Password",
-                placeholder: "Enter new password"
-              },
-              {
-                key: "confirm",
-                label: "Confirm New Password",
-                placeholder: "Re-enter new password"
-              }
-            ] as const
-          ).map((field) => {
-            const red =
-              passwordAttempted &&
-              (!passwordFields[field.key] ||
-                (field.key !== "current" &&
-                  (passwordFields.next.length < 12 || mismatch)));
-            return (
-              <View key={field.key} className="mt-5">
-                <TextComponent className="mb-2 text-xs font-semibold text-zinc-700">
-                  {field.label}
-                </TextComponent>
-                <TextInput
-                  secureTextEntry
-                  value={passwordFields[field.key]}
-                  onChangeText={(value) =>
-                    setPasswordFields((v) => ({ ...v, [field.key]: value }))
-                  }
-                  placeholder={field.placeholder}
-                  placeholderTextColor="#a1a1aa"
-                  className={
-                    red
-                      ? "h-12 rounded-xl border border-red-500 bg-white px-4 text-sm outline-none"
-                      : "h-12 rounded-xl border border-transparent bg-white px-4 text-sm outline-none"
-                  }
-                />
-                {field.key === "current" && (
-                  <Pressable onPress={() => setMode("forgot-password")}>
-                    <TextComponent className="mt-2 text-right text-[10px] font-bold text-primary">
-                      Forgot Password?
-                    </TextComponent>
-                  </Pressable>
-                )}
-              </View>
-            );
-          })}
-          <View className="mt-4 rounded-xl bg-zinc-200 p-4">
-            <TextComponent className="text-xs font-bold text-zinc-700">
-              Security Tip
-            </TextComponent>
-            <TextComponent className="mt-1 text-xs leading-4 text-zinc-600">
-              Use at least 12 characters, including numbers and special symbols
-              for maximum protection.
-            </TextComponent>
-          </View>
-          {invalid && (
-            <TextComponent className="mt-3 text-xs text-red-500">
-              Complete every field and ensure both new passwords match.
-            </TextComponent>
-          )}
-          <Pressable
-            onPress={() => {
-              setPasswordAttempted(true);
-              if (
-                passwordFields.current &&
-                passwordFields.next.length >= 12 &&
-                passwordFields.next === passwordFields.confirm
-              ) {
-                setSettingsFeedback("Password updated successfully.");
-                setMode("security");
-              }
-            }}
-            className="mt-6 h-12 items-center justify-center rounded-lg bg-primary"
-          >
-            <TextComponent className="font-bold text-white">
-              Update Password
-            </TextComponent>
-          </Pressable>
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (mode === "forgot-password") {
-    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail);
-    return (
-      <View className="flex-1 bg-white">
-        {settingsHeader("Forgot Password", "change-password")}
-        <ScrollView
-          contentContainerClassName="flex-1 gap-20 px-horizontal py-20 pt-40"
-          showsVerticalScrollIndicator={false}
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View className="w-full items-center justify-center gap-2">
-            <TextComponent
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              className="w-full text-center text-2xl font-bold"
-            >
-              Forgot your password?
-            </TextComponent>
-            <TextComponent className="max-w-sm text-center opacity-60">
-              Confirm your email and we will send the instructions.
-            </TextComponent>
-          </View>
-          <View className="gap-6">
-            <TextInput
-              value={forgotEmail}
-              onChangeText={setForgotEmail}
-              inputMode="email"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              autoCorrect={false}
-              autoFocus
-              returnKeyType="next"
-              placeholder="Enter your email"
-              placeholderTextColor="#a1a1aa"
-              className="h-14 rounded-lg border border-zinc-200 px-4 text-sm text-zinc-900 outline-none"
-            />
-          </View>
-          <Pressable
-            disabled={!emailValid}
-            onPress={() =>
-              setSettingsFeedback(
-                "Password verification connection will be added later."
-              )
-            }
-            className={
-              emailValid
-                ? "h-12 items-center justify-center rounded-lg bg-primary"
-                : "h-12 items-center justify-center rounded-lg bg-primary opacity-50"
-            }
-          >
-            <TextComponent className="font-bold text-white">
-              Continue
-            </TextComponent>
-          </Pressable>
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (mode === "two-factor") {
-    const methods = [
-      {
-        id: "SMS" as const,
-        title: "Text Message (SMS)",
-        detail: "Quick verification via your phone number"
-      },
-      {
-        id: "Email" as const,
-        title: "Email",
-        detail: "Receive a code at your verified email"
-      },
-      {
-        id: "Authenticator" as const,
-        title: "Authenticator App",
-        detail: "Use any standard TOTP authenticator"
-      }
-    ];
-    return (
-      <View className="flex-1 bg-zinc-50">
-        {settingsHeader("Two-Factor Authentication", "security")}
-        <ScrollView contentContainerClassName="p-5 pb-8">
-          <View className="mt-10 items-center">
-            <CustomImage
-              className="size-28 overflow-hidden rounded-3xl"
-              imageClassName="size-full"
-              source={TwoFactorAuthHero}
-              contentFit="cover"
-            />
-            <View className="hidden">
-              <TextComponent className="text-4xl text-primary">♦</TextComponent>
-            </View>
-            <TextComponent className="mt-5 text-xl font-bold text-zinc-900">
-              Protect Your Account
-            </TextComponent>
-            <TextComponent className="mt-2 text-center text-xs leading-5 text-zinc-500">
-              Two-factor authentication adds an extra layer of security when you
-              log in from a new device.
-            </TextComponent>
-          </View>
-          <View className="mt-8 gap-3">
-            {methods.map((method) => (
-              <Pressable
-                key={method.id}
-                onPress={() => setTwoFactorMethod(method.id)}
-                className={
-                  twoFactorMethod === method.id
-                    ? "flex-row items-center rounded-xl border-2 border-primary bg-white p-4"
-                    : "flex-row items-center rounded-xl border border-zinc-200 bg-white p-4"
-                }
-              >
-                <View className="flex-1">
-                  <TextComponent className="text-sm font-bold text-zinc-800">
-                    {method.title}
-                  </TextComponent>
-                  <TextComponent className="mt-1 text-[10px] text-zinc-500">
-                    {method.detail}
-                  </TextComponent>
-                </View>
-                <View
-                  className={
-                    twoFactorMethod === method.id
-                      ? "size-5 rounded-full border-[6px] border-primary"
-                      : "size-5 rounded-full border border-zinc-400"
-                  }
-                />
-              </Pressable>
-            ))}
-          </View>
-          <View className="mt-4 rounded-xl bg-zinc-100 p-4">
-            <TextComponent className="text-[10px] leading-4 text-zinc-600">
-              Turnupz uses end-to-end encrypted signals for authentication.
-              Authenticator apps use the standard time-based one-time password
-              (TOTP) protocol.
-            </TextComponent>
-          </View>
-          {twoFactorMethod === null && (
-            <TextComponent className="mt-3 text-xs text-red-500">
-              Select one verification method to continue.
-            </TextComponent>
-          )}
-          <Pressable
-            onPress={() => twoFactorMethod && setMode("two-factor-code")}
-            className={
-              twoFactorMethod
-                ? "mt-4 h-12 items-center justify-center rounded-lg bg-primary"
-                : "mt-4 h-12 items-center justify-center rounded-lg bg-zinc-300"
-            }
-          >
-            <TextComponent className="font-bold text-white">
-              Continue
-            </TextComponent>
-          </Pressable>
-          <Pressable
-            onPress={() => setMode("security")}
-            className="h-12 items-center justify-center"
-          >
-            <TextComponent className="text-xs text-zinc-600">
-              Maybe Later
-            </TextComponent>
-          </Pressable>
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (mode === "two-factor-code") {
-    return (
-      <View className="flex-1 bg-zinc-50">
-        {settingsHeader("Verification", "two-factor")}
-        <ScrollView contentContainerClassName="items-center p-5 pb-8">
-          <CustomImage
-            className="mt-8 size-36 overflow-hidden rounded-full"
-            imageClassName="size-full"
-            source={VerificationCodeHero}
-            contentFit="cover"
-          />
-          <TextComponent className="mt-6 text-xl font-bold text-zinc-900">
-            Enter 6-Digit Code
-          </TextComponent>
-          <TextComponent className="mt-2 text-center text-xs leading-5 text-zinc-500">
-            Enter the verification code sent using {twoFactorMethod}.
-          </TextComponent>
-          <TextInput
-            value={verificationCode}
-            onChangeText={(value) =>
-              setVerificationCode(value.replace(/\D/g, "").slice(0, 6))
-            }
-            keyboardType="number-pad"
-            maxLength={6}
-            placeholder="••••••"
-            placeholderTextColor="#a1a1aa"
-            className={
-              verificationCode.length > 0 && verificationCode.length < 6
-                ? "mt-8 h-14 w-full rounded-xl border border-red-500 bg-white px-5 text-center text-2xl tracking-[12px] outline-none"
-                : "mt-8 h-14 w-full rounded-xl border border-zinc-200 bg-white px-5 text-center text-2xl tracking-[12px] outline-none"
-            }
-          />
-          <View className="mt-5 flex-row">
-            <TextComponent className="text-xs text-zinc-500">
-              Didn't receive the code?{" "}
-            </TextComponent>
-            <Pressable
-              onPress={() =>
-                setSettingsFeedback("A new verification code was sent.")
-              }
-            >
-              <TextComponent className="text-xs font-bold text-primary">
-                Resend Code
-              </TextComponent>
-            </Pressable>
-          </View>
-          <Pressable
-            onPress={() => {
-              if (verificationCode.length === 6) {
-                setSecuritySettings((v) => ({ ...v, twoFactor: true }));
-                setMode("two-factor-success");
-              }
-            }}
-            className={
-              verificationCode.length === 6
-                ? "mt-8 h-12 w-full items-center justify-center rounded-lg bg-primary"
-                : "mt-8 h-12 w-full items-center justify-center rounded-lg bg-zinc-300"
-            }
-          >
-            <TextComponent className="font-bold text-white">
-              Verify
-            </TextComponent>
-          </Pressable>
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (mode === "two-factor-success") {
-    return (
-      <View className="flex-1 bg-zinc-50">
-        {settingsHeader("Verification", "security")}
-        <View className="flex-1 items-center px-5 pt-24">
-          <CustomImage
-            className="size-40 overflow-hidden rounded-full"
-            imageClassName="size-full"
-            source={VerificationSuccessHero}
-            contentFit="cover"
-          />
-          <TextComponent className="mt-8 text-xl font-bold text-zinc-900">
-            Verification Successful
-          </TextComponent>
-          <TextComponent className="mt-2 text-center text-xs leading-5 text-zinc-500">
-            Your account is now secure. You can continue to explore Turnupz.
-          </TextComponent>
-          <View className="mt-6 w-full rounded-xl bg-white p-4">
-            <TextComponent className="text-[10px] text-zinc-500">
-              SECURITY STATUS
-            </TextComponent>
-            <TextComponent className="mt-1 text-xs font-bold text-zinc-800">
-              2FA Fully Enabled
-            </TextComponent>
-            <View className="my-3 h-px bg-zinc-100" />
-            <TextComponent className="text-[10px] text-zinc-500">
-              COMPLETED ON
-            </TextComponent>
-            <TextComponent className="mt-1 text-xs font-bold text-zinc-800">
-              Today
-            </TextComponent>
-          </View>
-          <Pressable
-            onPress={() => setMode("security")}
-            className="absolute bottom-8 h-12 w-full items-center justify-center rounded-lg bg-primary"
-          >
-            <TextComponent className="font-bold text-white">
-              Continue →
-            </TextComponent>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
-
-  if (mode === "biometric") {
-    const enableBiometrics = async () => {
-      const compatible = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
-      if (!compatible || !enrolled) {
-        setSettingsFeedback(
-          "No Face ID or fingerprint is enrolled on this device."
-        );
-        return;
-      }
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: "Enable biometric login for Turnupz"
-      });
-      if (result.success) {
-        setSecuritySettings((v) => ({ ...v, biometric: true }));
-        setSettingsFeedback("Biometric login enabled.");
-        setMode("security");
-      }
-    };
-    return (
-      <View className="flex-1 bg-zinc-50">
-        {settingsHeader("Biometric Login", "security")}
-        <View className="flex-1 items-center px-5 pt-20">
-          <CustomImage
-            className="size-36 overflow-hidden rounded-full"
-            imageClassName="size-full"
-            source={BiometricLoginHero}
-            contentFit="cover"
-          />
-          <View className="hidden">
-            <TextComponent className="text-6xl text-primary">◎</TextComponent>
-          </View>
-          <TextComponent className="hidden">Biometric Login</TextComponent>
-          <TextComponent className="mt-2 text-center text-xs leading-5 text-zinc-500">
-            Unlock Turnupz and authorize transactions securely using your
-            device's biometric sensors.
-          </TextComponent>
-          <View className="mt-8 w-full flex-row items-center rounded-xl bg-white p-4">
-            <View className="flex-1">
-              <TextComponent className="text-sm font-bold text-zinc-800">
-                Enable Biometrics
-              </TextComponent>
-              <TextComponent className="mt-1 text-[10px] text-zinc-500">
-                Face ID, Touch ID, or device fingerprint
-              </TextComponent>
-            </View>
-            <SettingsSwitch
-              enabled={securitySettings.biometric}
-              onPress={() =>
-                securitySettings.biometric
-                  ? setSecuritySettings((v) => ({ ...v, biometric: false }))
-                  : enableBiometrics()
-              }
-              label="Enable biometrics"
-            />
-          </View>
-          <View className="mt-4 w-full rounded-xl bg-zinc-100 p-4">
-            <TextComponent className="text-xs font-bold text-zinc-700">
-              Privacy First
-            </TextComponent>
-            <TextComponent className="mt-2 text-[10px] leading-4 text-zinc-500">
-              Your biometric data remains encrypted in your device's secure
-              hardware and is never sent to our servers.
-            </TextComponent>
-          </View>
-          <Pressable
-            onPress={() => setMode("security")}
-            className="absolute bottom-8"
-          >
-            <TextComponent className="text-xs text-zinc-600">
-              Not Now
-            </TextComponent>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
-
-  if (mode === "login-activity") {
-    const removeSession = (id: string) =>
-      setSessions((current) => current.filter((session) => session.id !== id));
-    return (
-      <View className="flex-1 bg-zinc-50">
-        {settingsHeader("Login Activity", "security")}
-        <ScrollView contentContainerClassName="p-4 pb-8">
-          <TextComponent className="mt-1 text-xs text-zinc-500">
-            Review where you're currently logged in and manage active sessions.
-          </TextComponent>
-          <TextComponent className="mb-2 mt-6 text-[10px] font-bold uppercase text-primary">
-            Active session
-          </TextComponent>
-          {sessions
-            .filter((s) => s.current)
-            .map((session) => (
-              <View key={session.id} className="rounded-xl bg-white p-4">
-                <TextComponent className="text-sm font-bold text-zinc-800">
-                  {session.device}
-                </TextComponent>
-                <TextComponent className="mt-1 text-xs text-zinc-500">
-                  {session.place}
-                </TextComponent>
-                <TextComponent className="mt-1 text-[10px] text-zinc-400">
-                  {session.detail}
-                </TextComponent>
-              </View>
-            ))}
-          <TextComponent className="mb-2 mt-6 text-[10px] font-bold uppercase text-zinc-400">
-            Recent logins
-          </TextComponent>
-          <View className="gap-3">
-            {sessions
-              .filter((s) => !s.current)
-              .map((session) => (
-                <View
-                  key={session.id}
-                  className="flex-row items-center rounded-xl bg-white p-4"
-                >
-                  <View className="flex-1">
-                    <TextComponent className="text-sm font-bold text-zinc-800">
-                      {session.device}
-                    </TextComponent>
-                    <TextComponent className="mt-1 text-xs text-zinc-500">
-                      {session.place} • {session.detail}
-                    </TextComponent>
-                  </View>
-                  <Pressable
-                    onPress={() => setLogoutTarget(session.id)}
-                    accessibilityLabel={`Log out ${session.device}`}
-                    className="size-9 items-center justify-center"
-                  >
-                    <TextComponent className="text-xl text-red-500">
-                      ↪
-                    </TextComponent>
-                  </Pressable>
-                </View>
-              ))}
-          </View>
-          <Pressable
-            onPress={() => setLogoutTarget("all")}
-            className="mt-5 h-12 items-center justify-center rounded-xl bg-red-50"
-          >
-            <TextComponent className="text-sm font-bold text-red-500">
-              Log Out All Other Sessions
-            </TextComponent>
-          </Pressable>
-          <TextComponent className="mt-3 text-center text-[10px] text-zinc-500">
-            If you don't recognize a device, change your password immediately.
-          </TextComponent>
-        </ScrollView>
-        {!!logoutTarget && (
-          <View className="absolute inset-0 items-center justify-center bg-black/45 px-5">
-            <View className="w-full rounded-2xl bg-white p-5">
-              <TextComponent className="text-base font-bold text-zinc-900">
-                Confirm logout
-              </TextComponent>
-              <TextComponent className="mt-2 text-xs leading-5 text-zinc-500">
-                {logoutTarget === "all"
-                  ? "Log out every other active session?"
-                  : "Log out this device session?"}
-              </TextComponent>
-              <View className="mt-5 flex-row gap-3">
-                <Pressable
-                  onPress={() => setLogoutTarget(null)}
-                  className="h-11 flex-1 items-center justify-center rounded-lg bg-zinc-100"
-                >
-                  <TextComponent className="font-bold text-zinc-700">
-                    Cancel
-                  </TextComponent>
-                </Pressable>
-                <Pressable
-                  onPress={() => {
-                    if (logoutTarget === "all")
-                      setSessions((current) =>
-                        current.filter((session) => session.current)
-                      );
-                    else removeSession(logoutTarget);
-                    setLogoutTarget(null);
-                  }}
-                  className="h-11 flex-1 items-center justify-center rounded-lg bg-red-500"
-                >
-                  <TextComponent className="font-bold text-white">
-                    Log Out
-                  </TextComponent>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        )}
-      </View>
-    );
-  }
-
-  if (mode === "security") {
-    return (
-      <View className="flex-1 bg-zinc-50">
-        <View className="h-14 flex-row items-center border-b border-zinc-100 bg-white px-3">
-          <Pressable
-            onPress={() => setMode("settings")}
-            className="size-9 items-center justify-center"
-          >
-            <ChevronLeftIcon size={18} color="#52525b" />
-          </Pressable>
-          <TextComponent className="flex-1 text-center font-bold text-zinc-950">
-            Security
-          </TextComponent>
-          <View className="size-9" />
-        </View>
-        <ScrollView contentContainerClassName="p-4 pb-8">
-          <View className="rounded-xl bg-white p-4 shadow-sm">
-            <TextComponent className="text-xs font-bold text-amber-600">
-              Account Protection
-            </TextComponent>
-            <TextComponent className="mt-2 max-w-[75%] text-sm leading-5 text-zinc-600">
-              Your account is currently secured with standard protection.
-            </TextComponent>
-          </View>
-          <View className="mt-5 gap-3">
-            {[
-              {
-                title: "Change Password",
-                detail: "Last updated 3 months ago",
-                target: "change-password" as const
-              },
-              {
-                title: "Two-Factor Authentication",
-                detail: securitySettings.twoFactor
-                  ? "Enabled"
-                  : "Adds an extra layer of security",
-                target: "two-factor" as const
-              },
-              {
-                title: "Biometric Login",
-                detail: securitySettings.biometric
-                  ? "Enabled on this device"
-                  : "Face ID or Fingerprint",
-                target: "biometric" as const
-              },
-              {
-                title: "Login Activity",
-                detail: "Monitor recent sessions",
-                target: "login-activity" as const
-              }
-            ].map((item) => (
-              <Pressable
-                key={item.title}
-                onPress={() => {
-                  setSettingsFeedback("");
-                  setMode(item.target);
-                }}
-                className="flex-row items-center rounded-xl bg-white p-4"
-              >
-                <View className="size-9 items-center justify-center rounded-full bg-blue-50">
-                  <TextComponent className="text-sm font-bold text-primary">
-                    {item.title.charAt(0)}
-                  </TextComponent>
-                </View>
-                <View className="ml-3 flex-1">
-                  <TextComponent className="text-sm font-bold text-zinc-800">
-                    {item.title}
-                  </TextComponent>
-                  <TextComponent className="mt-1 text-[10px] text-zinc-400">
-                    {item.detail}
-                  </TextComponent>
-                </View>
-                <ChevronRightVectorIcon size={14} color="#71717a" />
-              </Pressable>
-            ))}
-          </View>
-          <View className="mt-5 flex-row gap-3">
-            <View className="flex-1 rounded-xl bg-white p-4">
-              <TextComponent className="text-[10px] text-zinc-400">
-                STATUS
-              </TextComponent>
-              <TextComponent className="mt-2 font-bold text-zinc-800">
-                Strong
-              </TextComponent>
-            </View>
-            <View className="flex-1 rounded-xl bg-orange-400 p-4">
-              <TextComponent className="text-[10px] text-orange-950">
-                ALERTS
-              </TextComponent>
-              <TextComponent className="mt-2 font-bold text-orange-950">
-                0 New
-              </TextComponent>
-            </View>
-          </View>
-          {!!settingsFeedback && (
-            <View className="mt-5 rounded-lg bg-blue-50 p-3">
-              <TextComponent className="text-xs text-primary">
-                {settingsFeedback}
-              </TextComponent>
-            </View>
-          )}
-          <TextComponent className="mt-8 text-center text-xs leading-5 text-zinc-500">
-            Manage your privacy and security settings to keep your data safe and
-            sound.
-          </TextComponent>
-        </ScrollView>
-      </View>
-    );
-  }
-
-  const openCamera = async () => {
-    const permission = cameraPermission?.granted
-      ? cameraPermission
-      : await requestCameraPermission();
-    if (!permission.granted) {
-      onError("Allow camera access to take a profile photo.");
-      return;
-    }
-    setShowPhotoOptions(false);
-    setMode("camera");
-  };
-  const captureProfilePhoto = async () => {
-    const photo = await cameraRef.current?.takePictureAsync({ quality: 0.9 });
-    if (photo?.uri) {
-      setProfileDraft((current) => ({ ...current, image: photo.uri }));
-      setMode("edit-profile");
-    }
-  };
-
-  if (mode === "camera") {
-    return (
-      <View className="flex-1 bg-black">
-        <View className="h-14 flex-row items-center px-4">
-          <Pressable onPress={() => setMode("edit-profile")} className="w-16">
-            <TextComponent className="text-xs font-bold text-white">
-              Cancel
-            </TextComponent>
-          </Pressable>
-          <TextComponent className="flex-1 text-center font-bold text-white">
-            Take Photo
-          </TextComponent>
-          <View className="w-16" />
-        </View>
-        <View className="flex-1">
-          <CameraView ref={cameraRef} style={{ flex: 1 }} facing="front" />
-          <View className="absolute inset-x-0 bottom-8 items-center">
-            <Pressable
-              onPress={captureProfilePhoto}
-              accessibilityLabel="Capture profile photo"
-              className="size-20 items-center justify-center rounded-full border-4 border-white bg-white/30"
-            >
-              <View className="size-14 rounded-full bg-white" />
-            </Pressable>
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  if (mode === "edit-profile") {
-    const editFields = [
-      { key: "fullName", label: "Full Name", multiline: false },
-      { key: "username", label: "Username", multiline: false },
-      { key: "bio", label: "Bio", multiline: true },
-      { key: "email", label: "Email", multiline: false },
-      { key: "phone", label: "Phone Number", multiline: false },
-      { key: "website", label: "Website", multiline: false }
-    ] as const;
-    return (
-      <View className="flex-1 bg-zinc-50">
-        <View className="h-14 flex-row items-center border-b border-zinc-100 bg-white px-3">
-          <Pressable
-            onPress={() => {
-              setProfileDraft(profileDetails);
-              setMode("profile");
-            }}
-            className="size-9 items-center justify-center"
-          >
-            <ChevronLeftIcon size={18} color="#52525b" />
-          </Pressable>
-          <TextComponent className="flex-1 text-center font-bold text-zinc-950">
-            Edit Profile
-          </TextComponent>
-          <Pressable
-            onPress={() => {
-              setProfileDetails(profileDraft);
-              setMode("profile");
-              onSuccess("Profile updated successfully");
-            }}
-            className="w-12 items-end"
-          >
-            <TextComponent className="text-xs font-bold text-primary">
-              Save
-            </TextComponent>
-          </Pressable>
-        </View>
-        <ScrollView contentContainerClassName="p-4 pb-10">
-          <View className="items-center">
-            <View className="relative">
-              {profileDraft.image ? (
-                <CustomImage
-                  className="size-24 overflow-hidden rounded-xl bg-zinc-100"
-                  imageClassName="size-full"
-                  source={{ uri: profileDraft.image }}
-                  contentFit="contain"
-                />
-              ) : (
-                <View className="size-24 items-center justify-center rounded-xl bg-zinc-200">
-                  <UserOutlineIcon size={32} color="#71717a" />
-                </View>
-              )}
-              <View className="absolute -bottom-1 -right-1 size-8 items-center justify-center rounded-lg border-2 border-white bg-primary">
-                <TextComponent className="text-xs font-bold text-white">
-                  ✎
-                </TextComponent>
-              </View>
-            </View>
-            <Pressable
-              onPress={() => setShowPhotoOptions(true)}
-              className="mt-3"
-            >
-              <TextComponent className="text-xs font-bold text-primary">
-                Change Profile Photo
-              </TextComponent>
-            </Pressable>
-          </View>
-          {editFields.map((field, index) => (
-            <View
-              key={field.key}
-              className={
-                index === 3 ? "mt-7 border-t border-zinc-200 pt-5" : "mt-4"
-              }
-            >
-              {index === 3 && (
-                <TextComponent className="mb-4 font-bold text-zinc-700">
-                  Further Information
-                </TextComponent>
-              )}
-              <TextComponent className="mb-2 text-xs font-bold text-zinc-600">
-                {field.label}
-              </TextComponent>
-              <TextInput
-                value={profileDraft[field.key]}
-                onChangeText={(value) =>
-                  setProfileDraft((current) => ({
-                    ...current,
-                    [field.key]: value
-                  }))
-                }
-                multiline={field.multiline}
-                placeholder={field.label}
-                placeholderTextColor="#a1a1aa"
-                className={
-                  field.multiline
-                    ? "min-h-24 rounded-xl bg-white px-4 py-3 text-sm text-zinc-900 outline-none"
-                    : "h-12 rounded-xl bg-white px-4 text-sm text-zinc-900 outline-none"
-                }
-              />
-            </View>
-          ))}
-        </ScrollView>
-        {showPhotoOptions && (
-          <View className="absolute inset-0 justify-end bg-black/45">
-            <Pressable
-              className="flex-1"
-              onPress={() => setShowPhotoOptions(false)}
-            />
-            <View className="rounded-t-3xl bg-white px-5 pb-8 pt-3">
-              <View className="mb-5 items-center">
-                <View className="h-1 w-10 rounded-full bg-zinc-300" />
-              </View>
-              <TextComponent className="mb-3 text-base font-bold text-zinc-950">
-                Change Profile Photo
-              </TextComponent>
-              <Pressable
-                onPress={selectProfileImage}
-                className="flex-row items-center border-b border-zinc-100 py-4"
-              >
-                <View className="size-9 items-center justify-center rounded-lg bg-blue-50">
-                  <CustomImage
-                    className="size-5"
-                    imageClassName="size-full"
-                    source={GalleryActionIcon}
-                    contentFit="contain"
-                  />
-                </View>
-                <TextComponent className="ml-3 font-semibold text-zinc-700">
-                  Upload from Gallery
-                </TextComponent>
-              </Pressable>
-              <Pressable
-                onPress={openCamera}
-                className="flex-row items-center border-b border-zinc-100 py-4"
-              >
-                <View className="size-9 items-center justify-center rounded-lg bg-blue-50">
-                  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-                    <Path
-                      d="M4 7.5h3l1.4-2h7.2l1.4 2h3a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9.5a2 2 0 0 1 2-2Z"
-                      stroke={ACTIVE_NAV_COLOR}
-                      strokeWidth={1.7}
-                      strokeLinejoin="round"
-                    />
-                    <Circle
-                      cx={12}
-                      cy={13.5}
-                      r={3.5}
-                      stroke={ACTIVE_NAV_COLOR}
-                      strokeWidth={1.7}
-                    />
-                  </Svg>
-                </View>
-                <TextComponent className="ml-3 font-semibold text-zinc-700">
-                  Take Photo
-                </TextComponent>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  setProfileDraft((current) => ({ ...current, image: "" }));
-                  setShowPhotoOptions(false);
-                }}
-                className="flex-row items-center py-4"
-              >
-                <View className="size-9 items-center justify-center rounded-lg bg-red-50">
-                  <TextComponent className="text-red-500">×</TextComponent>
-                </View>
-                <TextComponent className="ml-3 font-semibold text-red-500">
-                  Remove Current Photo
-                </TextComponent>
-              </Pressable>
-            </View>
-          </View>
-        )}
-      </View>
-    );
-  }
-
-  if (mode === "wallet") {
-    return <WalletContent onBack={() => setMode("settings")} />;
-  }
-
-  if (mode === "accessibility") {
-    const options = [
-      {
-        key: "largerText",
-        label: "Larger text",
-        detail: "Increase text size throughout Turnupz."
-      },
-      {
-        key: "highContrast",
-        label: "High contrast",
-        detail: "Improve separation between text and backgrounds."
-      },
-      {
-        key: "reduceMotion",
-        label: "Reduce motion",
-        detail: "Limit animations and moving transitions."
-      },
-      {
-        key: "screenReaderHints",
-        label: "Screen reader hints",
-        detail: "Provide additional guidance for interactive controls."
-      },
-      {
-        key: "buttonLabels",
-        label: "Always show button labels",
-        detail: "Display text labels with navigation icons."
-      }
-    ] as const;
-
-    return (
-      <View className="flex-1 bg-zinc-50">
-        <View className="h-14 flex-row items-center border-b border-zinc-100 bg-white px-3">
-          <Pressable
-            onPress={() => setMode("settings")}
-            accessibilityRole="button"
-            accessibilityLabel="Back to settings"
-            className="size-9 items-center justify-center"
-          >
-            <ChevronLeftIcon size={18} color="#52525b" />
-          </Pressable>
-          <TextComponent className="flex-1 text-center font-bold text-zinc-950">
-            Accessibility
-          </TextComponent>
-          <View className="size-9" />
-        </View>
-        <ScrollView contentContainerClassName="p-4 pb-8">
-          <TextComponent className="mb-3 text-xs leading-5 text-zinc-500">
-            Adjust Turnupz to make event discovery, tickets, and chats easier to
-            use.
-          </TextComponent>
-          <View className="overflow-hidden rounded-xl bg-white shadow-sm">
-            {options.map((option) => {
-              const enabled = accessibilityOptions[option.key];
-              return (
-                <Pressable
-                  key={option.key}
-                  accessibilityRole="switch"
-                  accessibilityState={{ checked: enabled }}
-                  accessibilityLabel={option.label}
-                  onPress={() => accessibilityOptions.toggleOption(option.key)}
-                  className="flex-row items-center border-b border-zinc-100 px-4 py-4"
-                >
-                  <View className="flex-1 pr-4">
-                    <TextComponent className="text-sm font-bold text-zinc-800">
-                      {option.label}
-                    </TextComponent>
-                    <TextComponent className="mt-1 text-xs leading-4 text-zinc-500">
-                      {option.detail}
-                    </TextComponent>
-                  </View>
-                  <View
-                    className={
-                      enabled
-                        ? "h-6 w-11 justify-center rounded-full bg-primary px-1"
-                        : "h-6 w-11 justify-center rounded-full bg-zinc-300 px-1"
-                    }
-                  >
-                    <View
-                      className={
-                        enabled
-                          ? "size-4 self-end rounded-full bg-white"
-                          : "size-4 self-start rounded-full bg-white"
-                      }
-                    />
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (mode === "help-center") {
-    const topics = [
-      "Tickets and bookings",
-      "Payments and refunds",
-      "Account and security",
-      "Something else"
-    ];
-    const chooseTopic = (topic: string) => {
-      setSupportTopic(topic);
-      setSupportChannel(null);
-      setSupportQueue(null);
-      if (topic === "Something else") setOtherHelpClicks((count) => count + 1);
-    };
-    const startSupport = (channel: "chat" | "call") => {
-      setSupportChannel(channel);
-      const wait = otherHelpClicks >= 2 ? 10 : 3;
-      setSupportQueue(wait);
-      setSupportSeconds(wait * 60);
-    };
-    return (
-      <View className="flex-1 bg-zinc-50">
-        {settingsHeader("Help Center")}
-        <ScrollView contentContainerClassName="p-4 pb-8">
-          <View className="rounded-2xl bg-primary p-5">
-            <TextComponent className="text-lg font-bold text-white">
-              How can we help?
-            </TextComponent>
-            <TextComponent className="mt-2 text-xs leading-5 text-white/80">
-              Choose what you need help with so we can provide the right
-              information.
-            </TextComponent>
-          </View>
-          <View className="mt-5 gap-3">
-            {topics.map((topic) => (
-              <Pressable
-                key={topic}
-                onPress={() => chooseTopic(topic)}
-                className={
-                  supportTopic === topic
-                    ? "flex-row items-center rounded-xl border-2 border-primary bg-white p-4"
-                    : "flex-row items-center rounded-xl border border-zinc-200 bg-white p-4"
-                }
-              >
-                <TextComponent className="flex-1 text-sm font-semibold text-zinc-700">
-                  {topic}
-                </TextComponent>
-                <ChevronRightVectorIcon size={14} color="#71717a" />
-              </Pressable>
-            ))}
-          </View>
-          {!!supportTopic && supportTopic !== "Something else" && (
-            <View className="mt-5 rounded-xl bg-blue-50 p-4">
-              <TextComponent className="text-sm font-bold text-zinc-800">
-                Suggested help
-              </TextComponent>
-              <TextComponent className="mt-2 text-xs leading-5 text-zinc-600">
-                Review the related settings and recent activity. If this does
-                not solve the issue, select Something else to contact our
-                support team.
-              </TextComponent>
-            </View>
-          )}
-          {supportTopic === "Something else" && !supportQueue && (
-            <View className="mt-5 rounded-xl bg-white p-4">
-              <TextComponent className="text-sm font-bold text-zinc-800">
-                Contact customer service
-              </TextComponent>
-              <TextComponent className="mt-2 text-xs text-zinc-500">
-                How would you like a representative to assist you?
-              </TextComponent>
-              <View className="mt-4 flex-row gap-3">
-                <Pressable
-                  onPress={() => startSupport("chat")}
-                  className="h-11 flex-1 items-center justify-center rounded-lg bg-primary"
-                >
-                  <TextComponent className="font-bold text-white">
-                    Chat
-                  </TextComponent>
-                </Pressable>
-                <Pressable
-                  onPress={() => startSupport("call")}
-                  className="h-11 flex-1 items-center justify-center rounded-lg border border-primary bg-white"
-                >
-                  <TextComponent className="font-bold text-primary">
-                    Call
-                  </TextComponent>
-                </Pressable>
-              </View>
-            </View>
-          )}
-          {!!supportQueue && (
-            <View className="mt-5 items-center rounded-2xl bg-white p-6">
-              <TextComponent className="text-3xl font-bold text-primary">
-                {String(Math.floor(supportSeconds / 60)).padStart(2, "0")}:
-                {String(supportSeconds % 60).padStart(2, "0")}
-              </TextComponent>
-              <TextComponent className="mt-2 text-sm font-bold text-zinc-800">
-                Estimated waiting time
-              </TextComponent>
-              <TextComponent className="mt-2 text-center text-xs leading-5 text-zinc-500">
-                {supportQueue === 10
-                  ? "We are currently experiencing a high volume of requests. A representative will attend to you in approximately 10 minutes."
-                  : `A customer service representative will join your ${supportChannel} in approximately 3 minutes.`}
-              </TextComponent>
-              <Pressable
-                onPress={() => {
-                  setSupportQueue(null);
-                  setSupportChannel(null);
-                }}
-                className="mt-5 h-11 w-full items-center justify-center rounded-lg bg-zinc-100"
-              >
-                <TextComponent className="font-bold text-zinc-700">
-                  Cancel Request
-                </TextComponent>
-              </Pressable>
-            </View>
-          )}
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (mode === "settings") {
-    return (
-      <ScrollView
-        className="flex-1 bg-zinc-50"
-        stickyHeaderIndices={[0]}
-        contentContainerClassName="pb-8"
-      >
-        <View className="h-14 flex-row items-center border-b border-zinc-100 bg-white px-3">
-          <Pressable
-            onPress={() => setMode("profile")}
-            className="size-9 items-center justify-center"
-          >
-            <ChevronLeftIcon size={18} color="#52525b" />
-          </Pressable>
-          <TextComponent className="flex-1 text-center font-bold text-zinc-950">
-            Settings
-          </TextComponent>
-          <View className="size-9" />
-        </View>
-        {[
-          {
-            title: "Account",
-            items: ["Tickets", "Wallet", "Security"]
-          },
-          {
-            title: "Preferences",
-            items: ["Notifications", "Privacy", "Language"]
-          },
-          {
-            title: "Support",
-            items: [
-              "Help Center",
-              "Accessibility",
-              "Terms of Service",
-              "Privacy Policy"
-            ]
-          }
-        ].map((section) => (
-          <View key={section.title} className="mx-4 mt-5">
-            <TextComponent className="mb-2 text-[10px] font-bold uppercase text-zinc-400">
-              {section.title}
-            </TextComponent>
-            <View className="overflow-hidden rounded-xl bg-white shadow-sm">
-              {section.items.map((item) => (
-                <Pressable
-                  key={item}
-                  onPress={() => {
-                    if (item === "Tickets") onOpenTickets();
-                    if (item === "Wallet") setMode("wallet");
-                    if (item === "Notifications") {
-                      setSettingsFeedback("");
-                      setMode("notifications-settings");
-                    }
-                    if (item === "Security") {
-                      setSettingsFeedback("");
-                      setMode("security");
-                    }
-                    if (item === "Privacy") {
-                      setSettingsFeedback("");
-                      setMode("privacy");
-                    }
-                    if (item === "Language") {
-                      setSettingsFeedback("");
-                      setMode("language");
-                    }
-                    if (item === "Accessibility") setMode("accessibility");
-                    if (item === "Help Center") {
-                      setSupportTopic(null);
-                      setSupportQueue(null);
-                      setMode("help-center");
-                    }
-                  }}
-                  className="flex-row items-center justify-between border-b border-zinc-100 px-4 py-4"
-                >
-                  <View className="flex-row items-center">
-                    <View className="size-7 items-center justify-center rounded-md bg-blue-50">
-                      <UserOutlineIcon size={14} color={ACTIVE_NAV_COLOR} />
-                    </View>
-                    <TextComponent className="ml-3 text-sm font-semibold text-zinc-700">
-                      {item}
-                    </TextComponent>
-                  </View>
-                  <View className="flex-row items-center">
-                    {item === "Language" && (
-                      <TextComponent className="mr-2 text-[10px] text-zinc-400">
-                        {language}
-                      </TextComponent>
-                    )}
-                    <ChevronRightVectorIcon size={14} color="#a1a1aa" />
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ))}
-        <Pressable className="mx-4 mt-6 h-12 items-center justify-center rounded-lg bg-red-100">
-          <TextComponent className="font-bold text-red-500">
-            Log Out
-          </TextComponent>
-        </Pressable>
-        <TextComponent className="mt-6 text-center text-[10px] text-zinc-400">
-          Turnupz Mobile v1.0
-        </TextComponent>
-      </ScrollView>
-    );
-  }
-
-  return (
-    <View className="flex-1 bg-white">
-      <ScrollView className="flex-1 bg-white" contentContainerClassName="pb-8">
-        <View className="h-14 flex-row items-center justify-end border-b border-zinc-100 bg-white px-4">
-          <Pressable
-            onPress={() => setMode("settings")}
-            className="size-9 items-center justify-center"
-          >
-            <View className="gap-0.5">
-              <View className="size-1 rounded-full bg-primary" />
-              <View className="size-1 rounded-full bg-primary" />
-              <View className="size-1 rounded-full bg-primary" />
-            </View>
-          </Pressable>
-        </View>
-        <View className="px-4 pt-5">
-          <View className="flex-row items-stretch">
-            <View className="w-28 overflow-hidden rounded-lg bg-zinc-100">
-              {profileDetails.image ? (
-                <CustomImage
-                  className="h-full min-h-[132px] w-28 overflow-hidden rounded-lg bg-zinc-100"
-                  imageClassName="size-full"
-                  source={{ uri: profileDetails.image }}
-                  contentFit="cover"
-                />
-              ) : (
-                <View className="h-full min-h-[132px] w-28 items-center justify-center rounded-lg bg-zinc-200">
-                  <UserOutlineIcon size={28} color="#71717a" />
-                </View>
-              )}
-            </View>
-            <View className="ml-4 flex-1">
-              <TextComponent className="text-lg font-bold text-zinc-950">
-                {profileDetails.fullName}
-              </TextComponent>
-              <TextComponent className="mt-1 text-xs font-semibold text-zinc-500">
-                {profileDetails.username}
-              </TextComponent>
-              <TextComponent className="mt-3 text-xs leading-5 text-zinc-600">
-                {profileDetails.bio}
-              </TextComponent>
-              <TextComponent className="mt-3 text-xs font-bold text-primary">
-                {profileDetails.website}
-              </TextComponent>
-            </View>
-          </View>
-
-          <View className="mt-4 flex-row gap-3">
-            <Pressable
-              onPress={() => {
-                setProfileDraft(profileDetails);
-                setMode("edit-profile");
-              }}
-              className="h-11 flex-1 flex-row items-center justify-center rounded-lg bg-primary"
-            >
-              <UserOutlineIcon size={15} color="#ffffff" />
-              <TextComponent className="ml-2 text-xs font-bold text-white">
-                Edit
-              </TextComponent>
-            </Pressable>
-            <Pressable
-              onPress={() => Linking.openURL(`mailto:${profileDetails.email}`)}
-              className="h-11 flex-1 flex-row items-center justify-center rounded-lg border border-primary bg-white"
-            >
-              <StoryActionIcon
-                type="email"
-                size={16}
-                color={ACTIVE_NAV_COLOR}
-              />
-              <TextComponent className="ml-2 text-xs font-bold text-primary">
-                Email
-              </TextComponent>
-            </Pressable>
-            <Pressable
-              onPress={() =>
-                Share.share({
-                  message: `View ${profileDetails.fullName} on Turnupz: https://turnupz.app/${profileDetails.username.replace("@", "")}`
-                })
-              }
-              className="h-11 flex-1 flex-row items-center justify-center rounded-lg border border-primary bg-white"
-            >
-              <StoryActionIcon
-                type="share"
-                size={16}
-                color={ACTIVE_NAV_COLOR}
-              />
-              <TextComponent className="ml-2 text-xs font-bold text-primary">
-                Share
-              </TextComponent>
-            </Pressable>
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerClassName="gap-2 py-4"
-          >
-            {["Posts", "Events", "Saved", "Tagged", "Following"].map((pill) => {
-              const isActive = activePill === pill;
-
-              return (
-                <Pressable
-                  key={pill}
-                  onPress={() => setActivePill(pill)}
-                  className={
-                    isActive
-                      ? "rounded-full bg-primary px-5 py-2"
-                      : "rounded-full bg-zinc-100 px-5 py-2"
-                  }
-                >
-                  <TextComponent
-                    className={
-                      isActive
-                        ? "text-xs font-bold text-white"
-                        : "text-xs font-bold text-zinc-500"
-                    }
-                  >
-                    {pill}
-                  </TextComponent>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          {activePill === "Events" ? (
-            <View>
-              {bookings.map((booking) => (
-                <Pressable
-                  key={booking.id}
-                  onPress={onOpenEvents}
-                  className="mb-3 flex-row overflow-hidden rounded-xl bg-zinc-50"
-                >
-                  <CustomImage
-                    className="h-20 w-28"
-                    imageClassName="size-full"
-                    source={{ uri: booking.event.image }}
-                    contentFit="cover"
-                  />
-                  <View className="flex-1 justify-center px-3">
-                    <TextComponent
-                      className="font-bold text-zinc-950"
-                      numberOfLines={1}
-                    >
-                      {booking.event.title}
-                    </TextComponent>
-                    <TextComponent className="mt-1 text-[10px] text-zinc-500">
-                      {booking.event.date} · {booking.event.time}
-                    </TextComponent>
-                    <TextComponent className="mt-1 text-[10px] font-bold text-primary">
-                      {booking.kind === "registration" ? "Registered" : "Paid"}
-                    </TextComponent>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-          ) : activePill === "Saved" ? (
-            <View className="overflow-hidden rounded-xl border border-zinc-100">
-              {savedEvents.length ? (
-                savedEvents.map((event) => (
-                  <View key={event.id}>
-                    <FeedCard
-                      event={event}
-                      onOpenSettings={setSelectedSavedMenuEvent}
-                      onOpenDetails={setSelectedSavedEvent}
-                    />
-                    <View className="border-b border-zinc-100 bg-blue-50 px-4 py-2">
-                      <TextComponent className="text-[10px] font-semibold text-primary">
-                        Saved for later · Ticket reminder will appear as the
-                        date approaches
-                      </TextComponent>
-                    </View>
-                  </View>
-                ))
-              ) : (
-                <TextComponent className="py-10 text-center text-sm text-zinc-400">
-                  Events saved for later will appear here.
-                </TextComponent>
-              )}
-            </View>
-          ) : activePill === "Following" ? (
-            <View>
-              {[
-                ...followedPerformers.map((item) => ({
-                  id: item.id,
-                  name: item.name,
-                  type: "Performer"
-                })),
-                ...followedLocations.map((item) => ({
-                  id: item.id,
-                  name: item.title,
-                  type: "Location"
-                })),
-                ...followedPlanners.map((item) => ({
-                  id: item.id,
-                  name: item.name,
-                  type: "Event planner"
-                }))
-              ].map((item) => (
-                <Pressable
-                  onPress={onOpenHome}
-                  accessibilityRole="button"
-                  accessibilityLabel={`View latest events from ${item.name}`}
-                  key={`${item.type}-${item.id}`}
-                  className="mb-2 flex-row items-center justify-between rounded-xl bg-zinc-50 p-4"
-                >
-                  <View>
-                    <TextComponent className="font-bold text-zinc-950">
-                      {item.name}
-                    </TextComponent>
-                    <TextComponent className="mt-1 text-[10px] text-zinc-500">
-                      {item.type}
-                    </TextComponent>
-                  </View>
-                  <View className="rounded-full bg-blue-50 px-3 py-1.5">
-                    <TextComponent className="text-xs font-bold text-primary">
-                      Following
-                    </TextComponent>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-          ) : (
-            <View>
-              <TextComponent className="mb-3 text-xs text-zinc-500">
-                {activePill === "Posts"
-                  ? "Expired posts from your stories"
-                  : "Stories you were tagged in"}
-              </TextComponent>
-              <View className="flex-row flex-wrap justify-between gap-y-2">
-                {galleryImages.map((image, index) => (
-                  <View
-                    key={`${image}-${index}`}
-                    className="w-[48.5%] overflow-hidden rounded-lg bg-zinc-100"
-                    style={{ aspectRatio: 1 }}
-                  >
-                    <CustomImage
-                      className="size-full"
-                      imageClassName="size-full"
-                      source={{ uri: image }}
-                      contentFit="cover"
-                    />
-                    {index === 2 && (
-                      <View className="absolute right-2 top-2 rounded-full bg-orange-500 px-2 py-1">
-                        <TextComponent className="text-[9px] font-bold text-white">
-                          LIVE
-                        </TextComponent>
-                      </View>
-                    )}
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-        </View>
-      </ScrollView>
-      <SettingsSheet
-        event={selectedSavedMenuEvent}
-        onClose={() => setSelectedSavedMenuEvent(null)}
-        onMessageOrganizer={onMessageOrganizer}
-        onShareWithCommunity={onShareWithCommunity}
-      />
-    </View>
-  );
-};
-
 const MoreButton = ({ onPress }: { onPress: () => void }) => {
   return (
     <Pressable
@@ -13316,6 +10056,10 @@ const MoreButton = ({ onPress }: { onPress: () => void }) => {
   );
 };
 
+/** The feed's background; the card's ticket notches are cut in it. */
+const FEED_BACKGROUND = TICKET_LIST_BACKGROUND;
+
+/** A feed event as a web-style ticket stub; the dots open its options. */
 const FeedCard = ({
   event,
   onOpenSettings,
@@ -13324,466 +10068,62 @@ const FeedCard = ({
   event: TFeedEvent;
   onOpenSettings: (event: TFeedEvent) => void;
   onOpenDetails?: (event: TFeedEvent) => void;
-}) => {
-  const mediaUrl = event.medias?.[0] || event.image;
+}) => (
+  <EventTicketCard
+    name={event.name}
+    date={event.date}
+    timezone={event.timezone}
+    image={event.medias?.[0] || event.image}
+    category={event.category}
+    place={event.venueName}
+    badge={event.mediaKind === "video" ? "Video" : undefined}
+    onPress={() => onOpenDetails?.(event)}
+    onMore={() => onOpenSettings(event)}
+  />
+);
 
-  return (
-    <View className="bg-white">
-      <View className="relative aspect-[4/3] w-full bg-zinc-100">
-        <CustomImage
-          className="size-full"
-          imageClassName="size-full"
-          source={{ uri: mediaUrl }}
-          contentFit="cover"
-        />
-        {event.mediaKind === "video" && (
-          <View className="absolute left-3 top-3 rounded-full bg-black/55 px-3 py-1">
-            <TextComponent className="text-xs font-semibold text-white">
-              Video
-            </TextComponent>
-          </View>
-        )}
-      </View>
-      <View className="min-h-[74px] flex-row items-center bg-white py-3 pl-4 pr-2">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Open details for ${event.name}`}
-          onPress={() => onOpenDetails?.(event)}
-          className="flex-1 gap-1"
-        >
-          <TextComponent
-            numberOfLines={1}
-            className="text-sm font-semibold text-zinc-950"
-          >
-            {event.name}
-          </TextComponent>
-          <TextComponent numberOfLines={1} className="text-xs text-zinc-700">
-            {event.venueName} - {formatEventDate(event.date, event.timezone)}
-          </TextComponent>
-        </Pressable>
-        <MoreButton onPress={() => onOpenSettings(event)} />
-      </View>
-    </View>
-  );
-};
 
-const SettingsAction = ({
-  icon,
-  label,
-  secondaryLabel,
-  onPress,
-  selected = false,
-  accessibilityLabel
-}: {
-  icon: React.ReactNode;
-  label: string;
-  secondaryLabel?: string;
-  onPress?: () => void;
-  selected?: boolean;
-  accessibilityLabel: string;
-}) => {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      onPress={onPress}
-      className={
-        selected
-          ? "flex-row items-center gap-3 rounded-lg bg-blue-50 px-2 py-2"
-          : "flex-row items-center gap-3 px-2 py-2"
-      }
-    >
-      <View
-        className={
-          selected
-            ? "size-7 items-center justify-center rounded-full bg-primary"
-            : "size-7 items-center justify-center rounded-full bg-zinc-100"
-        }
-      >
-        {icon}
-      </View>
-      <View className="flex-1">
-        <TextComponent
-          className={
-            selected
-              ? "text-xs font-bold text-primary"
-              : "text-xs font-semibold text-zinc-700"
-          }
-        >
-          {label}
-        </TextComponent>
-        {!!secondaryLabel && (
-          <TextComponent className="mt-0.5 text-[10px] text-zinc-500">
-            {secondaryLabel}
-          </TextComponent>
-        )}
-      </View>
-    </Pressable>
-  );
-};
-
+// Every card's dots open the one shared sheet (see EventOptionsSheet).
 const SettingsSheet = ({
   event,
-  onClose,
-  onMessageOrganizer,
-  onShareWithCommunity
+  onClose
 }: {
   event: TFeedEvent | null;
   onClose: () => void;
-  onMessageOrganizer: (event: TFeedEvent) => void;
-  onShareWithCommunity: (event: TFeedEvent) => void;
-}) => {
-  const savedEvents = usePrototypeSocialStore((state) => state.savedEvents);
-  const toggleSavedEvent = usePrototypeSocialStore(
-    (state) => state.toggleSavedEvent
-  );
-  const hiddenEventIds = usePrototypeSocialStore(
-    (state) => state.hiddenEventIds
-  );
-  const toggleHiddenEvent = usePrototypeSocialStore(
-    (state) => state.toggleHiddenEvent
-  );
-  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
-  const [showWebShare, setShowWebShare] = useState(false);
-  const [showReport, setShowReport] = useState(false);
-  const [reportReason, setReportReason] = useState("");
-  const [reportComment, setReportComment] = useState("");
-  const [reportState, setReportState] = useState<
-    "selecting" | "submitting" | "success" | "error"
-  >("selecting");
-  useEffect(() => {
-    setCopyState("idle");
-    setShowWebShare(false);
-    setShowReport(false);
-    setReportReason("");
-    setReportComment("");
-    setReportState("selecting");
-  }, [event?.id]);
-  if (!event) {
-    return null;
-  }
-
-  const isSaved = savedEvents.some((savedEvent) => savedEvent.id === event.id);
-  const isHidden = hiddenEventIds.includes(event.id);
-  const eventUrl = getEventPublicUrl(event.id);
-  const shareMessage = `${event.name}\n${formatEventDate(event.date, event.timezone)} · ${event.venueName}\n${eventUrl}`;
-  const reportReasons = [
-    "Spam or misleading content",
-    "Scam or suspected fraud",
-    "Inappropriate content",
-    "False event information",
-    "Duplicate event",
-    "Safety concern",
-    "Harassment or discrimination",
-    "Event does not exist",
-    "Other"
-  ];
-  const copyEventLink = async () => {
-    try {
-      await Clipboard.setStringAsync(eventUrl);
-      setCopyState("copied");
-      setTimeout(() => setCopyState("idle"), 1800);
-    } catch {
-      onError("Unable to copy the event link.");
+  onMessageOrganizer?: (event: TFeedEvent) => void;
+  onShareWithCommunity?: (event: TFeedEvent) => void;
+}) => (
+  <EventOptionsSheet
+    event={
+      event && {
+        id: event.id,
+        name: event.name,
+        date: event.date,
+        timezone: event.timezone,
+        image: event.medias?.[0] || event.image,
+        place: event.venueName,
+        isFavorite: event.isFavorite
+      }
     }
-  };
-  const openShare = async () => {
-    if (Platform.OS === "web") {
-      setShowWebShare(true);
-      return;
-    }
-    try {
-      await Share.share({
-        title: event.name,
-        message: shareMessage,
-        url: eventUrl
-      });
-    } catch {
-      onError("Unable to open sharing options.");
-    }
-  };
-  const openWebDestination = async (
-    destination: "whatsapp" | "facebook" | "x" | "email"
-  ) => {
-    const encodedUrl = encodeURIComponent(eventUrl);
-    const encodedText = encodeURIComponent(shareMessage);
-    const urls = {
-      whatsapp: `https://wa.me/?text=${encodedText}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
-      x: `https://twitter.com/intent/tweet?text=${encodedText}`,
-      email: `mailto:?subject=${encodeURIComponent(event.name)}&body=${encodedText}`
-    };
-    await Linking.openURL(urls[destination]);
-  };
-  const canSubmitReport =
-    Boolean(reportReason) &&
-    (reportReason !== "Other" || Boolean(reportComment.trim()));
-  const submitReport = async () => {
-    if (!canSubmitReport) return;
-    try {
-      setReportState("submitting");
-      await submitEventReport({
-        eventId: event.id,
-        reason: reportReason,
-        comment: reportComment.trim() || undefined,
-        submittedAt: new Date().toISOString()
-      });
-      setReportState("success");
-      onSuccess("Report submitted. Thank you.");
-      setShowReport(false);
-      onClose();
-    } catch (reportError) {
-      setReportState("error");
-      onError(
-        constructErrorMessage(
-          reportError as TApiErrorResponseType,
-          "Unable to submit the report. Please try again."
-        )
-      );
-    }
-  };
-
-  return (
-    <View className="absolute inset-0 justify-end bg-black/45">
-      <Pressable className="flex-1" onPress={onClose} />
-      <View className="rounded-t-3xl bg-white px-5 pb-8 pt-3">
-        <View className="mb-4 items-center">
-          <View className="h-1 w-10 rounded-full bg-zinc-300" />
-        </View>
-        {showReport ? (
-          <View>
-            <TextComponent className="text-base font-bold text-zinc-950">
-              Report this event
-            </TextComponent>
-            <TextComponent className="mt-2 text-xs text-zinc-600">
-              Why are you reporting this event?
-            </TextComponent>
-            <ScrollView
-              className="mt-3 max-h-64"
-              showsVerticalScrollIndicator={false}
-            >
-              {reportReasons.map((reason) => (
-                <Pressable
-                  key={reason}
-                  onPress={() => setReportReason(reason)}
-                  className="flex-row items-center border-b border-zinc-100 py-2.5"
-                >
-                  <View
-                    className={
-                      reportReason === reason
-                        ? "size-5 items-center justify-center rounded-full border border-primary"
-                        : "size-5 rounded-full border border-zinc-300"
-                    }
-                  >
-                    {reportReason === reason && (
-                      <View className="size-3 rounded-full bg-primary" />
-                    )}
-                  </View>
-                  <TextComponent className="ml-3 text-xs text-zinc-700">
-                    {reason}
-                  </TextComponent>
-                </Pressable>
-              ))}
-            </ScrollView>
-            <TextInput
-              value={reportComment}
-              onChangeText={setReportComment}
-              multiline
-              placeholder="Tell us more"
-              placeholderTextColor="#a1a1aa"
-              className="mt-3 min-h-20 rounded-xl bg-zinc-100 px-3 py-3 text-xs text-zinc-800 outline-none"
-            />
-            <View className="mt-4 flex-row gap-3">
-              <Pressable
-                onPress={() => setShowReport(false)}
-                className="h-11 flex-1 items-center justify-center rounded-lg bg-zinc-100"
-              >
-                <TextComponent className="font-bold text-zinc-700">
-                  Cancel
-                </TextComponent>
-              </Pressable>
-              <Pressable
-                disabled={!canSubmitReport || reportState === "submitting"}
-                onPress={submitReport}
-                className={
-                  canSubmitReport
-                    ? "h-11 flex-1 items-center justify-center rounded-lg bg-primary"
-                    : "h-11 flex-1 items-center justify-center rounded-lg bg-zinc-300"
-                }
-              >
-                <TextComponent className="font-bold text-white">
-                  {reportState === "submitting"
-                    ? "Submitting..."
-                    : "Submit report"}
-                </TextComponent>
-              </Pressable>
-            </View>
-          </View>
-        ) : showWebShare ? (
-          <View>
-            <TextComponent className="text-base font-bold text-zinc-950">
-              Share event
-            </TextComponent>
-            <View className="mt-4 gap-2">
-              <Pressable
-                onPress={() => {
-                  onShareWithCommunity(event);
-                  onClose();
-                }}
-                className="h-12 flex-row items-center rounded-lg bg-blue-50 px-4"
-              >
-                <MessageIcon size={18} color={ACTIVE_NAV_COLOR} />
-                <View className="ml-3">
-                  <TextComponent className="text-sm font-bold text-primary">Share with a Turnupz user</TextComponent>
-                  <TextComponent className="text-[10px] text-zinc-500">Choose a chat or group</TextComponent>
-                </View>
-              </Pressable>
-              <TextComponent className="pt-2 text-[10px] font-bold uppercase text-zinc-400">Share externally</TextComponent>
-              {(["whatsapp", "facebook", "x", "email"] as const).map(
-                (destination) => (
-                  <Pressable
-                    key={destination}
-                    onPress={() => openWebDestination(destination)}
-                    className="h-11 justify-center rounded-lg bg-zinc-100 px-4"
-                  >
-                    <TextComponent className="text-sm font-semibold capitalize text-zinc-700">
-                      {destination}
-                    </TextComponent>
-                  </Pressable>
-                )
-              )}
-              <Pressable
-                onPress={copyEventLink}
-                className="h-11 justify-center rounded-lg bg-zinc-100 px-4"
-              >
-                <TextComponent className="text-sm font-semibold text-zinc-700">
-                  {copyState === "copied" ? "Copied!" : "Copy Link"}
-                </TextComponent>
-              </Pressable>
-            </View>
-            <Pressable
-              onPress={() => setShowWebShare(false)}
-              className="mt-4 h-11 items-center justify-center rounded-lg border border-zinc-200"
-            >
-              <TextComponent className="font-bold text-zinc-600">
-                Back
-              </TextComponent>
-            </Pressable>
-          </View>
-        ) : (
-          <>
-            <TextComponent className="mb-3 text-base font-semibold text-zinc-950">
-              Event actions
-            </TextComponent>
-            <SettingsAction
-              accessibilityLabel="Message event organizer"
-              icon={<MessageIcon size={15} color="#71717a" />}
-              label="Message event organizer"
-              secondaryLabel={event.name}
-              onPress={() => {
-                onMessageOrganizer(event);
-                onClose();
-              }}
-            />
-            <SettingsAction
-              accessibilityLabel="Share event with community"
-              icon={<UserOutlineIcon size={15} color="#71717a" />}
-              label="Share with community"
-              onPress={() => {
-                onShareWithCommunity(event);
-                onClose();
-              }}
-            />
-            <SettingsAction
-              accessibilityLabel={
-                isSaved ? "Remove event from saved" : "Save event"
-              }
-              icon={
-                <HeartOutlineIcon
-                  size={15}
-                  color={isSaved ? "#ffffff" : "#71717a"}
-                />
-              }
-              label={isSaved ? "Remove from saved" : "Save event"}
-              selected={isSaved}
-              onPress={() => toggleSavedEvent(event)}
-            />
-            <View className="mt-4 flex-row justify-between">
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Copy event link"
-                onPress={copyEventLink}
-                className="min-h-12 w-[23%] items-center gap-1"
-              >
-                <View className="size-8 items-center justify-center rounded-full bg-zinc-100">
-                  {copyState === "copied" ? (
-                    <CheckIcon size={16} color={ACTIVE_NAV_COLOR} />
-                  ) : (
-                    <CopyIcon size={15} color="#71717a" />
-                  )}
-                </View>
-                <TextComponent className="text-[10px] text-zinc-600">
-                  {copyState === "copied" ? "Copied!" : "Copy"}
-                </TextComponent>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Share event"
-                onPress={openShare}
-                className="min-h-12 w-[23%] items-center gap-1"
-              >
-                <View className="size-8 items-center justify-center rounded-full bg-zinc-100">
-                  <SendIcon size={15} color="#71717a" />
-                </View>
-                <TextComponent className="text-[10px] text-zinc-600">
-                  Share Via...
-                </TextComponent>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={isHidden ? "Unhide event" : "Hide event"}
-                onPress={() => {
-                  toggleHiddenEvent(event.id);
-                  onInfo(isHidden ? "Event restored" : "Event hidden");
-                }}
-                className="min-h-12 w-[23%] items-center gap-1"
-              >
-                <View className="size-8 items-center justify-center rounded-full bg-zinc-100">
-                  {isHidden ? (
-                    <EyeOutlineIcon size={16} color="#71717a" />
-                  ) : (
-                    <EyeSlashOutlineIcon size={16} color="#71717a" />
-                  )}
-                </View>
-                <TextComponent className="text-[10px] text-zinc-600">
-                  {isHidden ? "Unhide" : "Hide"}
-                </TextComponent>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Report event"
-                onPress={() => setShowReport(true)}
-                className="min-h-12 w-[23%] items-center gap-1"
-              >
-                <View className="size-8 items-center justify-center rounded-full bg-zinc-100">
-                  <CircleExclamationIcon size={15} color="#71717a" />
-                </View>
-                <TextComponent className="text-[10px] text-zinc-600">
-                  Report
-                </TextComponent>
-              </Pressable>
-            </View>
-          </>
-        )}
-      </View>
-    </View>
-  );
-};
+    onClose={onClose}
+  />
+);
 
 const RefinedHomeFeedDesignScreen = () => {
-  const reduceMotion = useAccessibilityStore((state) => state.reduceMotion);
-  const [isSplashVisible, setIsSplashVisible] = useState(true);
   const [activeTab, setActiveTab] = useState<TBottomNavId>("home");
+  // Tapping the tab you're on takes that screen back to its top.
+  const homeListRef = useRef<TBrandRefreshListHandle>(null);
+  const [exploreTopSignal, setExploreTopSignal] = useState(0);
+  const onTabPress = (tab: TBottomNavId) => {
+    if (tab !== activeTab) {
+      setActiveTab(tab);
+      return;
+    }
+    if (tab === "home") {
+      homeListRef.current?.scrollToTop();
+    }
+    if (tab === "search") setExploreTopSignal((count) => count + 1);
+  };
   const [hideMessageNav, setHideMessageNav] = useState(false);
   const [ticketsReturnTab, setTicketsReturnTab] =
     useState<TBottomNavId>("profile");
@@ -13795,8 +10135,15 @@ const RefinedHomeFeedDesignScreen = () => {
   );
   const [eventShareIntent, setEventShareIntent] =
     useState<TEventShareIntent>("organizer");
-  const hiddenEventIds = usePrototypeSocialStore(
-    (state) => state.hiddenEventIds
+  // Hidden events and the card dots: the same store and sheet as Explore.
+  const hiddenEventIds = useHiddenEventsStore((state) => state.hiddenEventIds);
+  const syncHiddenEvents = useHiddenEventsStore((state) => state.sync);
+  const isSignedIn = !!useUserStore((state) => state.userToken);
+  useEffect(() => {
+    if (isSignedIn) void syncHiddenEvents();
+  }, [isSignedIn, syncHiddenEvents]);
+  const [optionsEvent, setOptionsEvent] = useState<TEventOptionsTarget | null>(
+    null
   );
   const subscribedEventIds = usePrototypeSocialStore((state) => state.subscribedEventIds);
   const subscribeToEvent = usePrototypeSocialStore((state) => state.subscribeToEvent);
@@ -13826,15 +10173,11 @@ const RefinedHomeFeedDesignScreen = () => {
     }
   ]);
   const [transfers, setTransfers] = useState<TTicketTransfer[]>([]);
-  useEffect(() => {
-    const timer = setTimeout(
-      () => setIsSplashVisible(false),
-      reduceMotion ? 0 : 1200
-    );
-    return () => clearTimeout(timer);
-  }, [reduceMotion]);
-  // The home feed is live: published events from the API, newest pages as you scroll.
-  const liveEvents = useLiveEvents();
+  // The home feed is live: published events from the API, ten at a time,
+  // the next ten fetched as you scroll towards the end.
+  const liveEvents = useLiveEvents({ limit: String(HOME_FEED_BATCH) });
+  // The loader shows only while the feed's first page is on its way.
+  const isSplashVisible = liveEvents.isLoading && !liveEvents.data;
   const feedEvents = useMemo(
     () =>
       (liveEvents.data?.pages ?? [])
@@ -13844,6 +10187,8 @@ const RefinedHomeFeedDesignScreen = () => {
     [hiddenEventIds, liveEvents.data]
   );
   const [liveEventId, setLiveEventId] = useState<string | null>(null);
+  // A performer opened from an event's line-up on the home feed.
+  const [livePerformerId, setLivePerformerId] = useState<string | null>(null);
   const [liveBookingEvent, setLiveBookingEvent] = useState<TLiveEvent | null>(
     null
   );
@@ -13924,12 +10269,7 @@ const RefinedHomeFeedDesignScreen = () => {
       <ContainerComponent isSafeAreaView className="bg-white">
         <StatusBar style="dark" />
         <View className="flex-1 items-center justify-center bg-white">
-          <CustomImage
-            className="size-32"
-            imageClassName="size-full"
-            source={TurnupzLogo}
-            contentFit="contain"
-          />
+          <BrandLoader />
         </View>
       </ContainerComponent>
     );
@@ -13963,11 +10303,35 @@ const RefinedHomeFeedDesignScreen = () => {
             eventId={liveEventId}
             onBack={() => setLiveEventId(null)}
             onBook={setLiveBookingEvent}
+            onOpenPerformer={(id) => {
+              setLivePerformerId(id);
+              setLiveEventId(null);
+            }}
           />
         </View>
       </ContainerComponent>
     );
   }
+  if (livePerformerId) {
+    return (
+      <ContainerComponent isSafeAreaView className="bg-white" edges={["top"]}>
+        <View
+          className="flex-1 w-full self-center bg-white"
+          style={{ maxWidth: 430 }}
+        >
+          <LivePerformerProfileScreen
+            performerId={livePerformerId}
+            onBack={() => setLivePerformerId(null)}
+            onOpenEvent={(id) => {
+              setLivePerformerId(null);
+              setLiveEventId(id);
+            }}
+          />
+        </View>
+      </ContainerComponent>
+    );
+  }
+
 
   if (!isExploreTab && selectedHomeEvent && homeBookingMode === "ticket") {
     return (
@@ -14033,9 +10397,9 @@ const RefinedHomeFeedDesignScreen = () => {
         style={{ maxWidth: 430 }}
       >
         {isExploreTab ? (
-          <ExploreContent
-            onMessageOrganizer={openOrganizerChat}
-            onShareWithCommunity={shareEventWithCommunity}
+          <LiveExploreScreen
+            onBook={setLiveBookingEvent}
+            scrollToTopSignal={exploreTopSignal}
           />
         ) : isTicketsTab ? (
           <LiveMyTicketsScreen onBack={() => setActiveTab(ticketsReturnTab)} />
@@ -14066,16 +10430,9 @@ const RefinedHomeFeedDesignScreen = () => {
             }
           />
         ) : isProfileTab ? (
-          <ProfileContent
-            bookings={bookings}
-            onOpenHome={() => setActiveTab("home")}
-            onMessageOrganizer={openOrganizerChat}
-            onShareWithCommunity={shareEventWithCommunity}
+          <ProfileScreen
+            onOpenEvent={(eventId) => setLiveEventId(eventId)}
             onOpenTickets={() => {
-              setTicketsReturnTab("profile");
-              setActiveTab("tickets");
-            }}
-            onOpenEvents={() => {
               setTicketsReturnTab("profile");
               setActiveTab("tickets");
             }}
@@ -14090,22 +10447,53 @@ const RefinedHomeFeedDesignScreen = () => {
                 contentFit="contain"
               />
             </View>
-            <FlatList
+            <BrandRefreshList
+              listRef={homeListRef}
               data={feedEvents}
               keyExtractor={(event) => event.id}
+              style={{ backgroundColor: FEED_BACKGROUND }}
+              contentContainerStyle={{ paddingTop: 16 }}
               renderItem={({ item }) => (
                 <FeedCard
                   event={item}
-                  onOpenSettings={setSelectedEvent}
+                  onOpenSettings={(event) =>
+                    setOptionsEvent({
+                      id: event.id,
+                      name: event.name,
+                      date: event.date,
+                      timezone: event.timezone,
+                      image: event.medias?.[0] || event.image,
+                      place: event.venueName,
+                      isFavorite: event.isFavorite
+                    })
+                  }
                   onOpenDetails={openHomeEventDetails}
                 />
               )}
               refreshing={liveEvents.isRefetching}
               onRefresh={() => void liveEvents.refetch()}
+              // The next ten load well before the end is reached, so scrolling
+              // never has to stop and wait.
               onEndReached={() =>
                 liveEvents.hasNextPage &&
                 !liveEvents.isFetchingNextPage &&
                 void liveEvents.fetchNextPage()
+              }
+              onEndReachedThreshold={2}
+              initialNumToRender={4}
+              maxToRenderPerBatch={4}
+              windowSize={9}
+              ListFooterComponent={
+                liveEvents.isFetchingNextPage ? (
+                  <View className="items-center pb-8 pt-2">
+                    <BrandLoader height={22} hideLabel />
+                  </View>
+                ) : !liveEvents.hasNextPage &&
+                  feedEvents.length > HOME_FEED_BATCH ? (
+                  <TextComponent className="mb-6 text-center text-sm text-zinc-400">
+                    You're all caught up
+                  </TextComponent>
+                ) : null
               }
               ListEmptyComponent={
                 <View className="mt-24 items-center gap-2 px-8">
@@ -14131,13 +10519,18 @@ const RefinedHomeFeedDesignScreen = () => {
           </>
         )}
         {!isTicketsTab && !(isMessagesTab && hideMessageNav) && (
-          <PreviewBottomNav activeTab={activeTab} onTabPress={setActiveTab} />
+          <PreviewBottomNav activeTab={activeTab} onTabPress={onTabPress} />
         )}
         <SettingsSheet
           event={selectedEvent}
           onClose={() => setSelectedEvent(null)}
           onMessageOrganizer={openOrganizerChat}
           onShareWithCommunity={shareEventWithCommunity}
+        />
+        <EventOptionsSheet
+          event={optionsEvent}
+          onClose={() => setOptionsEvent(null)}
+          onOpenEvent={(eventId) => setLiveEventId(eventId)}
         />
       </View>
     </ContainerComponent>

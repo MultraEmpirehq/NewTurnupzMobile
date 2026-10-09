@@ -19,7 +19,13 @@ import {
   formatEventDay,
   formatEventTime
 } from "@/shared/utils/event-time";
-import { eventPlace, TLiveEvent, useLiveEvent } from "./live-api";
+import {
+  eventPlace,
+  PERFORMER_TYPE_LABELS,
+  TLiveEvent,
+  useLiveEvent
+} from "./live-api";
+import { PerformerAvatar } from "./explore-details";
 import ReportEventSheet from "./report-event.sheet";
 
 const ACCENT = "#00B2FF";
@@ -53,11 +59,14 @@ const guestName = (guest: NonNullable<TLiveEvent["eventGuestsOfHonour"]>[number]
 const LiveEventDetailScreen = ({
   eventId,
   onBack,
-  onBook
+  onBook,
+  onOpenPerformer
 }: {
   eventId: string;
   onBack: () => void;
   onBook: (event: TLiveEvent) => void;
+  /** Opens a performer's profile from the line-up. */
+  onOpenPerformer?: (performerId: string) => void;
 }) => {
   const { data: event, isLoading, error, refetch } = useLiveEvent(eventId);
   const [activeTab, setActiveTab] = useState<TTab>("Overview");
@@ -231,6 +240,37 @@ const LiveEventDetailScreen = ({
               <TextComponent className="mt-2 text-sm leading-5 text-zinc-950">
                 {event.description || "The organiser hasn't added a description yet."}
               </TextComponent>
+              {!!event.performers?.length && (
+                <>
+                  <TextComponent className="mt-6 text-base font-bold text-primary">
+                    Line-up
+                  </TextComponent>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerClassName="mt-3 gap-4 pr-4"
+                  >
+                    {event.performers.map((performer, index) => (
+                      <Pressable
+                        key={performer.id}
+                        onPress={() => onOpenPerformer?.(performer.id)}
+                        disabled={!onOpenPerformer}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${performer.name}${index === 0 ? ", headliner" : ""}`}
+                        className="w-[84px] items-center gap-1.5"
+                      >
+                        <PerformerAvatar performer={performer} size={72} />
+                        <TextComponent numberOfLines={2} className="text-center text-xs font-bold text-zinc-900">
+                          {performer.name}
+                        </TextComponent>
+                        <TextComponent className="text-[10px] text-zinc-500">
+                          {index === 0 ? "Headliner" : PERFORMER_TYPE_LABELS[performer.type]}
+                        </TextComponent>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </>
+              )}
               {guests.length > 0 && (
                 <>
                   <TextComponent className="mt-6 text-base font-bold text-primary">

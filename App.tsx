@@ -11,7 +11,7 @@ import NavigationWrapper from "@/navigation/navigator-wrapper/navigator-wrapper"
 import { useFonts } from "expo-font";
 import { BRAND_FONTS } from "@/shared/utils/fonts";
 import BrandIntro from "@/shared/components/brand-intro/brand-intro.component";
-import { useCallback, useState } from "react";
+import { useIntroStore } from "@/shared/stores/intro.store";
 
 const queryClient = new QueryClient();
 
@@ -20,8 +20,8 @@ export default function App() {
   // system font; if loading fails, carry on with the system font. The wait uses
   // the intro's base colour, so splash → intro reads as one piece.
   const [fontsLoaded, fontError] = useFonts(BRAND_FONTS);
-  const [introDone, setIntroDone] = useState(false);
-  const finishIntro = useCallback(() => setIntroDone(true), []);
+  const introDone = useIntroStore((state) => state.introDone);
+  const finishIntro = useIntroStore((state) => state.setIntroDone);
   if (!fontsLoaded && !fontError) {
     return <View style={{ flex: 1, backgroundColor: "#fbf9ff" }} />;
   }
@@ -39,7 +39,7 @@ export default function App() {
             <ContainerComponent>
               <NavigationWrapper />
             </ContainerComponent>
-            <FlashMessage position="top" />
+            <FlashMessage position="top" duration={7000} />
             {/* Plays over the app, which loads underneath in the meantime. */}
             {!introDone && <BrandIntro onFinish={finishIntro} />}
           </SafeAreaProvider>
