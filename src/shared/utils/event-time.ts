@@ -90,6 +90,20 @@ export const formatEventDay = (
   return `${WEEKDAYS[weekday]}, ${day} ${MONTHS[month]}${withYear ? ` ${year}` : ""}`;
 };
 
+/** The card's date block, on the venue's clock: { month: "NOV", day: "01" }. */
+export const formatEventDateBlock = (
+  value: Date | string,
+  timezone?: string | null
+) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const { month, day } = wallClock(date, zoneOf(timezone));
+  return {
+    month: MONTHS[month].toUpperCase(),
+    day: String(day).padStart(2, "0")
+  };
+};
+
 /** "Sat, 1 Nov 2026, 8:00 PM". */
 export const formatEventTime = (
   value: Date | string,

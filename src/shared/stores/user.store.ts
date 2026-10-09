@@ -30,7 +30,7 @@ const zustandStorage = createJSONStorage(() => ({
 export enum UserGender {
   MALE = "MALE",
   FEMALE = "FEMALE",
-  OTHER = "OTHER"
+  OTHER = "OTHERS"
 }
 
 export type TUser = {
@@ -47,6 +47,13 @@ export type TUser = {
   createdAt?: Date;
   gender?: UserGender;
   dateOfBirth?: Date;
+  bio?: string;
+  website?: string;
+  phone?: string;
+  country?: string;
+  countryCode?: string;
+  platformCurrency?: string;
+  profileImage?: string;
 };
 
 type TUserStoreState = {

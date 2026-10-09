@@ -122,6 +122,10 @@ xcrun simctl launch <UDID> com.turnup.mobile
 
 A Release build bundles the JavaScript, so it runs without `npm start`. After a JS-only change, rerun `xcodebuild` and `install` (about 1–2 minutes).
 
+`.env` values are baked into the JavaScript at build time and cached. After changing `.env`, clear Metro's cache before rebuilding (`rm -rf "$TMPDIR"/metro-cache`), or the build keeps the old values.
+
+Google sign-in reads `GOOGLE_WEB_CLIENT_ID` and `GOOGLE_IOS_CLIENT_ID` from `.env`. `app.config.js` adds the iOS URL scheme only when the iOS ID is set. Until it's set, the Google button stays hidden on iOS. After setting it, run `npx expo prebuild -p ios --no-install && cd ios && pod install`, then rebuild.
+
 Xcode 27 also refuses any target below iOS 15, and a few pods still declare 9.0 / 12.4. The `plugins/with-pod-deployment-target.js` config plugin (registered in `app.json`) raises them to 15.1 on every prebuild, so don't hand-edit `ios/Podfile` for this.
 
 ### Launch intro

@@ -1,7 +1,6 @@
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import AuthTicketLayout from "@/shared/components/auth-ticket/auth-ticket.layout";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import React, { memo, useCallback, useEffect, useState } from "react";
-import ContainerComponent from "@/shared/components/container/container.component";
-import AuthNavHeaderComponent from "@/shared/components/headers/auth-nav-header/auth-nav-header.component";
 import NumberKeyboardComponent from "@/shared/components/form/keyboards/number-keyboard.component";
 import OtpFormComponent from "@/shared/components/form/otp-form/otp-form.component";
 import OtpCountdownComponent from "@/shared/components/otp-countdown/otp-countdown.component";
@@ -143,37 +142,34 @@ const VerificationScreen = () => {
   }, [otp]);
   return (
     <>
-      <ContainerComponent isSafeAreaView>
-        <AuthNavHeaderComponent className="px-horizontal py-4" />
-        <ContainerComponent>
-          <ContainerComponent className="items-center justify-center gap-7">
-            <View className="gap-2 items-center">
-              <TextComponent className="font-bold text-xl text-center">
-                OTP Verification
-              </TextComponent>
-              <TextComponent className="opacity-60 text-center">
-                Please provide the code sent to your{" "}
-                {email && `email: ${email}`}
-                {phoneNumber && `mobile number: ${phoneNumber}`}
-              </TextComponent>
-            </View>
-            <OtpFormComponent value={otp} totalBoxes={6} error={otpError} />
-            <OtpCountdownComponent
-              expiryTime={timer}
-              loading={isLoading}
-              resendOTP={sendOTP}
+      <AuthTicketLayout
+        eyebrow="Verify it's you"
+        title="Enter your code"
+        subtitle={`We sent a 6-digit code to ${email ?? phoneNumber ?? "you"}.`}
+        onBack={() => navigation.goBack()}
+        footer={
+          // The keypad sits on its own card so it reads on the night sky.
+          <View className="h-[300px] rounded-3xl bg-white p-3">
+            <NumberKeyboardComponent
+              value={otp}
+              onChange={setOtp}
+              disabled={isLoading || !isFocused || !token}
             />
-          </ContainerComponent>
-          <NumberKeyboardComponent
-            value={otp}
-            onChange={setOtp}
-            disabled={isLoading || !isFocused || !token}
+          </View>
+        }
+      >
+        <View className="items-center gap-5">
+          <OtpFormComponent value={otp} totalBoxes={6} error={otpError} />
+          <OtpCountdownComponent
+            expiryTime={timer}
+            loading={isLoading}
+            resendOTP={sendOTP}
           />
-        </ContainerComponent>
-      </ContainerComponent>
+        </View>
+      </AuthTicketLayout>
       {isLoading && (
-        <View className="size-full absolute inset-0 bg-black/50 items-center justify-center">
-          <ActivityIndicator size="large" color="#05B5FF" />
+        <View className="size-full absolute inset-0 bg-black/30 items-center justify-center">
+          <ActivityIndicator size="large" color="#00b2ff" />
         </View>
       )}
     </>

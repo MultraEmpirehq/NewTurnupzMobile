@@ -1,5 +1,9 @@
 import { getData, postData } from "@/api";
 import {
+  TTransferRecipient,
+  recipientBody
+} from "@/shared/utils/transfer-recipient";
+import {
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -26,6 +30,12 @@ export type TLiveEvent = {
   medias?: string[];
   description?: string;
   organizerName?: string;
+  /** The organiser's user id: what a planner is followed by. */
+  organizerId?: string;
+  category?: { id: string; name: string } | null;
+  /** Who's on the bill, headliner first (on the event's detail). */
+  performers?: TLivePerformerSummary[];
+  isFavorite?: boolean;
   saleMethod?: "on_turnup" | "register" | "external_link" | string;
   ticketUrl?: string;
   status?: string;
@@ -82,7 +92,21 @@ export type TLiveUserTicket = {
   status?: string;
   checkedInAt?: string | null;
   currentHolderName?: string;
-  ticket?: TLiveTicket & { event?: TLiveEvent };
+  ticket?: TLiveTicket & {
+    event?: TLiveEvent;
+    transferable?: boolean;
+    isTransferable?: boolean;
+  };
+  /** Its latest transfer that wasn't cancelled; PENDING means it's on its way to someone. */
+  transfer?: {
+    id: string;
+    status: "PENDING" | "CLAIMED" | "CANCELLED" | string;
+    /** Only when they have no account; account holders show by name and @username. */
+    toEmail: string | null;
+    recipientUsername?: string | null;
+    recipientName?: string | null;
+    createdAt: string;
+  };
 };
 
 const PAGE_SIZE = 20;
@@ -111,21 +135,287 @@ export const formatPrice = (price?: TPrice | null, quantity = 1) => {
   }
 };
 
-export const useLiveEvents = (search = "") =>
-  useInfiniteQuery({
-    queryKey: ["live-events", search],
+/** Explore's filters, as the api names them (the same ones the web sends). */
+export type TLiveEventFilters = {
+  q?: string;
+  startDate?: string;
+  endDate?: string;
+  categoryId?: string;
+  venueId?: string;
+  performerId?: string;
+  /** One organiser's published events. */
+  organizerId?: string;
+  /** ISO country code, e.g. "NG". */
+  countryCode?: string;
+  city?: string;
+  priceType?: "FREE" | "PAID";
+  /** "true" for the api's trending events. */
+  isTrending?: "true";
+  /** "true" for the events the signed-in person has saved. */
+  isFavorite?: "true";
+  /** Upcoming (the api's default) or past events. */
+  status?: "UPCOMING" | "PAST";
+  /** Page size; the rails ask for a few, the lists for a full page. */
+  limit?: string;
+};
+
+export const useLiveEvents = (
+  filters: string | TLiveEventFilters = {},
+  enabled = true
+) => {
+  const options = typeof filters === "string" ? { q: filters } : filters;
+  return useInfiniteQuery({
+    enabled,
+    queryKey: ["live-events", options],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams({
         page: String(pageParam),
         limit: String(PAGE_SIZE)
       });
-      if (search.trim()) params.set("q", search.trim());
+      // Set entries (including a limit) override the defaults above.
+      Object.entries(options).forEach(([key, value]) => {
+        const text = typeof value === "string" ? value.trim() : "";
+        if (text) params.set(key, text);
+      });
       const { data } = await getData<TLiveEvent[]>(`/events?${params}`);
       return { events: data?.data ?? [], pagination: data?.pagination };
     },
-    getNextPageParam: (lastPage) =>
-      lastPage.pagination?.nextPage ?? undefined
+    getNextPageParam: (lastPage) => lastPage.pagination?.nextPage ?? undefined
+  });
+};
+
+export type TLiveCategory = { id: string; name: string };
+
+export type TLiveLocation = {
+  countryCode: string;
+  country: string;
+  count: number;
+  cities: { name: string; count: number }[];
+};
+
+/** Countries (and their cities) with upcoming events, busiest first. */
+export const useLiveEventLocations = () =>
+  useQuery({
+    queryKey: ["live-event-locations"],
+    queryFn: async () => {
+      const { data } = await getData<TLiveLocation[]>("/events/locations");
+      return data?.data ?? [];
+    },
+    staleTime: 10 * 60 * 1000,
+    // An older api without locations just hides the filter.
+    retry: false
+  });
+
+export type TPerformerType =
+  | "ARTIST"
+  | "DJ"
+  | "BAND"
+  | "SPEAKER"
+  | "COMEDIAN"
+  | "HOST"
+  | "ATHLETE"
+  | "CHEF"
+  | "OTHER";
+
+export type TLivePerformerSummary = {
+  id: string;
+  name: string;
+  type: TPerformerType;
+  image?: string | null;
+};
+
+export type TLivePerformer = TLivePerformerSummary & {
+  bio?: string | null;
+  countryCode?: string | null;
+  country?: string | null;
+  instagram?: string | null;
+  twitter?: string | null;
+  website?: string | null;
+  upcomingEventsCount: number;
+  /** Position on a chart, when it came from one. */
+  rank?: number;
+};
+
+export const PERFORMER_TYPE_LABELS: Record<TPerformerType, string> = {
+  ARTIST: "Artist",
+  DJ: "DJ",
+  BAND: "Band",
+  SPEAKER: "Speaker",
+  COMEDIAN: "Comedian",
+  HOST: "Host",
+  ATHLETE: "Athlete",
+  CHEF: "Chef",
+  OTHER: "Performer"
+};
+
+export const CHART_REGIONS = [
+  { value: "global", label: "Global" },
+  { value: "africa", label: "Africa" },
+  { value: "europe", label: "Europe" },
+  { value: "americas", label: "Americas" },
+  { value: "asia", label: "Asia" }
+] as const;
+
+export type TChartRegion = (typeof CHART_REGIONS)[number]["value"];
+
+/** A chart: performers ranked by tickets sold for their events. */
+export const useLivePerformerChart = (region: TChartRegion, limit = 20) =>
+  useQuery({
+    queryKey: ["live-performer-chart", region, limit],
+    queryFn: async () => {
+      const { data } = await getData<{
+        region: TChartRegion;
+        performers: TLivePerformer[];
+      }>(`/performers/charts?region=${region}&limit=${limit}`);
+      return data?.data?.performers ?? [];
+    },
+    staleTime: 5 * 60 * 1000
+  });
+
+/**
+ * The chart for a country's region (or the world when there's no regional
+ * chart yet), with which region it turned out to be.
+ */
+export const useLivePerformerChartFor = (countryCode?: string, limit = 10) =>
+  useQuery({
+    queryKey: ["live-performer-chart-for", countryCode ?? "", limit],
+    queryFn: async () => {
+      const get = (params: string) =>
+        getData<{ region: TChartRegion; performers: TLivePerformer[] }>(
+          `/performers/charts?${params}&limit=${limit}`
+        );
+      // An api without country charts yet answers 400: use the world's.
+      const { data } = countryCode
+        ? await get(`countryCode=${countryCode}`).catch(() =>
+            get("region=global")
+          )
+        : await get("region=global");
+      return {
+        region: data?.data?.region ?? "global",
+        performers: data?.data?.performers ?? []
+      };
+    },
+    staleTime: 5 * 60 * 1000
+  });
+
+/** Performers matching a search, by name. */
+export const useLivePerformers = (q = "", enabled = true) =>
+  useInfiniteQuery({
+    queryKey: ["live-performers", q.trim()],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const params = new URLSearchParams({
+        page: String(pageParam),
+        limit: String(PAGE_SIZE)
+      });
+      if (q.trim()) params.set("q", q.trim());
+      const { data } = await getData<TLivePerformer[]>(`/performers?${params}`);
+      return { performers: data?.data ?? [], pagination: data?.pagination };
+    },
+    getNextPageParam: (lastPage) => lastPage.pagination?.nextPage ?? undefined,
+    enabled,
+    retry: false
+  });
+
+export const useLivePerformer = (performerId?: string) =>
+  useQuery({
+    queryKey: ["live-performer", performerId],
+    queryFn: async () => {
+      const { data } = await getData<TLivePerformer>(
+        `/performers/${performerId}`
+      );
+      return data?.data;
+    },
+    enabled: !!performerId
+  });
+
+/** Saves the event, or un-saves it if it was saved (the api toggles). */
+export const toggleSavedEvent = (eventId: string) =>
+  postData(`/events/favorite/${eventId}`);
+
+export const useLiveCategories = () =>
+  useQuery({
+    queryKey: ["live-categories"],
+    queryFn: async () => {
+      const { data } = await getData<TLiveCategory[]>("/categories");
+      return data?.data ?? [];
+    },
+    staleTime: 10 * 60 * 1000
+  });
+
+export type TLiveVenue = {
+  id: string;
+  name: string;
+  address?: string;
+  totalAvailableSeat?: number;
+  rating?: number;
+  images?: string[];
+};
+
+export type TLivePlanner = {
+  /** Their user id: the organizerId on events, and what they're followed by. */
+  id: string;
+  name: string;
+  image?: string | null;
+  upcomingEvents: number;
+};
+
+/** Every planner with something coming up, busiest first. */
+export const useLivePlanners = (q = "", limit = PAGE_SIZE) =>
+  useInfiniteQuery({
+    queryKey: ["live-planners", q.trim(), limit],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const params = new URLSearchParams({
+        page: String(pageParam),
+        limit: String(limit)
+      });
+      if (q.trim()) params.set("q", q.trim());
+      const { data } = await getData<TLivePlanner[]>(
+        `/events/planners?${params}`
+      );
+      return { planners: data?.data ?? [], pagination: data?.pagination };
+    },
+    getNextPageParam: (lastPage) => lastPage.pagination?.nextPage ?? undefined,
+    retry: false
+  });
+
+/** One venue, e.g. one you follow. */
+export const useLiveVenue = (venueId?: string) =>
+  useQuery({
+    queryKey: ["live-venue", venueId],
+    queryFn: async () => {
+      const { data } = await getData<TLiveVenue>(`/venue/${venueId}`);
+      return data?.data ?? null;
+    },
+    enabled: !!venueId
+  });
+
+export const useLiveVenues = (
+  q = "",
+  place?: { country?: string; city?: string }
+) =>
+  useInfiniteQuery({
+    queryKey: [
+      "live-venues",
+      q.trim(),
+      place?.country ?? "",
+      place?.city ?? ""
+    ],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const params = new URLSearchParams({
+        page: String(pageParam),
+        limit: String(PAGE_SIZE)
+      });
+      if (q.trim()) params.set("q", q.trim());
+      if (place?.country) params.set("country", place.country);
+      if (place?.city) params.set("city", place.city);
+      const { data } = await getData<TLiveVenue[]>(`/venues?${params}`);
+      return { venues: data?.data ?? [], pagination: data?.pagination };
+    },
+    getNextPageParam: (lastPage) => lastPage.pagination?.nextPage ?? undefined
   });
 
 export const useLiveEvent = (eventId?: string) =>
@@ -182,8 +472,7 @@ export const useLiveUserTickets = () =>
       );
       return { tickets: data?.data ?? [], pagination: data?.pagination };
     },
-    getNextPageParam: (lastPage) =>
-      lastPage.pagination?.nextPage ?? undefined
+    getNextPageParam: (lastPage) => lastPage.pagination?.nextPage ?? undefined
   });
 
 /** Report reasons; the keys are the API's. */
@@ -200,3 +489,244 @@ export const reportEvent = (
   eventId: string,
   body: { reason: string; details?: string }
 ) => postData(`/event/${eventId}/report`, body);
+
+/* ---------------------------------------------------------------- chats */
+
+export type TLiveChat = {
+  id: string;
+  eventId?: string | null;
+  /** What to call the chat: the event, the group, or the other person. */
+  eventName: string;
+  title?: string | null;
+  preview?: string | null;
+  type: "EVENT" | "GROUP" | "DIRECT" | string;
+  memberCount?: number;
+  lastActivityAt?: string;
+};
+
+export type TSharedEvent = {
+  id: string;
+  name: string;
+  date: string;
+  timezone?: string;
+  image?: string | null;
+  place?: string | null;
+  organizerName?: string | null;
+};
+
+export type TLiveChatMessage = {
+  id: string;
+  senderId?: string | null;
+  senderName?: string | null;
+  kind: string;
+  body?: string | null;
+  href?: string | null;
+  metadata?: { sharedEvent?: TSharedEvent } | null;
+  createdAt: string;
+};
+
+/** The chats the signed-in person is in, most recent first. */
+export const useLiveChats = (enabled = true) =>
+  useQuery({
+    queryKey: ["live-chats"],
+    queryFn: async () => {
+      const { data } = await getData<TLiveChat[]>("/chats?limit=50");
+      return data?.data ?? [];
+    },
+    enabled
+  });
+
+const MESSAGE_PAGE = 50;
+
+/** A chat's latest messages, oldest first (the api pages from the oldest). */
+export const useLiveChatMessages = (chatId?: string | null) =>
+  useQuery({
+    queryKey: ["live-chat-messages", chatId],
+    queryFn: async () => {
+      const first = await getData<TLiveChatMessage[]>(
+        `/chats/${chatId}/messages?limit=${MESSAGE_PAGE}`
+      );
+      const last = first.data?.pagination?.totalPage ?? 1;
+      if (last <= 1) return first.data?.data ?? [];
+      const latest = await getData<TLiveChatMessage[]>(
+        `/chats/${chatId}/messages?limit=${MESSAGE_PAGE}&page=${last}`
+      );
+      return latest.data?.data ?? [];
+    },
+    enabled: !!chatId,
+    refetchInterval: 8000
+  });
+
+/** Opens (or reopens) a private chat with the organiser of an event. */
+export const startOrganizerChat = async (eventId: string) => {
+  const { data } = await postData<
+    { eventId: string },
+    { id: string; title: string; isNew: boolean }
+  >("/chats/direct", { eventId });
+  return data!.data!;
+};
+
+/** Sends a message; with an event attached it shows as that event's card. */
+export const sendChatMessage = (
+  chatId: string,
+  body: { body: string; sharedEventId?: string }
+) => postData(`/chats/${chatId}/messages`, body);
+
+/* ---------------------------------------------------------------- transfers */
+
+export type TSentTransfer = {
+  id: string;
+  /** Only when they have no account; account holders show by name and @username. */
+  toEmail: string | null;
+  recipientUsername?: string | null;
+  status: "PENDING" | "CLAIMED" | "CANCELLED";
+  createdAt: string;
+  claimedAt?: string | null;
+  recipientName?: string | null;
+  userTicket: TLiveUserTicket;
+};
+
+/** A ticket can be sent on when its category allows it and it hasn't been used or sent. */
+export const canTransfer = (ticket: TLiveUserTicket) =>
+  (ticket.ticket?.isTransferable ?? ticket.ticket?.transferable ?? false) &&
+  (ticket.status ?? "UN_USED") === "UN_USED" &&
+  ticket.transfer?.status !== "PENDING";
+
+/** Tickets you've sent: waiting to be claimed, claimed or cancelled. */
+export const useSentTransfers = () =>
+  useQuery({
+    queryKey: ["live-sent-transfers"],
+    queryFn: async () => {
+      const { data } = await getData<TSentTransfer[]>(
+        "/ticket/transfers?limit=50"
+      );
+      return data?.data ?? [];
+    }
+  });
+
+const useRefreshTicketLists = () => {
+  const queryClient = useQueryClient();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: ["live-user-tickets"] });
+    void queryClient.invalidateQueries({ queryKey: ["live-sent-transfers"] });
+  };
+};
+
+/**
+ * Sends a ticket to someone by email. They claim it from the link we email
+ * them (on the web, so it works whether or not they have the app).
+ */
+export const useTransferTicket = () => {
+  const refresh = useRefreshTicketLists();
+  return useMutation({
+    mutationFn: ({
+      userTicketId,
+      recipient,
+      claimBaseUrl
+    }: {
+      userTicketId: string;
+      recipient: TTransferRecipient;
+      claimBaseUrl: string;
+    }) =>
+      postData("/ticket/transfer", {
+        userTicketId,
+        ...recipientBody(recipient),
+        claimUrl: `${claimBaseUrl}/tickets/claim/{{transferId}}`
+      }),
+    onSuccess: refresh
+  });
+};
+
+/** Takes back a ticket that hasn't been claimed yet. */
+export const useCancelTransfer = () => {
+  const refresh = useRefreshTicketLists();
+  return useMutation({
+    mutationFn: (transferId: string) =>
+      postData(`/ticket/transfer/${transferId}/cancel`),
+    onSuccess: refresh
+  });
+};
+
+export type TTransferRecipientPreview = {
+  username: string;
+  name: string | null;
+  avatar: string | null;
+  isYou: boolean;
+};
+
+/** Who a username belongs to, so the sender sees who they're sending to. */
+export const useTransferRecipient = (username?: string) =>
+  useQuery({
+    queryKey: ["live-transfer-recipient", username?.toLowerCase()],
+    queryFn: async () => {
+      const { data } = await getData<TTransferRecipientPreview>(
+        `/ticket/transfer/recipient?username=${encodeURIComponent(username ?? "")}`
+      );
+      return data?.data ?? null;
+    },
+    enabled: !!username,
+    retry: false,
+    staleTime: 60_000
+  });
+
+/** How a recipient reads: their name, else @username, else the email typed. */
+export const recipientLabel = (recipient: {
+  recipientName?: string | null;
+  recipientUsername?: string | null;
+  toEmail?: string | null;
+}) =>
+  recipient.recipientName ||
+  (recipient.recipientUsername ? `@${recipient.recipientUsername}` : null) ||
+  recipient.toEmail ||
+  "them";
+
+export type TReceivedTransfer = {
+  id: string;
+  status: "PENDING" | "CLAIMED" | "CANCELLED";
+  createdAt: string;
+  senderName: string;
+  senderUsername?: string | null;
+  userTicket: TLiveUserTicket;
+};
+
+/** Tickets sent to you, waiting for you to accept. */
+export const useReceivedTransfers = () =>
+  useQuery({
+    queryKey: ["live-received-transfers"],
+    queryFn: async () => {
+      const { data } = await getData<TReceivedTransfer[]>(
+        "/ticket/transfers/received"
+      );
+      return data?.data ?? [];
+    }
+  });
+
+const useRefreshAfterReceiving = () => {
+  const queryClient = useQueryClient();
+  return () => {
+    void queryClient.invalidateQueries({
+      queryKey: ["live-received-transfers"]
+    });
+    void queryClient.invalidateQueries({ queryKey: ["live-user-tickets"] });
+  };
+};
+
+/** Accepts a ticket sent to you; it moves into your tickets. */
+export const useAcceptTransfer = () => {
+  const refresh = useRefreshAfterReceiving();
+  return useMutation({
+    mutationFn: (transferId: string) =>
+      postData(`/ticket/transfer/${transferId}/claim`),
+    onSuccess: refresh
+  });
+};
+
+/** Turns down a ticket sent to you; it goes back to the sender. */
+export const useDeclineTransfer = () => {
+  const refresh = useRefreshAfterReceiving();
+  return useMutation({
+    mutationFn: (transferId: string) =>
+      postData(`/ticket/transfer/${transferId}/decline`),
+    onSuccess: refresh
+  });
+};

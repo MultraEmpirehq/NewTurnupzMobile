@@ -39,7 +39,7 @@ export default function App() {
             <ContainerComponent>
               <NavigationWrapper />
             </ContainerComponent>
-            <FlashMessage position="top" />
+            <FlashMessage position="top" duration={7000} />
             {/* Plays over the app, which loads underneath in the meantime. */}
             {!introDone && <BrandIntro onFinish={finishIntro} />}
           </SafeAreaProvider>

@@ -1,7 +1,11 @@
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Pressable, TouchableOpacity, View } from "react-native";
 import React, { memo, useCallback, useState } from "react";
-import ContainerComponent from "@/shared/components/container/container.component";
-import KeyboardViewLayout from "@/shared/components/keyboard-view/keyboard-view.layout";
+import { WEB_APP_URL } from "@env";
+import AuthTicketLayout from "@/shared/components/auth-ticket/auth-ticket.layout";
+import GoogleSignInButton, {
+  isGoogleSignInAvailable
+} from "@/shared/components/google-sign-in/google-sign-in-button.component";
+import AppleSignInButton from "@/shared/components/apple-sign-in/apple-sign-in-button.component";
 import TextComponent from "@/shared/components/text/text.component";
 import InputFieldComponent from "@/shared/components/form/input-field/input-field.component";
 import ButtonComponent from "@/shared/components/button/button.component";
@@ -69,6 +73,8 @@ const LandingScreen = () => {
   const {
     control,
     handleSubmit,
+    getValues,
+    resetField,
     formState: { isValid, isSubmitting }
   } = useForm<TAuthBodyType>({
     defaultValues: canLogin
@@ -90,7 +96,8 @@ const LandingScreen = () => {
               "/auth/register",
               {
                 email: body.email,
-                url: "http://localhost:3333/{{token}}"
+                // The link finishes sign-up on the web, as the web's own does.
+                url: `${WEB_APP_URL}/auth/register/{{token}}?email=${body.email}`
               }
             );
             navigation.navigate("verification", {
@@ -137,42 +144,102 @@ const LandingScreen = () => {
     },
     [canLogin, performAuthOperations, performAuthVerificationCheck]
   );
+  // Google lands in the same place as a password login.
+  const onGoogleToken = useCallback(
+    async (accessToken: string) => {
+      performAuthOperations(accessToken, true);
+      await performAuthVerificationCheck();
+      onSuccess("Login successful");
+    },
+    [performAuthOperations, performAuthVerificationCheck]
+  );
   return (
-    <ContainerComponent isSafeAreaView>
-      <KeyboardViewLayout className="flex-1" contentContainerClassName="flex-1">
-        <ScrollView
-          contentContainerClassName="flex-1 py-20 pt-40 gap-20 px-horizontal"
-          showsVerticalScrollIndicator={false}
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View className="gap-2 items-center justify-center max-w-[250px] self-center">
-            <TextComponent className="font-bold text-2xl">
-              Welcome
+    <AuthTicketLayout
+      eyebrow={canLogin ? "Log in" : "Log in or sign up"}
+      title={canLogin ? "Welcome back" : "Let's get you in"}
+      subtitle={
+        canLogin
+          ? "Enter your password to carry on where you left off."
+          : "Enter your email. We'll log you in, or send a link to set up your account if you're new."
+      }
+      footer={
+        <TextComponent className="text-center text-xs text-white/55">
+          By continuing you agree to the Turnupz Terms of Service and Privacy
+          Policy.
+        </TextComponent>
+      }
+    >
+      <View className="gap-5">
+        {canLogin ? (
+          // The email is settled by now, so it shows as a chip that can be changed.
+          <View className="flex-row items-center gap-3 rounded-2xl bg-[#f7f9fc] px-4 py-3">
+            <TextComponent
+              numberOfLines={1}
+              className="flex-1 text-base font-medium text-black"
+            >
+              {getValues("email")?.trim().toLowerCase()}
             </TextComponent>
-            <TextComponent className="opacity-60 max-w-sm text-center">
-              Enter your email to signup if you are new here or login if you are
-              already a member
-            </TextComponent>
+            <Pressable
+              onPress={() => {
+                resetField("password");
+                setCanLogin(false);
+              }}
+              accessibilityRole="button"
+              hitSlop={8}
+            >
+              <TextComponent className="text-sm font-bold text-[#ff0088]">
+                Change
+              </TextComponent>
+            </Pressable>
           </View>
-          <View className="gap-6">
+        ) : (
+          <Controller
+            control={control}
+            name="email"
+            render={({
+              field: { onChange, value, ref },
+              fieldState: { error }
+            }) => (
+              <InputFieldComponent
+                key={introDone ? "email-ready" : "email-waiting"}
+                autoFocus={introDone}
+                label="Email"
+                placeholder="name@example.com"
+                inputMode="email"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                autoCorrect={false}
+                returnKeyType="next"
+                onSubmitEditing={() => {
+                  handleSubmit(onSubmit)();
+                }}
+                ref={ref}
+                onChangeText={onChange}
+                value={value}
+                error={error?.message}
+              />
+            )}
+          />
+        )}
+        {canLogin && (
+          <View className="gap-2">
             <Controller
               control={control}
-              name="email"
+              name="password"
               render={({
                 field: { onChange, value, ref },
                 fieldState: { error }
               }) => (
                 <InputFieldComponent
-                  key={introDone ? "email-ready" : "email-waiting"}
-                  autoFocus={introDone}
-                  placeholder="E.G example@gmail.com"
-                  inputMode="email"
-                  keyboardType="email-address"
+                  label="Password"
+                  placeholder="Enter your password"
+                  secureTextEntry
                   autoCapitalize="none"
-                  autoComplete="email"
+                  autoComplete="password"
                   autoCorrect={false}
-                  returnKeyType="next"
+                  autoFocus
+                  returnKeyType="done"
                   onSubmitEditing={() => {
                     handleSubmit(onSubmit)();
                   }}
@@ -183,62 +250,44 @@ const LandingScreen = () => {
                 />
               )}
             />
-            {canLogin && (
-              <>
-                <Controller
-                  control={control}
-                  name="password"
-                  render={({
-                    field: { onChange, value, ref },
-                    fieldState: { error }
-                  }) => (
-                    <InputFieldComponent
-                      placeholder="********"
-                      secureTextEntry
-                      autoCapitalize="none"
-                      autoComplete="password"
-                      autoCorrect={false}
-                      autoFocus={false}
-                      returnKeyType="done"
-                      onSubmitEditing={() => {
-                        handleSubmit(onSubmit)();
-                      }}
-                      ref={ref}
-                      onChangeText={onChange}
-                      value={value}
-                      error={error?.message}
-                    />
-                  )}
-                />
-                <View className="w-full justify-end flex-row items-center">
-                  <TouchableOpacity
-                    onPress={() => {
-                      navigation.navigate("forgot-password");
-                    }}
-                  >
-                    <TextComponent className="text-primary">
-                      Forgot password?
-                    </TextComponent>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-            <ButtonComponent
-              onPress={handleSubmit(onSubmit)}
-              disabled={isSubmitting || !isValid}
-              isLoading={isSubmitting}
-            >
-              Continue
-            </ButtonComponent>
-            <View className="flex-row items-center gap-2">
-              <View className="flex-1 h-[1px] bg-black/20" />
-              <TextComponent className="opacity-60">OR</TextComponent>
-              <View className="flex-1 h-[1px] bg-black/20" />
+            <View className="w-full flex-row items-center justify-end">
+              <TouchableOpacity
+                onPress={() => {
+                  navigation.navigate("forgot-password");
+                }}
+              >
+                <TextComponent className="text-sm font-medium text-black/60">
+                  Forgot password?
+                </TextComponent>
+              </TouchableOpacity>
             </View>
           </View>
-        </ScrollView>
-      </KeyboardViewLayout>
-    </ContainerComponent>
+        )}
+        <ButtonComponent
+          onPress={handleSubmit(onSubmit)}
+          disabled={isSubmitting || !isValid}
+          isLoading={isSubmitting}
+          className="h-12 rounded-full bg-[#00b2ff] py-0"
+        >
+          {canLogin ? "Log in" : "Continue with email"}
+        </ButtonComponent>
+        <View className="flex-row items-center gap-3">
+          <View className="h-[1px] flex-1 bg-black/10" />
+          <TextComponent className="text-xs text-black/40">OR</TextComponent>
+          <View className="h-[1px] flex-1 bg-black/10" />
+        </View>
+        <View className="gap-3">
+          {isGoogleSignInAvailable && (
+            <GoogleSignInButton
+              onToken={onGoogleToken}
+              onError={onError}
+              disabled={isSubmitting}
+            />
+          )}
+          <AppleSignInButton disabled={isSubmitting} />
+        </View>
+      </View>
+    </AuthTicketLayout>
   );
 };
 

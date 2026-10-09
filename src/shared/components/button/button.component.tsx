@@ -74,6 +74,7 @@ const ButtonComponent: React.FC<ButtonProps> = forwardRef<View, ButtonProps>(
       isLoading,
       disabled,
       onPress,
+      className,
       ...props
     },
     ref
@@ -85,11 +86,14 @@ const ButtonComponent: React.FC<ButtonProps> = forwardRef<View, ButtonProps>(
         {...props}
         activeOpacity={isLoading || disabled ? 0.5 : 0.2}
         onPress={isLoading || disabled ? undefined : onPress}
-        className={buttonClassName({
-          variant,
-          size,
-          isDisabled: disabled || isLoading
-        })}
+        className={cn(
+          buttonClassName({
+            variant,
+            size,
+            isDisabled: disabled || isLoading
+          }),
+          className
+        )}
       >
         {isLoading && (
           <ActivityIndicator size={size === "sm" ? 10 : 10} color="white" />

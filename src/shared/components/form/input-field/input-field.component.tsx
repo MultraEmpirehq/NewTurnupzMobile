@@ -9,6 +9,7 @@ import React, {
   forwardRef,
   memo,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -48,7 +49,9 @@ const /* INPUT_ACCESSORY_VIEW_ID = "dismiss-keyboard-view", */
   DEFAULT_BUTTON_CLASSNAME =
     "absolute flex-row h-full items-center justify-center",
   ICON_SIZE = 23,
-  ICON_OPACITY = 0.7;
+  ICON_OPACITY = 0.7,
+  /** How long a revealed password stays visible. */
+  PASSWORD_REVEAL_MS = 5000;
 
 const generateClassName = cva(
   `flex-1 py-5 px-4 ${BG_COLOR} ${BORDER_COLOR} border rounded-md text-black placeholder:text-black/40 dark:text-white placeholder:dark:text-white/40`,
@@ -95,12 +98,24 @@ const InputField = forwardRef<
     const [secureTextEntry, setSecureTextEntry] = useState(
       propSecureTextEntry || false
     );
+    // A revealed password hides itself again after a few seconds, so it isn't
+    // left on screen for someone looking over a shoulder.
+    useEffect(() => {
+      if (!propSecureTextEntry || secureTextEntry) return;
+      const timer = setTimeout(
+        () => setSecureTextEntry(true),
+        PASSWORD_REVEAL_MS
+      );
+      return () => clearTimeout(timer);
+    }, [propSecureTextEntry, secureTextEntry]);
 
     const inputRef = useRef<TextInput>(null);
     useImperativeHandle(ref, () => inputRef.current as TextInput);
 
+    // Not "visible-password": on Android that keyboard shows the text in plain
+    // view even while it's meant to be hidden.
     const finalKeyboardType = useMemo(
-      () => (propSecureTextEntry ? "visible-password" : keyboardType),
+      () => (propSecureTextEntry ? "default" : keyboardType),
       [propSecureTextEntry, keyboardType]
     );
 

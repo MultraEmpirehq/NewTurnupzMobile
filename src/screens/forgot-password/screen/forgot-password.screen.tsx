@@ -1,7 +1,6 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import AuthTicketLayout from "@/shared/components/auth-ticket/auth-ticket.layout";
+import { StyleSheet, View } from "react-native";
 import React, { memo, useCallback } from "react";
-import ContainerComponent from "@/shared/components/container/container.component";
-import KeyboardViewLayout from "@/shared/components/keyboard-view/keyboard-view.layout";
 import TextComponent from "@/shared/components/text/text.component";
 import joi from "joi";
 import { Controller, useForm } from "react-hook-form";
@@ -68,60 +67,50 @@ const ForgotPasswordScreen = () => {
     }
   }, []);
   return (
-    <ContainerComponent isSafeAreaView>
-      <KeyboardViewLayout className="flex-1" contentContainerClassName="flex-1">
-        <ScrollView
-          contentContainerClassName="flex-1 py-20 pt-40 gap-20 px-horizontal"
-          showsVerticalScrollIndicator={false}
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View className="gap-2 items-center justify-center max-w-[250px] self-center">
-            <TextComponent className="font-bold text-2xl">
-              Forgot your password?
-            </TextComponent>
-            <TextComponent className="opacity-60 max-w-sm text-center">
-              Confirm your email and we will send the instructions.
-            </TextComponent>
-          </View>
-          <View className="gap-6">
-            <Controller
-              control={control}
-              name="email"
-              render={({
-                field: { onChange, value, ref },
-                fieldState: { error }
-              }) => (
-                <InputFieldComponent
-                  placeholder="Enter your email"
-                  inputMode="email"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  autoCorrect={false}
-                  autoFocus={true}
-                  returnKeyType="next"
-                  onSubmitEditing={() => {
-                    handleSubmit(onSubmit)();
-                  }}
-                  ref={ref}
-                  onChangeText={onChange}
-                  value={value}
-                  error={error?.message}
-                />
-              )}
+    <AuthTicketLayout
+      eyebrow="Forgot password"
+      title="Let's get you back in"
+      subtitle="Enter your email and we'll send you a code to reset your password."
+      onBack={() => navigation.goBack()}
+    >
+      <View className="gap-5">
+        <Controller
+          control={control}
+          name="email"
+          render={({
+            field: { onChange, value, ref },
+            fieldState: { error }
+          }) => (
+            <InputFieldComponent
+              label="Email"
+              placeholder="name@example.com"
+              inputMode="email"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              autoCorrect={false}
+              autoFocus
+              returnKeyType="next"
+              onSubmitEditing={() => {
+                handleSubmit(onSubmit)();
+              }}
+              ref={ref}
+              onChangeText={onChange}
+              value={value}
+              error={error?.message}
             />
-          </View>
-          <ButtonComponent
-            onPress={handleSubmit(onSubmit)}
-            disabled={isSubmitting || !isValid}
-            isLoading={isSubmitting}
-          >
-            Continue
-          </ButtonComponent>
-        </ScrollView>
-      </KeyboardViewLayout>
-    </ContainerComponent>
+          )}
+        />
+        <ButtonComponent
+          onPress={handleSubmit(onSubmit)}
+          disabled={isSubmitting || !isValid}
+          isLoading={isSubmitting}
+          className="h-12 rounded-full bg-[#00b2ff] py-0"
+        >
+          Send reset code
+        </ButtonComponent>
+      </View>
+    </AuthTicketLayout>
   );
 };
 
