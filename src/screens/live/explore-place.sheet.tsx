@@ -145,7 +145,7 @@ const ExplorePlaceSheet = ({
             placeholder="Search a country or city"
             placeholderTextColor="#a1a1aa"
             className="mb-1 h-11 rounded-full bg-zinc-100 px-4 text-base text-zinc-950"
-            style={{ fontFamily: "Avenir-Book" }}
+            style={{ fontFamily: "PlusJakartaSans-Regular" }}
           />
           <ScrollView
             keyboardShouldPersistTaps="handled"

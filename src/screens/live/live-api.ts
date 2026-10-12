@@ -448,7 +448,12 @@ export const fetchOrder = async (orderId: string) => {
 export const useCreateOrder = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (body: { ticketId: string; quantity: number }) => {
+    mutationFn: async (body: {
+      ticketId: string;
+      quantity: number;
+      /** Spend Turnupz Credit first; the rest goes to the payment page. */
+      useCredit?: boolean;
+    }) => {
       const { data } = await postData<
         typeof body,
         { orderId: string; status: string; redirectUrl?: string }
@@ -458,9 +463,62 @@ export const useCreateOrder = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["live-tickets"] });
       queryClient.invalidateQueries({ queryKey: ["live-user-tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["credit"] });
     }
   });
 };
+
+export type TCreditBalance = {
+  currency: string;
+  /** Spendable now. */
+  available: TPrice;
+  /** Earned, released after the waiting period. */
+  pending: TPrice;
+  nextExpiry: string | null;
+};
+
+/** Turnupz Credit per currency: what can be spent now and what's on the way. */
+export const useCreditBalance = (enabled = true) =>
+  useQuery({
+    queryKey: ["credit", "balance"],
+    enabled,
+    queryFn: async () => {
+      const { data } = await getData<TCreditBalance[]>("/credit");
+      return data?.data ?? [];
+    }
+  });
+
+export type TCreditGrant = {
+  id: string;
+  currency: string;
+  amount: TPrice;
+  remaining: TPrice;
+  state: "PENDING" | "AVAILABLE" | "SPENT" | "EXPIRED" | "CANCELLED";
+  description: string;
+  availableAt: string | null;
+  releaseAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+};
+
+/** Every credit grant, newest first. */
+export const useCreditHistory = (enabled = true) =>
+  useQuery({
+    queryKey: ["credit", "history"],
+    enabled,
+    queryFn: async () => {
+      const { data } = await getData<TCreditGrant[]>("/credit/history?limit=50");
+      return data?.data ?? [];
+    }
+  });
+
+/** An amount in major units as money, in that currency's style. */
+export const formatMoney = (amount: number, like?: TPrice | null) =>
+  formatPrice(
+    like
+      ? { ...like, amount, formatted: undefined }
+      : ({ amount, currency: { code: "NGN" } } as TPrice)
+  );
 
 export const useLiveUserTickets = () =>
   useInfiniteQuery({
@@ -730,3 +788,31 @@ export const useDeclineTransfer = () => {
     onSuccess: refresh
   });
 };
+
+export type TOrderRefund = {
+  status: "processing" | "completed" | "failed";
+  tickets: number;
+  toCard: TPrice;
+  asCredit: TPrice;
+  requestedAt: string;
+  completedAt: string | null;
+};
+
+export type TRefundedOrder = {
+  id: string;
+  quantity: number;
+  createdAt: string;
+  ticket?: { name?: string; event?: { data?: { name?: string } } };
+  refunds: TOrderRefund[];
+  refundedTickets: number;
+};
+
+/** Orders with tickets refunded: refunded tickets leave the ticket list. */
+export const useRefundedOrders = () =>
+  useQuery({
+    queryKey: ["live-refunded-orders"],
+    queryFn: async () => {
+      const { data } = await getData<TRefundedOrder[]>("/orders?limit=50");
+      return (data?.data ?? []).filter((order) => order.refundedTickets > 0);
+    }
+  });

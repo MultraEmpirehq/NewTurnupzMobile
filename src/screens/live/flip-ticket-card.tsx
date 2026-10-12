@@ -1,4 +1,5 @@
 import React, { memo, useEffect } from "react";
+import { BRAND } from "@/shared/utils/brand-colors";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
@@ -36,7 +37,8 @@ import { TICKET_LIST_BACKGROUND } from "./event-ticket-card";
  */
 
 const BLUE = "#00b2ff";
-const PINK = "#ff0088";
+// Accents are the deeper brand blue (strictly blue, black, white and grey).
+const ACCENT = BRAND.blueDeep;
 const NAVY = "#00121a";
 const easeFlip = Easing.bezier(0.22, 1, 0.36, 1);
 
@@ -125,7 +127,7 @@ const FlipTicketCard = ({
 
   const radius = 22 * k;
   const notch = 24 * k;
-  const colors: [string, string, string] = past ? ["#334155", "#475569", "#64748b"] : [BLUE, BLUE, PINK];
+  const colors: [string, string, string] = past ? ["#334155", "#475569", "#64748b"] : [BLUE, BLUE, ACCENT];
 
   return (
     <Pressable
@@ -245,18 +247,18 @@ const styles = StyleSheet.create({
   topRight: { flexDirection: "row", alignItems: "center" },
   thumb: { overflow: "hidden", borderColor: "rgba(255,255,255,0.9)", backgroundColor: "rgba(255,255,255,0.2)" },
   chip: { borderRadius: 999, backgroundColor: "rgba(255,255,255,0.22)" },
-  chipText: { color: "#ffffff", fontFamily: "Avenir-Black", letterSpacing: 1.2 },
-  eyebrow: { color: "rgba(255, 255, 255, 0.8)", fontFamily: "Avenir-Roman", letterSpacing: 2.2 },
+  chipText: { color: "#ffffff", fontFamily: "PlusJakartaSans-Bold", letterSpacing: 1.2 },
+  eyebrow: { color: "rgba(255, 255, 255, 0.8)", fontFamily: "PlusJakartaSans-Medium", letterSpacing: 2.2 },
   headline: {
     color: "#ffffff",
-    fontFamily: "Avenir-Black",
+    fontFamily: "PlusJakartaSans-Bold",
     textShadowColor: "rgba(0, 18, 26, 0.25)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3
   },
   detail: {
     color: "rgba(255, 255, 255, 0.92)",
-    fontFamily: "Avenir-Roman",
+    fontFamily: "PlusJakartaSans-Medium",
     textShadowColor: "rgba(0, 18, 26, 0.2)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2
@@ -270,12 +272,12 @@ const styles = StyleSheet.create({
   hole: { position: "absolute", borderRadius: 999, backgroundColor: TICKET_LIST_BACKGROUND },
   serial: {
     color: "rgba(255, 255, 255, 0.85)",
-    fontFamily: "Avenir-Roman",
+    fontFamily: "PlusJakartaSans-Medium",
     textAlign: "center",
     transform: [{ rotate: "90deg" }]
   },
   back: { flexDirection: "row", alignItems: "center", backgroundColor: NAVY },
   code: { backgroundColor: "#ffffff" },
-  ready: { fontFamily: "Avenir-Roman", letterSpacing: 2.2 },
-  hint: { color: "rgba(255, 255, 255, 0.6)", fontFamily: "Avenir-Book" }
+  ready: { fontFamily: "PlusJakartaSans-Medium", letterSpacing: 2.2 },
+  hint: { color: "rgba(255, 255, 255, 0.6)", fontFamily: "PlusJakartaSans-Regular" }
 });

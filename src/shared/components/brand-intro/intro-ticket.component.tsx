@@ -16,7 +16,7 @@ import Svg, {
 import {
   BASE,
   BLUE,
-  PINK,
+  BLUE_DEEP,
   RASTERIZE,
   T,
   easeOut,
@@ -123,8 +123,8 @@ const IntroTicket: React.FC<TTicketProps> = ({ t, width }) => {
         <Svg width="100%" height="100%">
           <Defs>
             <RadialGradient id="ticket-shadow" cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor={PINK} stopOpacity="0.32" />
-              <Stop offset="1" stopColor={PINK} stopOpacity="0" />
+              <Stop offset="0" stopColor={BLUE_DEEP} stopOpacity="0.32" />
+              <Stop offset="1" stopColor={BLUE_DEEP} stopOpacity="0" />
             </RadialGradient>
           </Defs>
           <Ellipse
@@ -142,7 +142,7 @@ const IntroTicket: React.FC<TTicketProps> = ({ t, width }) => {
         style={[styles.face, { borderRadius: 22 * k }, frontStyle]}
       >
         <LinearGradient
-          colors={[BLUE, BLUE, PINK]}
+          colors={[BLUE, BLUE, BLUE_DEEP]}
           locations={[0, 0.3, 1]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -237,9 +237,7 @@ const IntroTicket: React.FC<TTicketProps> = ({ t, width }) => {
           >
             See you there.
           </Text> */}
-          {/* <Text style={[styles.hint, { fontSize: 12 * k, marginTop: 4 * k }]}>
-            Show it at the door
-          </Text> */}
+        
         </View>
       </Animated.View>
     </Animated.View>
@@ -267,12 +265,12 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     color: "rgba(255, 255, 255, 0.75)",
-    fontFamily: "Avenir-Roman",
+    fontFamily: "PlusJakartaSans-Medium",
     letterSpacing: 2.4
   },
   headline: {
     color: "#ffffff",
-    fontFamily: "Avenir-Black"
+    fontFamily: "PlusJakartaSans-Bold"
   },
   stub: {
     alignItems: "center",
@@ -288,7 +286,7 @@ const styles = StyleSheet.create({
   },
   serial: {
     color: "rgba(255, 255, 255, 0.8)",
-    fontFamily: "Avenir-Roman",
+    fontFamily: "PlusJakartaSans-Medium",
     textAlign: "center",
     transform: [{ rotate: "90deg" }]
   },
@@ -305,11 +303,11 @@ const styles = StyleSheet.create({
   },
   ready: {
     color: "#6ee7b7",
-    fontFamily: "Avenir-Roman",
+    fontFamily: "PlusJakartaSans-Medium",
     letterSpacing: 2.4
   },
   hint: {
     color: "rgba(255, 255, 255, 0.55)",
-    fontFamily: "Avenir-Book"
+    fontFamily: "PlusJakartaSans-Regular"
   }
 });

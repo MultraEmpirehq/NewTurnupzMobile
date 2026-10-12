@@ -8,7 +8,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "backgroundColor": "#fbf9ff",
+      "backgroundColor": "#f7fbff",
       "resizeMode": "contain"
     },
     "ios": {
@@ -20,7 +20,7 @@
         "foregroundImage": "./src/shared/assets/images/adaptive-icon.png",
         "backgroundImage": "./src/shared/assets/images/adaptive-background.png",
         "monochromeImage": "./src/shared/assets/images/monochrome-icon.png",
-        "backgroundColor": "#7c5cc4"
+        "backgroundColor": "#0577FA"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -37,7 +37,8 @@
           "launchMode": "most-recent"
         }
       ],
-      "./plugins/with-pod-deployment-target"
+      "./plugins/with-pod-deployment-target",
+      "./plugins/with-android-release-signing"
     ]
   }
 }

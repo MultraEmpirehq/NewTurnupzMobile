@@ -5,6 +5,7 @@ import {
   Linking,
   Pressable,
   ScrollView,
+  Switch,
   useWindowDimensions,
   View
 } from "react-native";
@@ -20,11 +21,13 @@ import { formatEventClock } from "@/shared/utils/event-time";
 import { orderOutcome } from "@/shared/utils/order-status";
 import {
   fetchOrder,
+  formatMoney,
   formatPrice,
   TLiveEvent,
   TLiveOrder,
   TLiveTicket,
   useCreateOrder,
+  useCreditBalance,
   useLiveTickets
 } from "./live-api";
 
@@ -45,9 +48,9 @@ const maxFor = (ticket: TLiveTicket) => {
 
 /**
  * Picking tickets and paying, for one event. One ticket type per order, as the API
- * takes it. Payment happens on Paystack's own page in the browser; when the app
- * comes back to the front, the order is read again, and the API confirms the
- * payment with Paystack as it answers.
+ * takes it. Turnupz Credit can pay for some or all of it; the rest is paid on
+ * Flutterwave's page in the browser. When the app comes back to the front, the
+ * order is read again, and the API confirms the payment as it answers.
  */
 const LiveTicketCheckoutScreen = ({
   event,
@@ -86,6 +89,21 @@ const LiveTicketCheckoutScreen = ({
   const total = selected ? formatPrice(selected.price, quantity) : "";
   const isFree = !selected?.price?.amount;
 
+  // Turnupz Credit in the ticket's currency, spent first when switched on.
+  const { data: credit } = useCreditBalance(!isRegistration);
+  const [useCredit, setUseCredit] = useState(true);
+  const currency = selected?.price?.currency?.code?.toUpperCase();
+  const creditAvailable =
+    credit?.find((row) => row.currency.toUpperCase() === currency)?.available
+      ?.amount ?? 0;
+  const orderAmount = (selected?.price?.amount ?? 0) * quantity;
+  const creditApplied =
+    !isFree && !isRegistration && useCredit
+      ? Math.min(creditAvailable, orderAmount)
+      : 0;
+  const toPay = Math.max(orderAmount - creditApplied, 0);
+  const coveredByCredit = creditApplied > 0 && toPay === 0;
+
   useEffect(() => {
     if (!selectedId) {
       const firstBuyable = tickets.find(
@@ -115,7 +133,7 @@ const LiveTicketCheckoutScreen = ({
     }
   }, []);
 
-  // Coming back from the Paystack page is the moment to look again.
+  // Coming back from the payment page is the moment to look again.
   const awaitingOrderId = step.kind === "awaiting-payment" ? step.orderId : null;
   const appState = useRef(AppState.currentState);
   useEffect(() => {
@@ -157,7 +175,8 @@ const LiveTicketCheckoutScreen = ({
       }
       const created = await createOrder.mutateAsync({
         ticketId: selected.id,
-        quantity
+        quantity,
+        ...(creditApplied > 0 ? { useCredit: true } : {})
       });
       if (!created?.orderId) throw new Error("No order was created");
       if (created.redirectUrl) {
@@ -169,7 +188,7 @@ const LiveTicketCheckoutScreen = ({
         await Linking.openURL(created.redirectUrl);
         return;
       }
-      // A free ticket completes straight away.
+      // A free ticket, or one paid fully with credit, completes straight away.
       const order = await checkOrder(created.orderId);
       if (order) setStep({ kind: "outcome", order });
     } catch (payError) {
@@ -225,7 +244,7 @@ const LiveTicketCheckoutScreen = ({
         <View className="mt-10 items-center gap-3 px-4">
           <ActivityIndicator color="#00B2FF" />
           <TextComponent className="text-center text-lg font-bold text-zinc-950">
-            Finish paying on Paystack
+            Finish paying on Flutterwave
           </TextComponent>
           <TextComponent className="text-center text-sm text-zinc-600">
             Your seats are held for a few minutes. Come back here when you're done and
@@ -271,7 +290,7 @@ const LiveTicketCheckoutScreen = ({
     const reason = step.kind === "outcome" ? step.order.statusReason : null;
     const toneClass = {
       good: "bg-emerald-50 text-emerald-700",
-      wait: "bg-amber-50 text-amber-800",
+      wait: "bg-sky-50 text-sky-800",
       bad: "bg-red-50 text-red-700",
       info: "bg-sky-50 text-sky-700"
     }[outcome.tone];
@@ -381,7 +400,7 @@ const LiveTicketCheckoutScreen = ({
                   {formatPrice(ticket.price)}
                 </TextComponent>
                 {!!saleNote && (
-                  <TextComponent className="mt-2 text-xs font-semibold text-amber-700">
+                  <TextComponent className="mt-2 text-xs font-semibold text-sky-700">
                     {saleNote}
                   </TextComponent>
                 )}
@@ -434,9 +453,42 @@ const LiveTicketCheckoutScreen = ({
             </TextComponent>
             <TextComponent className="text-sm font-bold text-zinc-950">{total}</TextComponent>
           </View>
+          {!isFree && !isRegistration && creditAvailable > 0 && (
+            <View className="mt-3 flex-row items-center justify-between gap-3 border-t border-zinc-100 pt-3">
+              <View className="flex-1">
+                <TextComponent className="text-sm font-semibold text-zinc-950">
+                  Use Turnupz Credit
+                </TextComponent>
+                <TextComponent className="text-xs text-zinc-500">
+                  {formatMoney(creditAvailable, selected.price)} available
+                </TextComponent>
+              </View>
+              <Switch
+                value={useCredit}
+                onValueChange={setUseCredit}
+                accessibilityLabel="Use Turnupz Credit"
+              />
+            </View>
+          )}
+          {creditApplied > 0 && (
+            <View className="mt-2 flex-row justify-between">
+              <TextComponent className="text-xs text-zinc-500">Turnupz Credit</TextComponent>
+              <TextComponent className="text-sm font-bold text-zinc-950">
+                −{formatMoney(creditApplied, selected.price)}
+              </TextComponent>
+            </View>
+          )}
           <View className="mt-3 flex-row flex-wrap justify-between gap-2 border-t border-zinc-100 pt-3">
-            <TextComponent className="text-xs text-zinc-500">Total</TextComponent>
-            <TextComponent className="text-xl font-bold text-zinc-950">{total}</TextComponent>
+            <TextComponent className="text-xs text-zinc-500">
+              {creditApplied > 0 ? "To pay" : "Total"}
+            </TextComponent>
+            <TextComponent className="text-xl font-bold text-zinc-950">
+              {creditApplied > 0
+                ? coveredByCredit
+                  ? "Covered by credit"
+                  : formatMoney(toPay, selected.price)
+                : total}
+            </TextComponent>
           </View>
           <TextComponent className="mt-2 text-[10px] text-zinc-400">
             Doors at {formatEventClock(event.date, event.timezone)}, venue time.
@@ -461,13 +513,15 @@ const LiveTicketCheckoutScreen = ({
               ? "Register"
               : isFree
                 ? "Get free ticket"
-                : `Pay ${total} with Paystack`}
+                : coveredByCredit
+                  ? "Pay with Turnupz Credit"
+                  : `Pay ${creditApplied > 0 ? formatMoney(toPay, selected?.price) : total}`}
           </TextComponent>
         )}
       </Pressable>
-      {!isRegistration && !isFree && (
+      {!isRegistration && !isFree && !coveredByCredit && (
         <TextComponent className="mt-2 text-center text-[11px] text-zinc-400">
-          You'll pay securely on Paystack's page. We never see your card.
+          You'll pay securely on Flutterwave's page. We never see your card.
         </TextComponent>
       )}
     </ScrollView>

@@ -25,6 +25,9 @@ import {
   eventPlace,
   useLiveUserTickets,
   useSentTransfers,
+  useRefundedOrders,
+  TRefundedOrder,
+  formatPrice,
   useReceivedTransfers,
   canTransfer
 } from "./live-api";
@@ -189,7 +192,7 @@ const PassViewer = ({
 }: {
   group: TEventTickets | null;
   onClose: () => void;
-  /** Sends one pass to someone; offered only on passes that can be sent. */
+  /** Transfers one pass to someone; offered only on passes that can be. */
   onSend: (ticket: TLiveUserTicket) => void;
 }) => {
   const { width } = useWindowDimensions();
@@ -274,7 +277,7 @@ const PassViewer = ({
                     className="h-11 flex-row items-center justify-center rounded-full bg-white/10 px-6"
                   >
                     <TextComponent className="font-semibold text-white">
-                      Send to someone
+                      Transfer
                     </TextComponent>
                   </Pressable>
                 )}
@@ -310,6 +313,43 @@ const PassViewer = ({
 };
 
 /** "VIP", or "VIP + 1 more" when the tickets are of different types. */
+const REFUND_STATUS: Record<string, { label: string; color: string }> = {
+  processing: { label: "On its way", color: "#71717a" },
+  completed: { label: "Refunded", color: "#047857" },
+  failed: { label: "Delayed, we're on it", color: "#b91c1c" }
+};
+
+/** One refunded order: how many tickets, where the money went, and if it's arrived. */
+const RefundRow = ({ order }: { order: TRefundedOrder }) => (
+  <View className="mx-4 mb-3 rounded-2xl bg-white p-4">
+    <TextComponent className="text-base font-semibold" style={{ color: INK }}>
+      {order.ticket?.event?.data?.name ?? "Event"}
+    </TextComponent>
+    {order.refunds.map((refund, index) => {
+      const parts = [
+        refund.toCard.amount > 0 && `${formatPrice(refund.toCard)} to your card`,
+        refund.asCredit.amount > 0 &&
+          `${formatPrice(refund.asCredit)} as Turnupz Credit`
+      ].filter(Boolean);
+      const status = REFUND_STATUS[refund.status] ?? REFUND_STATUS.processing;
+      return (
+        <View key={index} className="mt-2">
+          <TextComponent className="text-sm text-zinc-700">
+            {refund.tickets} ticket{refund.tickets === 1 ? "" : "s"} refunded
+            {parts.length ? `: ${parts.join(" and ")}` : ""}
+          </TextComponent>
+          <TextComponent className="text-xs" style={{ color: status.color }}>
+            {status.label}
+            {refund.status === "processing" && refund.toCard.amount > 0
+              ? " · cards usually take 5–10 working days"
+              : ""}
+          </TextComponent>
+        </View>
+      );
+    })}
+  </View>
+);
+
 const ticketLabelOf = (tickets: TLiveUserTicket[]) => {
   const names = [
     ...new Set(tickets.map((ticket) => ticket.ticket?.name || "Ticket"))
@@ -330,12 +370,16 @@ const LiveMyTicketsScreen = ({ onBack }: { onBack: () => void }) => {
     hasNextPage,
     isFetchingNextPage
   } = useLiveUserTickets();
-  const [tab, setTab] = useState<"upcoming" | "past" | "received" | "sent">(
-    "upcoming"
-  );
+  const [tab, setTab] = useState<
+    "upcoming" | "past" | "received" | "sent" | "refunds"
+  >("upcoming");
+  const refunded = useRefundedOrders();
+  const refundedItems = refunded.data ?? [];
   const showPast = tab === "past";
   const [open, setOpen] = useState<TEventTickets | null>(null);
   const [sending, setSending] = useState<TLiveUserTicket | null>(null);
+  // The event the ticket being sent is for (the passes close before sending).
+  const [sendingEventName, setSendingEventName] = useState("this event");
   const sent = useSentTransfers();
   const sentItems = sent.data ?? [];
   const waiting = sentItems.filter(
@@ -393,7 +437,16 @@ const LiveMyTicketsScreen = ({ onBack }: { onBack: () => void }) => {
           {
             value: "sent" as const,
             label: waiting ? `Sent (${waiting})` : "Sent"
-          }
+          },
+          // Only once there's something to show.
+          ...(refundedItems.length
+            ? [
+                {
+                  value: "refunds" as const,
+                  label: `Refunds (${refundedItems.length})`
+                }
+              ]
+            : [])
         ].map((option) => (
           <Pressable
             key={option.value}
@@ -423,7 +476,25 @@ const LiveMyTicketsScreen = ({ onBack }: { onBack: () => void }) => {
       style={{ backgroundColor: TICKET_LIST_BACKGROUND }}
     >
       <BackHeader title="My tickets" onBack={onBack} />
-      {tab === "received" ? (
+      {tab === "refunds" ? (
+        <BrandRefreshList
+          data={refundedItems}
+          keyExtractor={(order) => order.id}
+          style={{ backgroundColor: TICKET_LIST_BACKGROUND }}
+          contentContainerStyle={{ paddingBottom: 32, paddingTop: 4 }}
+          refreshing={refunded.isRefetching}
+          onRefresh={() => void refunded.refetch()}
+          ListHeaderComponent={tabsHeader}
+          ListEmptyComponent={
+            refunded.isLoading ? (
+              <Loading />
+            ) : (
+              <EmptyNote title="No refunds" body="Refunded tickets show here." />
+            )
+          }
+          renderItem={({ item }) => <RefundRow order={item} />}
+        />
+      ) : tab === "received" ? (
         <BrandRefreshList
           data={receivedItems}
           keyExtractor={(transfer) => transfer.id}
@@ -464,7 +535,7 @@ const LiveMyTicketsScreen = ({ onBack }: { onBack: () => void }) => {
             ) : (
               <EmptyNote
                 title="Nothing sent yet"
-                body="Tickets you send to someone show here until they claim them."
+                body="Tickets you transfer show here until they claim them."
               />
             )
           }
@@ -539,11 +610,17 @@ const LiveMyTicketsScreen = ({ onBack }: { onBack: () => void }) => {
       <PassViewer
         group={open}
         onClose={() => setOpen(null)}
-        onSend={setSending}
+        onSend={(ticket) => {
+          // iOS shows one modal at a time: close the passes first, then open
+          // the send sheet once they've slid away.
+          setSendingEventName(open?.event.name ?? "this event");
+          setOpen(null);
+          setTimeout(() => setSending(ticket), 450);
+        }}
       />
       <TransferTicketSheet
         ticket={sending}
-        eventName={open?.event.name ?? "this event"}
+        eventName={sendingEventName}
         onClose={() => setSending(null)}
         onSent={() => {
           // It's left your tickets: close everything and show it under Sent.

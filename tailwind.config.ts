@@ -11,14 +11,16 @@ module.exports = {
       spacing: {
         horizontal: "20px"
       },
-      // Avenir cuts (loaded in App.tsx) for a plain Text/TextInput that doesn't
-      // go through TextComponent, which picks the cut from the weight itself.
+      // Plus Jakarta Sans cuts (loaded in App.tsx) for a plain Text/TextInput
+      // that doesn't go through TextComponent, which picks the cut itself.
       fontFamily: {
-        sans: ["Avenir-Book"],
-        "avenir-light": ["Avenir-Light"],
-        "avenir-book": ["Avenir-Book"],
-        "avenir-roman": ["Avenir-Roman"],
-        "avenir-black": ["Avenir-Black"]
+        sans: ["PlusJakartaSans-Regular"],
+        "jakarta-light": ["PlusJakartaSans-Light"],
+        "jakarta-regular": ["PlusJakartaSans-Regular"],
+        "jakarta-medium": ["PlusJakartaSans-Medium"],
+        "jakarta-semibold": ["PlusJakartaSans-SemiBold"],
+        "jakarta-bold": ["PlusJakartaSans-Bold"],
+        "jakarta-extrabold": ["PlusJakartaSans-ExtraBold"]
       },
       colors: {
         text: {

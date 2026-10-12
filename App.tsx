@@ -16,14 +16,14 @@ import { useIntroStore } from "@/shared/stores/intro.store";
 const queryClient = new QueryClient();
 
 export default function App() {
-  // Hold the first frame until Avenir is ready so text doesn't flash in the
+  // Hold the first frame until Plus Jakarta Sans is ready so text doesn't flash in the
   // system font; if loading fails, carry on with the system font. The wait uses
   // the intro's base colour, so splash → intro reads as one piece.
   const [fontsLoaded, fontError] = useFonts(BRAND_FONTS);
   const introDone = useIntroStore((state) => state.introDone);
   const finishIntro = useIntroStore((state) => state.setIntroDone);
   if (!fontsLoaded && !fontError) {
-    return <View style={{ flex: 1, backgroundColor: "#fbf9ff" }} />;
+    return <View style={{ flex: 1, backgroundColor: "#f7fbff" }} />;
   }
 
   // const clearUserStore = useUserStore((state) => state.clearUserStore);

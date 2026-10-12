@@ -25,8 +25,8 @@ export const useMe = () =>
 export type TProfileUpdate = Partial<
   Pick<
     TUser,
-    "firstName" | "lastName" | "username" | "bio" | "website" | "phone"
-  >
+    "firstName" | "lastName" | "username" | "bio" | "website" | "phone" | "gender"
+  > & { dateOfBirth: string }
 >;
 
 export const updateProfile = async (body: TProfileUpdate) => {
@@ -203,3 +203,38 @@ export const sendSupportMessage = (body: {
   subject?: string;
   message: string;
 }) => postData("/contact", body);
+
+/** Turnupz Credit earned through invites, one row per currency. */
+type TReferralEarnings = {
+  currency: string;
+  earned: { amount: number; formatted: { withCurrency: string } };
+  pending: { amount: number; formatted: { withCurrency: string } };
+};
+
+export type TReferralMe = {
+  /** Their invite code, which is their username. */
+  code: string | null;
+  /** They can still add who invited them (new enough, no purchase yet). */
+  canAddCode: boolean;
+  addCodeUntil: string | null;
+  counts: { invited: number; pending: number; rewarded: number };
+  earnings: TReferralEarnings[];
+  referredBy: string | null;
+};
+
+/** Their invite code, who they've brought in and what it's earned. */
+export const useReferralMe = () =>
+  useQuery({
+    queryKey: ["referrals", "me"],
+    queryFn: async () =>
+      (await getData<TReferralMe>("/referrals/me")).data?.data ?? null
+  });
+
+/** Adds the code of whoever invited them; returns that person's name. */
+export const applyInviteCode = async (code: string) =>
+  (
+    await postData<{ code: string }, { invitedBy: string }>(
+      "/referrals/apply",
+      { code: code.trim() }
+    )
+  ).data?.data;

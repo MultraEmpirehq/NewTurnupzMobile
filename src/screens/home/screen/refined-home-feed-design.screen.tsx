@@ -2003,7 +2003,7 @@ const PodiumPerformer = ({
       <View
         className={
           featured
-            ? "rounded-lg border-4 border-amber-400 p-1"
+            ? "rounded-lg border-4 border-sky-400 p-1"
             : "rounded-lg border-2 border-zinc-300 p-1"
         }
       >
@@ -2012,7 +2012,7 @@ const PodiumPerformer = ({
       <View
         className={
           featured
-            ? "-mt-4 size-9 items-center justify-center rounded-full bg-amber-400"
+            ? "-mt-4 size-9 items-center justify-center rounded-full bg-sky-400"
             : "-mt-3 size-7 items-center justify-center rounded-full bg-zinc-100"
         }
       >
@@ -2202,14 +2202,14 @@ const PerformerProfileScreen = ({
                 <View
                   className={
                     event.bookingType === "external"
-                      ? "self-start rounded-full bg-amber-100 px-3 py-1"
+                      ? "self-start rounded-full bg-sky-100 px-3 py-1"
                       : "self-start rounded-full bg-green-100 px-3 py-1"
                   }
                 >
                   <TextComponent
                     className={
                       event.bookingType === "external"
-                        ? "text-[10px] font-bold text-amber-700"
+                        ? "text-[10px] font-bold text-sky-700"
                         : "text-[10px] font-bold text-green-700"
                     }
                   >
@@ -2765,8 +2765,8 @@ const EventBookingDetailScreen = ({
                 <View className="mb-4 flex-1 rounded-xl bg-white p-4 shadow-sm">
                   <View className="flex-row flex-wrap justify-between gap-2">
                     <View className="flex-row flex-wrap items-center gap-2">
-                      <View className="rounded-full bg-amber-50 px-3 py-1">
-                        <TextComponent className="text-[10px] font-bold text-amber-600">
+                      <View className="rounded-full bg-sky-50 px-3 py-1">
+                        <TextComponent className="text-[10px] font-bold text-sky-600">
                           {activity.category}
                         </TextComponent>
                       </View>
@@ -3080,7 +3080,7 @@ const TicketSelectionScreen = ({
                   {ticket.name}
                 </TextComponent>
                 {index === 1 && (
-                  <View className="rounded-full bg-amber-400 px-2 py-0.5">
+                  <View className="rounded-full bg-sky-400 px-2 py-0.5">
                     <TextComponent className="text-[8px] font-bold text-white">
                       POPULAR
                     </TextComponent>
@@ -3379,8 +3379,8 @@ const PaymentMethodScreen = ({
           <TextComponent className="mb-3 mt-3 text-sm font-bold text-zinc-950">
             Add another card
           </TextComponent>
-          <View className="rounded-2xl bg-[#065a73] p-5">
-            <TextComponent className="text-[10px] uppercase text-cyan-100">
+          <View className="rounded-2xl bg-[#006b99] p-5">
+            <TextComponent className="text-[10px] uppercase text-sky-100">
               Name
             </TextComponent>
             <TextComponent className="mt-1 text-sm font-bold text-white">
@@ -3389,7 +3389,7 @@ const PaymentMethodScreen = ({
             <TextComponent className="mt-8 text-lg font-bold tracking-widest text-white">
               **** **** **** {lastFour}
             </TextComponent>
-            <TextComponent className="mt-5 text-[10px] text-cyan-100">
+            <TextComponent className="mt-5 text-[10px] text-sky-100">
               CVV {cvv || "***"} EXP {expiryDate || "MM/YY"}
             </TextComponent>
           </View>
@@ -3615,7 +3615,7 @@ const PaymentSuccessScreen = ({
       showsVerticalScrollIndicator={false}
       contentContainerClassName="items-center px-5 pb-10 pt-16"
     >
-      <View className="size-24 items-center justify-center rounded-full bg-orange-400">
+      <View className="size-24 items-center justify-center rounded-full bg-sky-400">
         <TextComponent className="text-4xl font-bold text-white">
           ✓
         </TextComponent>
@@ -4058,7 +4058,7 @@ const ExploreMapScreen = ({ onBack }: { onBack: () => void }) => {
         query={query}
         onQueryChange={setQuery}
       />
-      <View className="relative flex-1 overflow-hidden bg-[#eef3ef]">
+      <View className="relative flex-1 overflow-hidden bg-[#f1f2f5]">
         <View className="absolute inset-0">
           <View className="absolute left-[-10%] top-[13%] h-5 w-[125%] rotate-[-12deg] bg-white/90" />
           <View className="absolute left-[-15%] top-[32%] h-4 w-[130%] rotate-[18deg] bg-white/90" />
@@ -4392,8 +4392,8 @@ const HappeningTodayCard = ({
           contentFit="cover"
         />
         {event.badge && (
-          <View className="absolute right-3 top-3 rounded-full bg-amber-200 px-3 py-1">
-            <TextComponent className="text-[10px] font-bold text-amber-950">
+          <View className="absolute right-3 top-3 rounded-full bg-sky-200 px-3 py-1">
+            <TextComponent className="text-[10px] font-bold text-sky-950">
               {event.badge}
             </TextComponent>
           </View>
@@ -5105,7 +5105,7 @@ const VenueStatusPill = ({ status }: { status?: string }) => {
     status === "Sold Out"
       ? { wrapper: "bg-red-50", text: "text-red-600" }
       : status === "Selling Fast"
-        ? { wrapper: "bg-amber-50", text: "text-amber-700" }
+        ? { wrapper: "bg-sky-50", text: "text-sky-700" }
         : { wrapper: "bg-green-50", text: "text-green-600" };
 
   return (
@@ -5718,7 +5718,7 @@ const ChatListScreen = ({
                     className={
                       viewedStoryIds.includes(story.id)
                         ? "rounded-xl border-2 border-zinc-300 p-0.5"
-                        : "rounded-xl border-2 border-orange-400 p-0.5"
+                        : "rounded-xl border-2 border-sky-400 p-0.5"
                     }
                   >
                     <ChatAvatar
@@ -6022,7 +6022,7 @@ const ContactsScreen = ({
                 key={friend.id}
                 className="w-[31.5%] rounded-xl border border-zinc-100 bg-white px-3 pb-3 pt-3 shadow-sm"
               >
-                <View className="relative self-center rounded-xl border-2 border-orange-500 p-0.5">
+                <View className="relative self-center rounded-xl border-2 border-sky-500 p-0.5">
                   <CustomImage
                     className="size-[58px] overflow-hidden rounded-lg bg-zinc-100"
                     imageClassName="size-full rounded-lg"
@@ -6443,7 +6443,7 @@ const CreateNewGroupScreen = ({
                 <ChatAvatar image={contact.avatar} size={52} online />
               ) : (
                 <View
-                  className="items-center justify-center rounded-lg bg-orange-400"
+                  className="items-center justify-center rounded-lg bg-sky-400"
                   style={{ height: 52, width: 52 }}
                 >
                   <TextComponent className="font-bold text-white">
@@ -7650,8 +7650,8 @@ const PrivateChatSettingsScreen = ({
                   online={index === 0}
                 />
               ) : (
-                <View className="size-10 items-center justify-center rounded-lg bg-orange-100">
-                  <TextComponent className="text-xs font-bold text-orange-700">
+                <View className="size-10 items-center justify-center rounded-lg bg-sky-100">
+                  <TextComponent className="text-xs font-bold text-sky-700">
                     TC
                   </TextComponent>
                 </View>
@@ -8054,8 +8054,8 @@ const ChatContent = ({
               storyEffect === 1
                 ? "absolute inset-0 bg-blue-500/20"
                 : storyEffect === 2
-                  ? "absolute inset-0 bg-fuchsia-500/20"
-                  : "absolute inset-0 bg-amber-400/20"
+                  ? "absolute inset-0 bg-sky-500/20"
+                  : "absolute inset-0 bg-sky-400/20"
             }
           />
         )}
@@ -9167,7 +9167,7 @@ const TicketTransferCard = ({
       contentFit="cover"
     />
     <View className="p-3">
-      <View className="self-start rounded bg-orange-400 px-2 py-0.5">
+      <View className="self-start rounded bg-sky-400 px-2 py-0.5">
         <TextComponent className="text-[8px] font-bold text-white">
           TICKET TRANSFER
         </TextComponent>
@@ -9385,7 +9385,7 @@ const TicketsContent = ({
               contentFit="cover"
             />
             <View className="p-3">
-              <View className="self-start rounded bg-orange-400 px-2 py-0.5">
+              <View className="self-start rounded bg-sky-400 px-2 py-0.5">
                 <TextComponent className="text-[8px] font-bold uppercase text-white">
                   {selectedCategory.name}
                 </TextComponent>
@@ -9571,7 +9571,7 @@ const TicketsContent = ({
             );
             return (
               <View key={ticketId} className="mb-4">
-                <View className="overflow-hidden rounded-xl bg-[#087d83] shadow-sm">
+                <View className="overflow-hidden rounded-xl bg-[#0577fa] shadow-sm">
                   <View className="relative h-32">
                     <CustomImage
                       className="absolute inset-0 size-full opacity-40"
@@ -9749,7 +9749,7 @@ const NotificationIconBadge = ({
 }) => {
   const bg =
     tone === "orange"
-      ? "bg-orange-400"
+      ? "bg-sky-400"
       : tone === "gray"
         ? "bg-zinc-100"
         : "bg-primary";

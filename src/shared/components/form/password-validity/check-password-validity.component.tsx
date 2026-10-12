@@ -50,7 +50,7 @@ const CheckParameters: React.FC<{ isValid: boolean; value: string }> = ({
   return (
     <View className={cn(validityViewClassName({ isValid }))}>
       <View>
-        {isValid && <BadgeCheckIcon color={"#1D006D"} color2={"#6FB1FC"} />}
+        {isValid && <BadgeCheckIcon color={"#006B99"} color2={"#6FB1FC"} />}
         {!isValid && <CircleExclamationIcon />}
       </View>
       <TextComponent className={cn(validityTextClassName({ isValid }))}>

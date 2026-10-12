@@ -1,4 +1,5 @@
 import React, { memo, useMemo, useState } from "react";
+import { BRAND } from "@/shared/utils/brand-colors";
 import {
   ActivityIndicator,
   FlatList,
@@ -39,7 +40,8 @@ import {
  */
 
 const INK = "#0b1d2a";
-const PINK = "#ff0088";
+// Accents are the deeper brand blue (strictly blue, black, white and grey).
+const ACCENT = BRAND.blueDeep;
 const BLUE = "#00b2ff";
 
 const initialsOf = (name: string) =>
@@ -69,7 +71,7 @@ export const PerformerAvatar = ({
     />
   ) : (
     <LinearGradient
-      colors={[BLUE, PINK]}
+      colors={[BLUE, ACCENT]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{
@@ -162,7 +164,8 @@ const PodiumSpot = ({
       <View>
         <View
           className="rounded-full p-1"
-          style={{ backgroundColor: place === 1 ? "#ffd166" : place === 2 ? "#d9dee7" : "#f1b98b" }}
+          // The podium ring: brand blue for first, greys for second and third.
+          style={{ backgroundColor: place === 1 ? BRAND.blue : place === 2 ? "#a1a1aa" : "#d4d4d8" }}
         >
           <PerformerAvatar performer={performer} size={size} />
         </View>
@@ -180,7 +183,7 @@ const PodiumSpot = ({
         {PERFORMER_TYPE_LABELS[performer.type]}
       </TextComponent>
       <LinearGradient
-        colors={place === 1 ? [BLUE, PINK] : ["#e9eef6", "#dfe6f0"]}
+        colors={place === 1 ? [BLUE, ACCENT] : ["#e9eef6", "#dfe6f0"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{ height, alignSelf: "stretch", marginTop: 10, marginHorizontal: 6, borderTopLeftRadius: 14, borderTopRightRadius: 14 }}
@@ -337,7 +340,7 @@ export const PerformerProfileScreen = memo(
             ListHeaderComponent={
               <View className="gap-5 pb-5">
                 <LinearGradient
-                  colors={["#e3f6ff", "#ffe8f3"]}
+                  colors={["#e3f6ff", BRAND.blueTintDeep]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={{ alignItems: "center", paddingTop: 28, paddingBottom: 22, gap: 10 }}
@@ -520,7 +523,7 @@ export const VenueDetailScreen = memo(
                     placeholder="Search events at this venue"
                     placeholderTextColor="#a1a1aa"
                     className="flex-1 text-base text-zinc-950"
-                    style={{ fontFamily: "Avenir-Book" }}
+                    style={{ fontFamily: "PlusJakartaSans-Regular" }}
                   />
                 </View>
               </View>
@@ -651,7 +654,7 @@ export const PlannersScreen = memo(
                   placeholder="Search planners"
                   placeholderTextColor="#a1a1aa"
                   className="flex-1 text-base text-zinc-950"
-                  style={{ fontFamily: "Avenir-Book" }}
+                  style={{ fontFamily: "PlusJakartaSans-Regular" }}
                 />
               </View>
             </View>

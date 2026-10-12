@@ -2,7 +2,7 @@ import React, { memo } from "react";
 import { DimensionValue, StyleSheet, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { G, Path, Rect } from "react-native-svg";
-import { BLUE, INK, PEACH, PINK, VIOLET } from "./intro-timeline";
+import { BLUE, INK, BLUE_SOFT, BLUE_DEEP, BLUE_NAVY } from "./intro-timeline";
 import { EVENT_ICONS, TEventIcon } from "./intro-icons";
 
 /**
@@ -17,13 +17,13 @@ import { EVENT_ICONS, TEventIcon } from "./intro-icons";
 type TEvent = { icon: TEventIcon; colors: [string, string] };
 
 const EVENTS: TEvent[] = [
-  { icon: "tech", colors: [BLUE, VIOLET] },
-  { icon: "food", colors: [PEACH, "#ff7a59"] },
-  { icon: "sport", colors: ["#00c9a7", BLUE] },
-  { icon: "comedy", colors: [VIOLET, PINK] },
+  { icon: "tech", colors: [BLUE, BLUE_NAVY] },
+  { icon: "food", colors: [BLUE_SOFT, BLUE] },
+  { icon: "sport", colors: [BLUE_SOFT, BLUE] },
+  { icon: "comedy", colors: [BLUE_NAVY, BLUE_DEEP] },
   { icon: "business", colors: ["#1e40af", BLUE] },
-  { icon: "family", colors: ["#ff6b9a", PEACH] },
-  { icon: "music", colors: [PINK, PEACH] }
+  { icon: "family", colors: [BLUE_DEEP, BLUE_SOFT] },
+  { icon: "music", colors: [BLUE_DEEP, BLUE_SOFT] }
 ];
 
 export type TScreen =
@@ -169,7 +169,7 @@ const Perforation = ({ u }: { u: number }) => (
 
 const Button = ({ u }: { u: number }) => (
   <LinearGradient
-    colors={[BLUE, PINK]}
+    colors={[BLUE, BLUE_DEEP]}
     start={{ x: 0, y: 0 }}
     end={{ x: 1, y: 0 }}
     style={[styles.center, { height: 26 * u, borderRadius: 13 * u }]}
@@ -202,7 +202,7 @@ const Feed = ({ u, events }: { u: number; events: [number, number] }) => (
         <Bar u={u} width="60%" height={8} color="#d5dae4" />
       </View>
       <LinearGradient
-        colors={[BLUE, PINK]}
+        colors={[BLUE, BLUE_DEEP]}
         style={{ width: 18 * u, height: 18 * u, borderRadius: 9 * u }}
       />
     </View>
@@ -228,7 +228,7 @@ const Feed = ({ u, events }: { u: number; events: [number, number] }) => (
           <View style={{ flex: 1, gap: 4 * u }}>
             <Bar u={u} width="85%" height={6} color="#d5dae4" />
             <Bar u={u} width="65%" height={4} />
-            <Bar u={u} width="35%" height={4} color="#ffc2e0" />
+            <Bar u={u} width="35%" height={4} color="#cde4fe" />
           </View>
         </View>
       </View>
@@ -297,7 +297,7 @@ const Tickets = ({ u }: { u: number }) => (
                 height: 7 * u,
                 borderRadius: 3.5 * u,
                 backgroundColor:
-                  dot === 1 ? (tier.picked ? PINK : "#d5dae4") : "#ffd1e6"
+                  dot === 1 ? (tier.picked ? BLUE_DEEP : "#d5dae4") : "#cde4fe"
               }}
             />
           ))}
@@ -317,7 +317,7 @@ const Tickets = ({ u }: { u: number }) => (
 const Paid = ({ u }: { u: number }) => (
   <View style={[styles.center, { flex: 1, gap: 8 * u }]}>
     <LinearGradient
-      colors={["#22c55e", "#00c9a7"]}
+      colors={["#22c55e", "#15803d"]}
       style={[
         styles.center,
         { width: 58 * u, height: 58 * u, borderRadius: 29 * u }
@@ -468,8 +468,8 @@ const styles = StyleSheet.create({
     borderColor: "#e8ebf2"
   },
   tierPicked: {
-    borderColor: PINK,
-    backgroundColor: "#fff5fa"
+    borderColor: BLUE_DEEP,
+    backgroundColor: "#e6f1fe"
   },
   soldOut: {
     opacity: 0.45

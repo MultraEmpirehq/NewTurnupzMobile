@@ -30,7 +30,7 @@ import {
   LOGO_VIEWBOX,
   LOGO_WIDTH
 } from "../brand-intro/logo-paths";
-import { BLUE, PINK } from "../brand-intro/intro-timeline";
+import { BLUE, BLUE_DEEP } from "../brand-intro/intro-timeline";
 
 /**
  * The web's brand loader (Re-TurnupWeb: components/ui/brand-loader), on the same
@@ -205,7 +205,7 @@ const BrandLoader: React.FC<TBrandLoaderProps> = ({
           <Svg width="100%" height="100%">
             <Defs>
               <RadialGradient id={`${uid}-glow`} cx="50%" cy="50%" r="50%">
-                <Stop offset="0" stopColor={PINK} stopOpacity="0.28" />
+                <Stop offset="0" stopColor={BLUE_DEEP} stopOpacity="0.28" />
                 <Stop offset="0.5" stopColor={BLUE} stopOpacity="0.14" />
                 <Stop offset="1" stopColor={BLUE} stopOpacity="0" />
               </RadialGradient>
@@ -225,7 +225,7 @@ const BrandLoader: React.FC<TBrandLoaderProps> = ({
               gradientUnits="userSpaceOnUse"
             >
               <Stop offset="0" stopColor={BLUE} />
-              <Stop offset="1" stopColor={PINK} />
+              <Stop offset="1" stopColor={BLUE_DEEP} />
             </LinearGradient>
             <ClipPath id={`${uid}-clip`}>
               <AnimatedRect

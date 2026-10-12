@@ -1,21 +1,39 @@
 import { StyleProp, StyleSheet, TextStyle } from "react-native";
+import {
+  PlusJakartaSans_300Light,
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold
+} from "@expo-google-fonts/plus-jakarta-sans";
 
 /**
- * Avenir, the same files the web uses. There's no Medium or Semibold cut, so the
- * weights are spread the way the web spreads them: Book for body text, Roman for
- * medium, and Black for semibold and bold.
+ * Plus Jakarta Sans, the brand typeface, in each weight the app uses.
  *
  * React Native picks a font by family name, not by weight, so each cut is
  * registered as its own family and text is given the family for its weight.
  */
 export const BRAND_FONTS = {
-  "Avenir-Light": require("@/shared/assets/fonts/avenir/Avenir-Light.ttf"),
-  "Avenir-Book": require("@/shared/assets/fonts/avenir/Avenir-Normal.otf"),
-  "Avenir-Roman": require("@/shared/assets/fonts/avenir/Avenir-Regular.otf"),
-  "Avenir-Black": require("@/shared/assets/fonts/avenir/Avenir-Bold.otf")
+  "PlusJakartaSans-Light": PlusJakartaSans_300Light,
+  "PlusJakartaSans-Regular": PlusJakartaSans_400Regular,
+  "PlusJakartaSans-Medium": PlusJakartaSans_500Medium,
+  "PlusJakartaSans-SemiBold": PlusJakartaSans_600SemiBold,
+  "PlusJakartaSans-Bold": PlusJakartaSans_700Bold,
+  "PlusJakartaSans-ExtraBold": PlusJakartaSans_800ExtraBold
 };
 
 export type TBrandFont = keyof typeof BRAND_FONTS;
+
+/** The brand cuts by role, for the few places that set a family directly. */
+export const FONT = {
+  light: "PlusJakartaSans-Light",
+  regular: "PlusJakartaSans-Regular",
+  medium: "PlusJakartaSans-Medium",
+  semibold: "PlusJakartaSans-SemiBold",
+  bold: "PlusJakartaSans-Bold",
+  extrabold: "PlusJakartaSans-ExtraBold"
+} as const satisfies Record<string, TBrandFont>;
 
 const WEIGHT_CLASSES: [RegExp, number][] = [
   [/(^|\s)font-thin(\s|$)/, 100],
@@ -30,10 +48,12 @@ const WEIGHT_CLASSES: [RegExp, number][] = [
 ];
 
 export const brandFontForWeight = (weight: number): TBrandFont => {
-  if (weight <= 300) return "Avenir-Light";
-  if (weight < 500) return "Avenir-Book";
-  if (weight < 600) return "Avenir-Roman";
-  return "Avenir-Black";
+  if (weight <= 300) return FONT.light;
+  if (weight < 500) return FONT.regular;
+  if (weight < 600) return FONT.medium;
+  if (weight < 700) return FONT.semibold;
+  if (weight < 800) return FONT.bold;
+  return FONT.extrabold;
 };
 
 const parseWeight = (weight: TextStyle["fontWeight"]) => {
@@ -44,10 +64,10 @@ const parseWeight = (weight: TextStyle["fontWeight"]) => {
 };
 
 /**
- * The style that puts text in the right Avenir cut, read from its `font-*`
- * weight class or `fontWeight` style (the style wins, as it does on screen).
- * `fontWeight` is reset because the family already carries the weight; leaving
- * it on makes some platforms fake an extra bold on top.
+ * The style that puts text in the right Plus Jakarta Sans cut, read from its
+ * `font-*` weight class or `fontWeight` style (the style wins, as it does on
+ * screen). `fontWeight` is reset because the family already carries the
+ * weight; leaving it on makes some platforms fake an extra bold on top.
  */
 export const brandFontStyle = (
   className?: string,

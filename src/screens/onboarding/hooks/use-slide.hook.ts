@@ -15,6 +15,8 @@ const useSlide = () => {
     shouldOpenAccountSetSuccessModal,
     setShouldOpenAccountSetSuccessModal,
     setActiveSlideIndex,
+    inviteStepDone,
+    setInviteStepDone,
     ...otherContent
   } = useSlideStore();
   const userNotVerifiedDetails = useUserStore(
@@ -49,6 +51,9 @@ const useSlide = () => {
       const genderIndex = screensList.findIndex(
         (screen) => screen === screensToShowInSlide["gender"]
       );
+      const inviteCodeIndex = screensList.findIndex(
+        (screen) => screen === screensToShowInSlide["invite-code"]
+      );
 
       if (!userDetails?.name) {
         console.log("fullNameIndex", fullNameIndex);
@@ -68,6 +73,11 @@ const useSlide = () => {
         setActiveSlideIndex(genderIndex);
         return;
       }
+      // Offered once, after the required details; adding or skipping ends it.
+      if (!inviteStepDone) {
+        setActiveSlideIndex(inviteCodeIndex);
+        return;
+      }
 
       // if (activeSlideIndex < slideInArrayFormat) {
       //   const nextSlideIndex = activeSlideIndex + 1;
@@ -78,9 +88,12 @@ const useSlide = () => {
       // setShouldOpenAccountSetSuccessModal(true);
       setUser(userDetails);
       setActiveSlideIndex(0);
+      setInviteStepDone(false);
       getUserDetails();
     },
     [
+      inviteStepDone,
+      setInviteStepDone,
       activeSlideIndex,
       nextSlide,
       userNotVerifiedDetails,

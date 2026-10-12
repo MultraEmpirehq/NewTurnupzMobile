@@ -31,7 +31,7 @@ import {
   BASE,
   BLUE,
   DURATION,
-  PINK,
+  BLUE_DEEP,
   RASTERIZE,
   REDUCED_DURATION,
   T,
@@ -221,7 +221,7 @@ const BrandIntro: React.FC<TBrandIntroProps> = ({ onFinish }) => {
           <Svg width="100%" height="100%">
             <Defs>
               <RadialGradient id="halo" cx="50%" cy="50%" r="50%">
-                <Stop offset="0" stopColor={PINK} stopOpacity="0.22" />
+                <Stop offset="0" stopColor={BLUE_DEEP} stopOpacity="0.22" />
                 <Stop offset="0.45" stopColor={BLUE} stopOpacity="0.1" />
                 <Stop offset="1" stopColor={BLUE} stopOpacity="0" />
               </RadialGradient>
@@ -267,7 +267,7 @@ const BrandIntro: React.FC<TBrandIntroProps> = ({ onFinish }) => {
                 gradientUnits="userSpaceOnUse"
               >
                 <Stop offset="0" stopColor={BLUE} />
-                <Stop offset="1" stopColor={PINK} />
+                <Stop offset="1" stopColor={BLUE_DEEP} />
               </LinearGradient>
               <LinearGradient id="shine" x1="0" y1="0" x2="1" y2="0">
                 <Stop offset="0" stopColor="#ffffff" stopOpacity="0" />
@@ -344,7 +344,7 @@ const BrandGradient = ({ id }: { id: string }) => (
       gradientUnits="userSpaceOnUse"
     >
       <Stop offset="0" stopColor={BLUE} />
-      <Stop offset="1" stopColor={PINK} />
+      <Stop offset="1" stopColor={BLUE_DEEP} />
     </LinearGradient>
   </Defs>
 );

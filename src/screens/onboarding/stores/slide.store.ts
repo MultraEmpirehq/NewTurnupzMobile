@@ -4,6 +4,9 @@ type TLandingStoreType = {
   activeSlideIndex: number;
   previousSlideIndex: number;
   shouldOpenAccountSetSuccessModal: boolean;
+  /** The optional invite-code step has been answered (added or skipped). */
+  inviteStepDone: boolean;
+  setInviteStepDone: (inviteStepDone: boolean) => void;
 
   setActiveSlideIndex: (activeSlideIndex: number) => void;
   setShouldOpenAccountSetSuccessModal: (
@@ -16,12 +19,14 @@ type TLandingStoreType = {
 const initialValue = {
   activeSlideIndex: 0,
   previousSlideIndex: -1,
-  shouldOpenAccountSetSuccessModal: false
+  shouldOpenAccountSetSuccessModal: false,
+  inviteStepDone: false
 };
 
 const useSlideStore = create<TLandingStoreType>((set) => ({
   ...initialValue,
   setActiveSlideIndex: (activeSlideIndex) => set({ activeSlideIndex }),
+  setInviteStepDone: (inviteStepDone) => set({ inviteStepDone }),
   setShouldOpenAccountSetSuccessModal: (
     shouldOpenAccountSetSuccessModal = false
   ) =>

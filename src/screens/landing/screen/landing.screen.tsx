@@ -187,7 +187,7 @@ const LandingScreen = () => {
               accessibilityRole="button"
               hitSlop={8}
             >
-              <TextComponent className="text-sm font-bold text-[#ff0088]">
+              <TextComponent className="text-sm font-bold text-[#0577FA]">
                 Change
               </TextComponent>
             </Pressable>

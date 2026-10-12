@@ -28,7 +28,7 @@ const CustomToastMessageComponent: React.FC<MessageComponentProps> = ({
             <BadgeCheckIcon color="#21CF46" color2={"#67FF7D"} />
           )}
           {message?.type === "info" && (
-            <CircleExclamationIcon color="#F9C034" />
+            <CircleExclamationIcon color="#00B2FF" />
           )}
           {message?.type === "danger" && (
             <CircleExclamationIcon color="#F22F22" />

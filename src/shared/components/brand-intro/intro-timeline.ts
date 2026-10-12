@@ -1,4 +1,5 @@
 import { Easing } from "react-native-reanimated";
+import { BRAND } from "@/shared/utils/brand-colors";
 
 /**
  * The intro's score, shared by the logo and everything around it. One clock
@@ -7,12 +8,13 @@ import { Easing } from "react-native-reanimated";
  */
 
 // Light and airy, so the intro hands over to the (white) app without a jolt.
-export const BASE = "#fbf9ff";
-export const INK = "#0b1d2a";
-export const PINK = "#ff0088";
-export const BLUE = "#00b2ff";
-export const PEACH = "#ffb36b";
-export const VIOLET = "#8b5cf6";
+// Strictly blue, black, white and grey (see shared/utils/brand-colors).
+export const BASE = "#f7fbff";
+export const INK = BRAND.ink;
+export const BLUE = BRAND.blue;
+export const BLUE_DEEP = BRAND.blueDeep;
+export const BLUE_SOFT = BRAND.blueSoft;
+export const BLUE_NAVY = BRAND.blueNavy;
 
 export const DURATION = 5000;
 export const REDUCED_DURATION = 1400;
