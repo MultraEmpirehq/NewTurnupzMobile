@@ -1,3 +1,4 @@
+import VerifiedName from "@/shared/components/verified-name/verified-name.component";
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { BRAND } from "@/shared/utils/brand-colors";
 import {
@@ -488,12 +489,11 @@ const PerformerRailCard = ({
         </TextComponent>
       </View>
     </View>
-    <TextComponent
-      numberOfLines={1}
+    <VerifiedName
+      name={performer.name}
+      verified={performer.isVerified}
       className="text-base font-bold text-zinc-950"
-    >
-      {performer.name}
-    </TextComponent>
+    />
     <TextComponent numberOfLines={1} className="text-xs text-zinc-500">
       {PERFORMER_TYPE_LABELS[performer.type]}
       {performer.country ? ` · ${performer.country}` : ""}

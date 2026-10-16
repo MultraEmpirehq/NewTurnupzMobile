@@ -1,3 +1,4 @@
+import VerifiedName from "@/shared/components/verified-name/verified-name.component";
 import React, { memo, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -49,9 +50,6 @@ const ClockIcon = () => (
 const TABS = ["Overview", "Media", "Activities", "Blogs"] as const;
 type TTab = (typeof TABS)[number];
 
-const guestName = (guest: NonNullable<TLiveEvent["eventGuestsOfHonour"]>[number]) =>
-  guest.name || [guest.firstName, guest.lastName].filter(Boolean).join(" ");
-
 /**
  * An event, from the API: the prototype's event page with everything on it real.
  * Times read on the venue's clock. `onBook` opens ticket checkout or registration.
@@ -79,7 +77,6 @@ const LiveEventDetailScreen = ({
     () => [event?.image, ...(event?.medias ?? [])].filter(Boolean) as string[],
     [event]
   );
-  const guests = (event?.eventGuestsOfHonour ?? []).map(guestName).filter(Boolean);
   const zoneNote = event ? eventZoneNote(event.timezone) : null;
   const isPast = event ? new Date(event.date) < new Date() : false;
 
@@ -260,31 +257,20 @@ const LiveEventDetailScreen = ({
                         className="w-[84px] items-center gap-1.5"
                       >
                         <PerformerAvatar performer={performer} size={72} />
-                        <TextComponent numberOfLines={2} className="text-center text-xs font-bold text-zinc-900">
-                          {performer.name}
-                        </TextComponent>
+                        <VerifiedName
+                          name={performer.name}
+                          verified={performer.isVerified}
+                          numberOfLines={2}
+                          tickSize={12}
+                          centered
+                          className="text-center text-xs font-bold text-zinc-900"
+                        />
                         <TextComponent className="text-[10px] text-zinc-500">
                           {index === 0 ? "Headliner" : PERFORMER_TYPE_LABELS[performer.type]}
                         </TextComponent>
                       </Pressable>
                     ))}
                   </ScrollView>
-                </>
-              )}
-              {guests.length > 0 && (
-                <>
-                  <TextComponent className="mt-6 text-base font-bold text-primary">
-                    Guests of honour
-                  </TextComponent>
-                  <View className="mt-3 flex-row flex-wrap gap-2">
-                    {guests.map((name) => (
-                      <View key={name} className="rounded-full bg-white px-3 py-2 shadow-sm">
-                        <TextComponent className="text-xs font-bold text-zinc-700">
-                          {name}
-                        </TextComponent>
-                      </View>
-                    ))}
-                  </View>
                 </>
               )}
             </View>

@@ -223,6 +223,8 @@ export type TLivePerformerSummary = {
   name: string;
   type: TPerformerType;
   image?: string | null;
+  /** Approved by the Turnupz team: shown with the verified tick. */
+  isVerified?: boolean;
 };
 
 export type TLivePerformer = TLivePerformerSummary & {

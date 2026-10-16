@@ -1,3 +1,4 @@
+import VerifiedName from "@/shared/components/verified-name/verified-name.component";
 import React, { memo, useMemo, useState } from "react";
 import { BRAND } from "@/shared/utils/brand-colors";
 import {
@@ -176,9 +177,14 @@ const PodiumSpot = ({
           <TextComponent className="text-xs font-bold text-white">{place}</TextComponent>
         </View>
       </View>
-      <TextComponent numberOfLines={1} className="mt-4 px-1 text-sm font-bold text-zinc-950">
-        {performer.name}
-      </TextComponent>
+      <View className="mt-4 px-1">
+        <VerifiedName
+          name={performer.name}
+          verified={performer.isVerified}
+          centered
+          className="text-sm font-bold text-zinc-950"
+        />
+      </View>
       <TextComponent numberOfLines={1} className="text-[11px] text-zinc-500">
         {PERFORMER_TYPE_LABELS[performer.type]}
       </TextComponent>
@@ -348,7 +354,13 @@ export const PerformerProfileScreen = memo(
                   <View className="rounded-full bg-white p-1.5">
                     <PerformerAvatar performer={performer} size={112} />
                   </View>
-                  <TextComponent className="text-2xl font-bold text-zinc-950">{performer.name}</TextComponent>
+                  <VerifiedName
+                    name={performer.name}
+                    verified={performer.isVerified}
+                    tickSize={22}
+                    centered
+                    className="text-2xl font-bold text-zinc-950"
+                  />
                   <View className="flex-row items-center gap-2">
                     <View className="rounded-full px-3 py-1" style={{ backgroundColor: INK }}>
                       <TextComponent className="text-xs font-semibold text-white">

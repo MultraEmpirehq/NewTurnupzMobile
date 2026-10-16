@@ -44,6 +44,7 @@ export type TEventDetailsType = {
   activities?: TEventActivityDetailsType[];
   additionalInformation?: string[];
   eventGuestsOfHonour?: ({ name: string } | TUser)[];
+  performers?: { id: string; name: string; isVerified?: boolean }[];
   medias?: string[];
 };
 
