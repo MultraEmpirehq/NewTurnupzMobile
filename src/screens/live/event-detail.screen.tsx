@@ -251,7 +251,8 @@ const LiveEventDetailScreen = ({
                       <Pressable
                         key={performer.id}
                         onPress={() => onOpenPerformer?.(performer.id)}
-                        disabled={!onOpenPerformer}
+                        // Only verified performers have a page to open.
+                        disabled={!onOpenPerformer || performer.isVerified === false}
                         accessibilityRole="button"
                         accessibilityLabel={`${performer.name}${index === 0 ? ", headliner" : ""}`}
                         className="w-[84px] items-center gap-1.5"
