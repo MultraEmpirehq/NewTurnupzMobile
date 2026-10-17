@@ -1,3 +1,4 @@
+import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import VerifiedName from "@/shared/components/verified-name/verified-name.component";
 import React, { memo, useMemo, useState } from "react";
 import {
@@ -66,6 +67,7 @@ const LiveEventDetailScreen = ({
   /** Opens a performer's profile from the line-up. */
   onOpenPerformer?: (performerId: string) => void;
 }) => {
+  useHardwareBack(onBack);
   const { data: event, isLoading, error, refetch } = useLiveEvent(eventId);
   const [activeTab, setActiveTab] = useState<TTab>("Overview");
   const [isReporting, setIsReporting] = useState(false);

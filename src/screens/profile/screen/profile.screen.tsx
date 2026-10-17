@@ -193,7 +193,7 @@ const ProfileScreen = () => {
               {isDirty && (
                 <ButtonComponent
                   onPress={handleSubmit(onSubmit)}
-                  disabled={!isValid || isSubmitting}
+                  disabled={isSubmitting}
                   isLoading={isSubmitting}
                 >
                   Save

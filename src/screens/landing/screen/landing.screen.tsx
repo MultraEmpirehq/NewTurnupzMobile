@@ -75,7 +75,7 @@ const LandingScreen = () => {
     handleSubmit,
     getValues,
     resetField,
-    formState: { isValid, isSubmitting }
+    formState: { isSubmitting }
   } = useForm<TAuthBodyType>({
     defaultValues: canLogin
       ? authDefaultValues
@@ -263,9 +263,11 @@ const LandingScreen = () => {
             </View>
           </View>
         )}
+        {/* Always tappable: a wrong or missing entry shows its message under
+            the field, rather than leaving a greyed-out button. */}
         <ButtonComponent
           onPress={handleSubmit(onSubmit)}
-          disabled={isSubmitting || !isValid}
+          disabled={isSubmitting}
           isLoading={isSubmitting}
           className="h-12 rounded-full bg-[#00b2ff] py-0"
         >

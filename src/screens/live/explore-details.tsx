@@ -1,3 +1,4 @@
+import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import VerifiedName from "@/shared/components/verified-name/verified-name.component";
 import React, { memo, useMemo, useState } from "react";
 import { BRAND } from "@/shared/utils/brand-colors";
@@ -89,7 +90,10 @@ export const PerformerAvatar = ({
     </LinearGradient>
   );
 
-export const BackHeader = ({ title, onBack }: { title: string; onBack: () => void }) => (
+/** Android's back button does the same as the arrow. */
+export const BackHeader = ({ title, onBack }: { title: string; onBack: () => void }) => {
+  useHardwareBack(onBack);
+  return (
   <View className="h-14 flex-row items-center gap-2 border-b border-black/5 bg-white px-3">
     <Pressable
       onPress={onBack}
@@ -106,7 +110,8 @@ export const BackHeader = ({ title, onBack }: { title: string; onBack: () => voi
       {title}
     </TextComponent>
   </View>
-);
+  );
+};
 
 export const Loading = () => (
   <View className="items-center py-16">

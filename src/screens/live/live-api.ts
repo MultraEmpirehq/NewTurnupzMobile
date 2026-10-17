@@ -1,4 +1,5 @@
-import { getData, postData } from "@/api";
+import { Platform } from "react-native";
+import { deleteData, getData, patchData, postData } from "@/api";
 import {
   TTransferRecipient,
   recipientBody
@@ -455,6 +456,10 @@ export const useCreateOrder = () => {
       quantity: number;
       /** Spend Turnupz Credit first; the rest goes to the payment page. */
       useCredit?: boolean;
+      /** Pay with a saved card: charged straight away, no payment page. */
+      cardId?: string;
+      /** Keep the card used on the payment page for next time. */
+      saveCard?: boolean;
     }) => {
       const { data } = await postData<
         typeof body,
@@ -466,9 +471,48 @@ export const useCreateOrder = () => {
       queryClient.invalidateQueries({ queryKey: ["live-tickets"] });
       queryClient.invalidateQueries({ queryKey: ["live-user-tickets"] });
       queryClient.invalidateQueries({ queryKey: ["credit"] });
+      queryClient.invalidateQueries({ queryKey: ["saved-cards"] });
     }
   });
 };
+
+/** A card kept for next time. Only its brand and last 4 digits are ever shown. */
+export type TSavedCard = {
+  id: string;
+  brand: string;
+  last4: string;
+  expiryMonth: number;
+  expiryYear: number;
+  /** Picked first at checkout. */
+  isDefault: boolean;
+  isExpired: boolean;
+  lastUsedAt: string | null;
+  createdAt: string;
+};
+
+export const useSavedCards = (enabled = true) =>
+  useQuery({
+    queryKey: ["saved-cards"],
+    enabled,
+    queryFn: async () => {
+      const { data } = await getData<TSavedCard[]>("/saved-cards");
+      return data?.data ?? [];
+    }
+  });
+
+/** "Visa ending 4242" */
+export const cardLabel = (card: Pick<TSavedCard, "brand" | "last4">) =>
+  `${card.brand} ending ${card.last4}`;
+
+/** "08/28" */
+export const cardExpiry = (card: Pick<TSavedCard, "expiryMonth" | "expiryYear">) =>
+  `${String(card.expiryMonth).padStart(2, "0")}/${String(card.expiryYear).slice(-2)}`;
+
+export const makeCardDefault = async (cardId: string) =>
+  (await patchData<undefined, TSavedCard[]>(`/saved-cards/${cardId}/default`, undefined)).data?.data ?? [];
+
+export const removeSavedCard = async (cardId: string) =>
+  (await deleteData<TSavedCard[]>(`/saved-cards/${cardId}`)).data?.data ?? [];
 
 export type TCreditBalance = {
   currency: string;
@@ -559,9 +603,24 @@ export type TLiveChat = {
   eventName: string;
   title?: string | null;
   preview?: string | null;
-  type: "EVENT" | "GROUP" | "DIRECT" | string;
+  type: "EVENT_GROUP" | "DIRECT" | "SUPPORT" | string;
+  /** ACTIVE, or ARCHIVED once an event's chat has closed (read-only). */
+  status?: "ACTIVE" | "ARCHIVED" | string;
   memberCount?: number;
   lastActivityAt?: string;
+  /** Only the organiser can post (others can react). */
+  announcementMode?: boolean;
+  muted?: boolean;
+  unreadCount?: number;
+  eventImage?: string | null;
+  eventDate?: string | null;
+  eventTimezone?: string | null;
+  /** One-to-one chats: when the other person last read it, for "Seen". */
+  otherLastReadAt?: string | null;
+  /** The event's organiser (the chat's owner). */
+  vendor?: { id?: string; name?: string; firstName?: string; lastName?: string };
+  /** Chats between two people: the other person. */
+  person?: { id: string; username: string | null; image: string | null } | null;
 };
 
 export type TSharedEvent = {
@@ -578,7 +637,12 @@ export type TLiveChatMessage = {
   id: string;
   senderId?: string | null;
   senderName?: string | null;
+  /** "vendor" for the organiser. */
+  senderRole?: string | null;
+  /** "text", "image", "event-update", "event-share", … */
   kind: string;
+  assetUrl?: string | null;
+  attachmentDetails?: { url?: string | null } | null;
   body?: string | null;
   href?: string | null;
   metadata?: { sharedEvent?: TSharedEvent } | null;
@@ -593,29 +657,59 @@ export const useLiveChats = (enabled = true) =>
       const { data } = await getData<TLiveChat[]>("/chats?limit=50");
       return data?.data ?? [];
     },
-    enabled
+    enabled,
+    refetchInterval: 20000
   });
 
 const MESSAGE_PAGE = 50;
 
-/** A chat's latest messages, oldest first (the api pages from the oldest). */
+/** A chat's latest messages in reading order. Opening it marks it read. */
 export const useLiveChatMessages = (chatId?: string | null) =>
   useQuery({
     queryKey: ["live-chat-messages", chatId],
     queryFn: async () => {
-      const first = await getData<TLiveChatMessage[]>(
-        `/chats/${chatId}/messages?limit=${MESSAGE_PAGE}`
+      const { data } = await getData<TLiveChatMessage[]>(
+        `/chats/${chatId}/messages?order=latest&limit=${MESSAGE_PAGE}`
       );
-      const last = first.data?.pagination?.totalPage ?? 1;
-      if (last <= 1) return first.data?.data ?? [];
-      const latest = await getData<TLiveChatMessage[]>(
-        `/chats/${chatId}/messages?limit=${MESSAGE_PAGE}&page=${last}`
-      );
-      return latest.data?.data ?? [];
+      return data?.data ?? [];
     },
     enabled: !!chatId,
-    refetchInterval: 8000
+    refetchInterval: 5000
   });
+
+/**
+ * Sends a photo: shrunk on the phone first (1080px wide, compressed) so it
+ * uploads fast and costs little to keep, then posted as an image message.
+ */
+export const sendChatPhoto = async (
+  chatId: string,
+  photo: { uri: string; width?: number; mimeType?: string | null; fileName?: string | null },
+  caption?: string
+) => {
+  const { manipulateAsync, SaveFormat } = await import("expo-image-manipulator");
+  const shrunk = await manipulateAsync(
+    photo.uri,
+    photo.width && photo.width > 1080 ? [{ resize: { width: 1080 } }] : [],
+    { compress: 0.7, format: SaveFormat.JPEG }
+  );
+  const form = new FormData();
+  const name = (photo.fileName || "photo").replace(/\.[^.]+$/, "") + ".jpg";
+  if (Platform.OS === "web") {
+    form.append("file", await (await fetch(shrunk.uri)).blob(), name);
+  } else {
+    form.append("file", { uri: shrunk.uri, name, type: "image/jpeg" } as unknown as Blob);
+  }
+  const upload = await postData<FormData, { id: string; assetUrl: string }>("/chats/upload", form, {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
+  const attachmentId = upload.data?.data?.id;
+  if (!attachmentId) throw new Error("Upload failed");
+  return postData(`/chats/${chatId}/messages`, {
+    body: caption?.trim() || "Photo",
+    kind: "IMAGE",
+    attachmentId
+  });
+};
 
 /** Opens (or reopens) a private chat with the organiser of an event. */
 export const startOrganizerChat = async (eventId: string) => {
@@ -647,7 +741,14 @@ export type TSentTransfer = {
 };
 
 /** A ticket can be sent on when its category allows it and it hasn't been used or sent. */
+/** Free tickets can't be passed on: your friend can get their own. */
+export const isFreeTicket = (ticket: TLiveUserTicket) =>
+  ticket.ticket?.type === "FREE" ||
+  ticket.ticket?.event?.saleMethod === "register" ||
+  !(ticket.ticket?.price?.amount && ticket.ticket.price.amount > 0);
+
 export const canTransfer = (ticket: TLiveUserTicket) =>
+  !isFreeTicket(ticket) &&
   (ticket.ticket?.isTransferable ?? ticket.ticket?.transferable ?? false) &&
   (ticket.status ?? "UN_USED") === "UN_USED" &&
   ticket.transfer?.status !== "PENDING";

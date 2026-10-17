@@ -1,3 +1,6 @@
+import { useCreditBalance } from "@/screens/live/live-api";
+import { maskAmount, useBalancePrivacyStore } from "@/shared/stores/balance-privacy.store";
+import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import React, { memo, useState } from "react";
 import { BRAND } from "@/shared/utils/brand-colors";
 import {
@@ -40,7 +43,6 @@ import {
   useMe,
   useNotificationPreferences,
   useSessions,
-  useWallet
 } from "./profile-api";
 
 /**
@@ -142,6 +144,7 @@ const Toggle = ({
       onValueChange={onChange}
       disabled={disabled}
       trackColor={{ true: BLUE, false: "#e4e4e7" }}
+      thumbColor="#ffffff"
       accessibilityLabel={label}
     />
   </View>
@@ -252,6 +255,7 @@ const Page = ({
 /* ---------------------------------------------------------------------- password */
 
 const PasswordPage = ({ onBack }: { onBack: () => void }) => {
+  useHardwareBack(onBack);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -307,12 +311,14 @@ const PasswordPage = ({ onBack }: { onBack: () => void }) => {
 /* ----------------------------------------------------------------- notifications */
 
 const NOTIFICATION_ROWS: { key: keyof TNotificationPreferences; label: string; hint: string }[] = [
-  { key: "eventUpdates", label: "Event updates", hint: "Changes and reminders for events you're going to" },
-  { key: "orderUpdates", label: "Orders and payments", hint: "Payment confirmations and refunds" },
-  { key: "ticketTransfers", label: "Ticket transfers", hint: "When someone sends you a ticket" }
+  { key: "orderUpdates", label: "My tickets and orders", hint: "Tickets ready, payments and refunds" },
+  { key: "ticketTransfers", label: "Tickets sent to me", hint: "When a friend sends you a ticket" },
+  { key: "eventUpdates", label: "Events I'm going to", hint: "Updates from the organiser, time or venue changes" },
+  { key: "creditUpdates", label: "Turnupz Credit and invites", hint: "When you earn credit, or it's about to run out" }
 ];
 
-const NotificationsPage = ({ onBack }: { onBack: () => void }) => {
+export const NotificationsPage = ({ onBack }: { onBack: () => void }) => {
+  useHardwareBack(onBack);
   const queryClient = useQueryClient();
   const prefs = useNotificationPreferences();
   const value = prefs.data;
@@ -330,7 +336,7 @@ const NotificationsPage = ({ onBack }: { onBack: () => void }) => {
   };
 
   return (
-    <Page title="Notifications" onBack={onBack}>
+    <Page title="Notification settings" onBack={onBack}>
       {!value ? (
         prefs.isLoading ? <Loading /> : (
           <TextComponent className="p-8 text-center text-sm text-zinc-500">We couldn't load your settings.</TextComponent>
@@ -339,8 +345,8 @@ const NotificationsPage = ({ onBack }: { onBack: () => void }) => {
         <>
           <Section>
             <Toggle
-              label="Push notifications"
-              hint="Alerts on this phone. Your inbox in the app keeps everything either way."
+              label="Notifications on this phone"
+              hint="Turn alerts off here any time. Everything still shows in Notifications."
               value={value.push}
               onChange={(next) => void change("push", next)}
               last
@@ -405,6 +411,7 @@ const DeviceIcon = ({ platform }: { platform: string }) => (
 );
 
 const DevicesPage = ({ onBack }: { onBack: () => void }) => {
+  useHardwareBack(onBack);
   const sessions = useSessions();
   const [busy, setBusy] = useState<string | null>(null);
   const list = sessions.data ?? [];
@@ -532,6 +539,7 @@ const ACCESSIBILITY_ROWS: { key: keyof TAccessibilityOptions; label: string; hin
 ];
 
 const AccessibilityPage = ({ onBack }: { onBack: () => void }) => {
+  useHardwareBack(onBack);
   const options = useAccessibilityStore();
   return (
     <Page title="Accessibility" onBack={onBack}>
@@ -555,6 +563,7 @@ const AccessibilityPage = ({ onBack }: { onBack: () => void }) => {
 /* -------------------------------------------------------------------------- help */
 
 const HelpPage = ({ onBack }: { onBack: () => void }) => {
+  useHardwareBack(onBack);
   const faqs = useFaqs();
   const me = useMe();
   const [open, setOpen] = useState<string | null>(null);
@@ -627,11 +636,28 @@ const HelpPage = ({ onBack }: { onBack: () => void }) => {
 
 /* -------------------------------------------------------------------------- menu */
 
-const ProfileSettingsScreen = ({ onBack }: { onBack: () => void }) => {
+const ProfileSettingsScreen = ({
+  onBack,
+  onOpenWallet
+}: {
+  onBack: () => void;
+  /** The Wallet page: Turnupz Credit and saved cards. */
+  onOpenWallet: () => void;
+}) => {
+  useHardwareBack(onBack);
   const queryClient = useQueryClient();
   const { logoutUser } = useUser();
   const [page, setPage] = useState<TPage>("menu");
-  const wallet = useWallet();
+  const credit = useCreditBalance();
+  const hideBalance = useBalancePrivacyStore((state) => state.hideBalance);
+  const creditRow = credit.data?.find((row) => row.available.amount > 0) ?? credit.data?.[0];
+  const creditText = hideBalance
+    ? maskAmount(creditRow?.available.formatted?.withCurrency)
+    : creditRow && creditRow.available.amount > 0
+      ? creditRow.available.formatted?.withCurrency
+      : credit.isLoading
+        ? "…"
+        : "None yet";
   const sessions = useSessions();
   const [loggingOut, setLoggingOut] = useState(false);
   const back = () => setPage("menu");
@@ -670,10 +696,10 @@ const ProfileSettingsScreen = ({ onBack }: { onBack: () => void }) => {
         <Section title="Account">
           <Row label="Change password" onPress={() => setPage("password")} />
           <Row
-            label="Wallet balance"
-            hint="Refunds and credit you can spend on tickets"
-            value={wallet.data?.balance?.formatted?.withCurrency ?? (wallet.isLoading ? "…" : "—")}
-            onPress={() => void wallet.refetch()}
+            label="Wallet"
+            hint="Your Turnupz Credit and saved cards"
+            value={creditText}
+            onPress={onOpenWallet}
             last
           />
         </Section>

@@ -25,7 +25,7 @@ export const useMe = () =>
 export type TProfileUpdate = Partial<
   Pick<
     TUser,
-    "firstName" | "lastName" | "username" | "bio" | "website" | "phone" | "gender"
+    "firstName" | "lastName" | "username" | "bio" | "website" | "phone" | "gender" | "showCountry"
   > & { dateOfBirth: string }
 >;
 
@@ -82,6 +82,7 @@ export type TNotificationPreferences = {
   eventUpdates: boolean;
   orderUpdates: boolean;
   ticketTransfers: boolean;
+  creditUpdates: boolean;
   email: boolean;
 };
 
@@ -137,7 +138,7 @@ export const signOutOtherDevices = async () => {
 
 /* --------------------------------------------------------------- following */
 
-export type TFollowTargetType = "PERFORMER" | "VENUE" | "PLANNER";
+export type TFollowTargetType = "PERFORMER" | "VENUE" | "PLANNER" | "PERSON";
 
 export type TFollowedItem = {
   targetType: TFollowTargetType;

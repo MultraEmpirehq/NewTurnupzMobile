@@ -1,3 +1,4 @@
+import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import React, { memo, useMemo, useState } from "react";
 import {
   Modal,
@@ -358,6 +359,7 @@ const ticketLabelOf = (tickets: TLiveUserTicket[]) => {
 };
 
 const LiveMyTicketsScreen = ({ onBack }: { onBack: () => void }) => {
+  useHardwareBack(onBack);
   const { width } = useWindowDimensions();
   const cardWidth = Math.min(420, width - 32);
   const {

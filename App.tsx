@@ -7,6 +7,7 @@ import { themes } from "@/shared/utils/colors";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import FlashMessage from "react-native-flash-message";
+import ToastMessage from "@/shared/components/status/toast/custom-toast-message.component";
 import NavigationWrapper from "@/navigation/navigator-wrapper/navigator-wrapper";
 import { useFonts } from "expo-font";
 import { BRAND_FONTS } from "@/shared/utils/fonts";
@@ -39,7 +40,7 @@ export default function App() {
             <ContainerComponent>
               <NavigationWrapper />
             </ContainerComponent>
-            <FlashMessage position="top" duration={7000} />
+            <FlashMessage position="top" MessageComponent={ToastMessage} />
             {/* Plays over the app, which loads underneath in the meantime. */}
             {!introDone && <BrandIntro onFinish={finishIntro} />}
           </SafeAreaProvider>

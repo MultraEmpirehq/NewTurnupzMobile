@@ -48,6 +48,8 @@ export type TUser = {
   gender?: UserGender;
   dateOfBirth?: Date;
   bio?: string;
+  /** Show their country on their profile (off unless they turn it on). */
+  showCountry?: boolean;
   website?: string;
   phone?: string;
   country?: string;

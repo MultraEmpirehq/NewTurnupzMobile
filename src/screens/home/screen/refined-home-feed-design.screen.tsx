@@ -1,3 +1,4 @@
+import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
@@ -62,6 +63,10 @@ import LiveTicketCheckoutScreen from "@/screens/live/ticket-checkout.screen";
 import LiveMyTicketsScreen from "@/screens/live/my-tickets.screen";
 import LiveExploreScreen from "@/screens/live/explore.screen";
 import ProfileScreen from "@/screens/profile/profile.screen";
+import NotificationsScreen from "@/screens/notifications/notifications.screen";
+import ChatsScreen from "@/screens/chat/chats.screen";
+import PeopleModal from "@/screens/people/people-modal";
+import { useUnreadNotifications } from "@/screens/notifications/notifications-api";
 import EventOptionsSheet, {
   TEventOptionsTarget
 } from "@/screens/live/event-options.sheet";
@@ -1361,10 +1366,13 @@ const toLiveFeedEvent = (event: TLiveEvent): TFeedEvent => ({
 
 const PreviewBottomNav = ({
   activeTab,
-  onTabPress
+  onTabPress,
+  unreadNotifications = 0
 }: {
   activeTab: TBottomNavId;
   onTabPress: (tab: TBottomNavId) => void;
+  /** Shows a blue dot on the notifications tab. */
+  unreadNotifications?: number;
 }) => {
   const buttonLabels = useAccessibilityStore((state) => state.buttonLabels);
   const screenReaderHints = useAccessibilityStore(
@@ -1397,7 +1405,11 @@ const PreviewBottomNav = ({
           <Pressable
             key={item.id}
             accessibilityRole="button"
-            accessibilityLabel={item.label}
+            accessibilityLabel={
+              item.id === "favorites" && unreadNotifications > 0
+                ? `${item.label}, ${unreadNotifications} unread`
+                : item.label
+            }
             accessibilityHint={
               screenReaderHints ? `Opens the ${item.label} section` : undefined
             }
@@ -1409,7 +1421,15 @@ const PreviewBottomNav = ({
                 : "size-14 items-center justify-center rounded-full"
             }
           >
-            {item.renderIcon(color)}
+            <View>
+              {item.renderIcon(color)}
+              {item.id === "favorites" && unreadNotifications > 0 && (
+                <View
+                  className="absolute -right-1 -top-0.5 size-2.5 rounded-full border-2 border-white"
+                  style={{ backgroundColor: "#0577FA" }}
+                />
+              )}
+            </View>
             {/* Icons only: a dot marks where you are. */}
             {!buttonLabels && (
               <View
@@ -1871,6 +1891,7 @@ const SearchHeader = ({
   query?: string;
   onQueryChange?: (value: string) => void;
 }) => {
+  useHardwareBack(onBack);
   const [internalQuery, setInternalQuery] = useState("");
   const value = query ?? internalQuery;
   const handleQueryChange = onQueryChange ?? setInternalQuery;
@@ -1908,6 +1929,7 @@ const TopPerformersChartsScreen = ({
   onBack: () => void;
   onSelectChart: (chart: TTopChart) => void;
 }) => {
+  useHardwareBack(onBack);
   const { width } = useWindowDimensions();
   const isCompactPhone = width < 380;
   const horizontalPadding = isCompactPhone ? 12 : 16;
@@ -2052,6 +2074,7 @@ const PerformerProfileScreen = ({
   onBack: () => void;
   onOpenEvent: (event: TPerformerEvent) => void;
 }) => {
+  useHardwareBack(onBack);
   const { width } = useWindowDimensions();
   const isCompactPhone = width < 380;
   const horizontalPadding = isCompactPhone ? 12 : 16;
@@ -2254,6 +2277,7 @@ const ArticleDetailScreen = ({
   event: TPerformerEvent;
   onBack: () => void;
 }) => {
+  useHardwareBack(onBack);
   return (
     <ScrollView
       className="flex-1 bg-white"
@@ -2358,6 +2382,7 @@ const EventBookingDetailScreen = ({
   onShareEvent?: (event: TFeedEvent) => void;
   onContactOrganizer?: (event: TFeedEvent) => void;
 }) => {
+  useHardwareBack(onBack);
   const [showExternalModal, setShowExternalModal] = useState(false);
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -2933,6 +2958,7 @@ const TicketSelectionScreen = ({
   ) => void;
   onViewTickets?: () => void;
 }) => {
+  useHardwareBack(onBack);
   const { width } = useWindowDimensions();
   const isCompactPhone = width < 380;
   const horizontalPadding = isCompactPhone ? 12 : 16;
@@ -3211,6 +3237,7 @@ const PaymentMethodScreen = ({
   onBack: () => void;
   onPay: () => void;
 }) => {
+  useHardwareBack(onBack);
   const [cardNumber, setCardNumber] = useState("3614");
   const [expiryDate, setExpiryDate] = useState("12/27");
   const [cvv, setCvv] = useState("123");
@@ -3696,6 +3723,7 @@ const RegistrationFormScreen = ({
   onRegistrationComplete?: (event: TPerformerEvent) => void;
   onViewTickets?: () => void;
 }) => {
+  useHardwareBack(onBack);
   const [isComplete, setIsComplete] = useState(false);
 
   if (isComplete) {
@@ -3866,6 +3894,7 @@ const TopPerformersDetailScreen = ({
   chart: TTopChart;
   onBack: () => void;
 }) => {
+  useHardwareBack(onBack);
   const [activeFilter, setActiveFilter] =
     useState<TPerformerFilter>("All Performers");
   const [selectedPerformer, setSelectedPerformer] = useState<TPerformer | null>(
@@ -4040,6 +4069,7 @@ const TopPerformersDetailScreen = ({
 };
 
 const ExploreMapScreen = ({ onBack }: { onBack: () => void }) => {
+  useHardwareBack(onBack);
   const [query, setQuery] = useState("");
   const mapEvents = useMemo(
     () =>
@@ -4166,6 +4196,7 @@ const ExploreFilterScreen = ({
   onBack: () => void;
   onApply: (categories: string[]) => void;
 }) => {
+  useHardwareBack(onBack);
   const [range, setRange] = useState(50);
   const [sortBy, setSortBy] = useState("All");
   const [priceLevel, setPriceLevel] = useState(50);
@@ -4434,6 +4465,7 @@ const EventFeedListScreen = ({
   onMessageOrganizer: (event: TFeedEvent) => void;
   onShareWithCommunity: (event: TFeedEvent) => void;
 }) => {
+  useHardwareBack(onBack);
   const [selectedEvent, setSelectedEvent] = useState<TFeedEvent | null>(null);
   const [selectedBookingEvent, setSelectedBookingEvent] =
     useState<TPerformerEvent | null>(null);
@@ -4678,6 +4710,7 @@ const CalendarScheduleScreen = ({
   events: TCalendarEvent[];
   onBack: () => void;
 }) => {
+  useHardwareBack(onBack);
   const { width } = useWindowDimensions();
   const isCompactPhone = width < 380;
   const horizontalPadding = isCompactPhone ? 12 : 16;
@@ -4850,6 +4883,7 @@ const CalendarScheduleScreenV2 = ({
   onOpenEvent: (event: TPerformerEvent) => void;
   onBack: () => void;
 }) => {
+  useHardwareBack(onBack);
   const [query, setQuery] = useState("");
   const [selectedDate, setSelectedDate] = useState(
     events[0]?.date || new Date(2024, 9, 15)
@@ -5168,6 +5202,7 @@ const VenueDetailScreen = ({
   venue: TVenue;
   onBack: () => void;
 }) => {
+  useHardwareBack(onBack);
   const [query, setQuery] = useState("");
   const [showCalendar, setShowCalendar] = useState(false);
   const followedLocations = usePrototypeSocialStore(
@@ -5417,6 +5452,7 @@ const EventPlannerDetailScreen = ({
   planner: TEventPlanner;
   onBack: () => void;
 }) => {
+  useHardwareBack(onBack);
   const followedPlanners = usePrototypeSocialStore(
     (state) => state.followedPlanners
   );
@@ -5495,7 +5531,9 @@ const ExploreDirectoryHeader = ({
   query: string;
   onQueryChange: (value: string) => void;
   onBack: () => void;
-}) => (
+}) => {
+  useHardwareBack(onBack);
+  return (
   <View className="bg-white">
     <View className="h-14 flex-row items-center border-b border-zinc-100 px-3">
       <Pressable onPress={onBack} className="size-9 items-center justify-center">
@@ -5509,7 +5547,8 @@ const ExploreDirectoryHeader = ({
       <TextInput value={query} onChangeText={onQueryChange} placeholder={`Search ${title.toLowerCase()}...`} placeholderTextColor="#8a8f98" className="ml-2 flex-1 text-xs outline-none" />
     </View>
   </View>
-);
+  );
+};
 
 const ExploreDirectoryCard = ({ image, title, subtitle, onPress }: { image: string; title: string; subtitle: string; onPress: () => void }) => (
   <Pressable onPress={onPress} className="mb-4 w-[48%] overflow-hidden rounded-xl bg-white shadow-sm">
@@ -5902,6 +5941,7 @@ const ContactsScreen = ({
   onInviteSuccess: () => void;
   onMessageFriend: (friend: TChatContact) => void;
 }) => {
+  useHardwareBack(onBack);
   const [query, setQuery] = useState("");
   const [messageContact, setMessageContact] = useState<TInviteTarget | null>(
     null
@@ -6151,6 +6191,7 @@ const AddContactScreen = ({
   onBack: () => void;
   onSuccess: () => void;
 }) => {
+  useHardwareBack(onBack);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -6279,6 +6320,7 @@ const CreateNewGroupScreen = ({
   onBack: () => void;
   onNext: (groupName: string, memberCount: number) => void;
 }) => {
+  useHardwareBack(onBack);
   const [query, setQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState(["sarah", "marcus"]);
   const [step, setStep] = useState<"select" | "name">("select");
@@ -6630,6 +6672,7 @@ const PrivateChatScreen = ({
   contextualEvent?: TFeedEvent | null;
   onOpenContextualEvent?: (event: TFeedEvent) => void;
 }) => {
+  useHardwareBack(onBack);
   const [message, setMessage] = useState("");
   const [showAttachments, setShowAttachments] = useState(false);
   const isGroup = conversation.kind !== "private";
@@ -6964,6 +7007,7 @@ const PrivateChatSettingsScreen = ({
   onOpenMemberChat: (member: { name: string; image: string }) => void;
   onRemoveGroup: () => void;
 }) => {
+  useHardwareBack(onBack);
   const isGroup = conversation.kind !== "private";
   const isOfficial = conversation.kind === "event-group";
   const members = [
@@ -9252,6 +9296,7 @@ const TicketsContent = ({
   onOpenEvent: (event: TPerformerEvent) => void;
   onBack: () => void;
 }) => {
+  useHardwareBack(onBack);
   const [mode, setMode] = useState<"list" | "details" | "transfer">("list");
   const [selectedBooking, setSelectedBooking] = useState<TBookedEvent | null>(
     null
@@ -10111,6 +10156,12 @@ const SettingsSheet = ({
 
 const RefinedHomeFeedDesignScreen = () => {
   const [activeTab, setActiveTab] = useState<TBottomNavId>("home");
+  // Android back on another tab returns to Home; on Home it leaves the app.
+  // Pages opened on top answer first (each has its own back handling).
+  useHardwareBack(() => {
+    if (activeTab === "home") return false;
+    setActiveTab("home");
+  });
   // Tapping the tab you're on takes that screen back to its top.
   const homeListRef = useRef<TBrandRefreshListHandle>(null);
   const [exploreTopSignal, setExploreTopSignal] = useState(0);
@@ -10139,6 +10190,7 @@ const RefinedHomeFeedDesignScreen = () => {
   const hiddenEventIds = useHiddenEventsStore((state) => state.hiddenEventIds);
   const syncHiddenEvents = useHiddenEventsStore((state) => state.sync);
   const isSignedIn = !!useUserStore((state) => state.userToken);
+  const unreadNotifications = useUnreadNotifications(isSignedIn);
   useEffect(() => {
     if (isSignedIn) void syncHiddenEvents();
   }, [isSignedIn, syncHiddenEvents]);
@@ -10404,30 +10456,20 @@ const RefinedHomeFeedDesignScreen = () => {
         ) : isTicketsTab ? (
           <LiveMyTicketsScreen onBack={() => setActiveTab(ticketsReturnTab)} />
         ) : isMessagesTab ? (
-          <ChatContent
-            sharedEvent={sharedChatEvent}
-            shareIntent={eventShareIntent}
-            onSharedEventHandled={() => setSharedChatEvent(null)}
-            transfers={transfers}
-            onOpenEvent={(event) => {
-              setSelectedHomeEvent(toBookingEvent(event));
-              setHomeBookingMode("detail");
-              setActiveTab("home");
+          <ChatsScreen
+            onOpenEvent={(eventId) => setLiveEventId(eventId)}
+            onOpenTickets={() => {
+              setTicketsReturnTab("messages");
+              setActiveTab("tickets");
             }}
-            onFullScreenChange={setHideMessageNav}
           />
         ) : isNotificationsTab ? (
-          <NotificationsContent
-            transfers={transfers}
-            subscribedEvents={feedEvents.filter((event) => subscribedEventIds.includes(event.id))}
-            onOpenChat={() => setActiveTab("messages")}
-            onRespond={(id, status) =>
-              setTransfers((current) =>
-                current.map((transfer) =>
-                  transfer.id === id ? { ...transfer, status } : transfer
-                )
-              )
-            }
+          <NotificationsScreen
+            onOpenEvent={(eventId) => setLiveEventId(eventId)}
+            onOpenTickets={() => {
+              setTicketsReturnTab("favorites");
+              setActiveTab("tickets");
+            }}
           />
         ) : isProfileTab ? (
           <ProfileScreen
@@ -10519,7 +10561,11 @@ const RefinedHomeFeedDesignScreen = () => {
           </>
         )}
         {!isTicketsTab && !(isMessagesTab && hideMessageNav) && (
-          <PreviewBottomNav activeTab={activeTab} onTabPress={onTabPress} />
+          <PreviewBottomNav
+            activeTab={activeTab}
+            onTabPress={onTabPress}
+            unreadNotifications={unreadNotifications.data ?? 0}
+          />
         )}
         <SettingsSheet
           event={selectedEvent}
@@ -10532,6 +10578,8 @@ const RefinedHomeFeedDesignScreen = () => {
           onClose={() => setOptionsEvent(null)}
           onOpenEvent={(eventId) => setLiveEventId(eventId)}
         />
+        {/* Someone's profile, their followers, finding people: opened from anywhere. */}
+        <PeopleModal />
       </View>
     </ContainerComponent>
   );

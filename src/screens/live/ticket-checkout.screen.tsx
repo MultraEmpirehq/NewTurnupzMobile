@@ -1,3 +1,4 @@
+import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -19,16 +20,20 @@ import useUserStore from "@/shared/stores/user.store";
 import { describeTicketSaleState, ticketSaleState } from "@/shared/utils/ticket-sales";
 import { formatEventClock } from "@/shared/utils/event-time";
 import { orderOutcome } from "@/shared/utils/order-status";
+import { BRAND } from "@/shared/utils/brand-colors";
 import {
+  cardLabel,
   fetchOrder,
   formatMoney,
   formatPrice,
   TLiveEvent,
   TLiveOrder,
   TLiveTicket,
+  TSavedCard,
   useCreateOrder,
   useCreditBalance,
-  useLiveTickets
+  useLiveTickets,
+  useSavedCards
 } from "./live-api";
 
 /** Most a buyer can pick when the ticket sets no limit of its own. */
@@ -36,6 +41,7 @@ const DEFAULT_MAX = 10;
 
 type TStep =
   | { kind: "select" }
+  /** On Flutterwave's page (redirectUrl), or a saved card the bank is still confirming. */
   | { kind: "awaiting-payment"; orderId: string; redirectUrl?: string }
   | { kind: "outcome"; order: TLiveOrder }
   | { kind: "registered"; status: "confirmed" | "pending" };
@@ -48,8 +54,9 @@ const maxFor = (ticket: TLiveTicket) => {
 
 /**
  * Picking tickets and paying, for one event. One ticket type per order, as the API
- * takes it. Turnupz Credit can pay for some or all of it; the rest is paid on
- * Flutterwave's page in the browser. When the app comes back to the front, the
+ * takes it. Turnupz Credit can pay for some or all of it; the rest is paid with a
+ * saved card (straight away) or on Flutterwave's page in the browser, where the
+ * card can be saved for next time. When the app comes back to the front, the
  * order is read again, and the API confirms the payment as it answers.
  */
 const LiveTicketCheckoutScreen = ({
@@ -73,6 +80,12 @@ const LiveTicketCheckoutScreen = ({
   const [step, setStep] = useState<TStep>({ kind: "select" });
   const [isChecking, setIsChecking] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Android back: never mid-payment; from the waiting screen, back to the tickets.
+  useHardwareBack(() => {
+    if (isSubmitting) return;
+    if (step.kind === "awaiting-payment") setStep({ kind: "select" });
+    else onBack();
+  });
 
   // Private tickets need the organiser's invite link, and external ones are sold
   // elsewhere, so neither is offered here.
@@ -103,6 +116,21 @@ const LiveTicketCheckoutScreen = ({
       : 0;
   const toPay = Math.max(orderAmount - creditApplied, 0);
   const coveredByCredit = creditApplied > 0 && toPay === 0;
+
+  // Pay with: a saved card (the one that pays first is picked), or a new card.
+  const needsCard = !!selected && !isFree && !isRegistration && !coveredByCredit;
+  const { data: savedCards } = useSavedCards(!isRegistration);
+  const usableCards = useMemo(
+    () => (savedCards ?? []).filter((card) => !card.isExpired),
+    [savedCards]
+  );
+  const [cardChoice, setCardChoice] = useState<string | "new" | null>(null);
+  const payWith =
+    cardChoice && (cardChoice === "new" || usableCards.some((card) => card.id === cardChoice))
+      ? cardChoice
+      : (usableCards.find((card) => card.isDefault) ?? usableCards[0])?.id ?? "new";
+  const payingCard = usableCards.find((card) => card.id === payWith) ?? null;
+  const [saveCard, setSaveCard] = useState(true);
 
   useEffect(() => {
     if (!selectedId) {
@@ -147,6 +175,15 @@ const LiveTicketCheckoutScreen = ({
     return () => subscription.remove();
   }, [awaitingOrderId, checkOrder]);
 
+  // A saved card being confirmed: look again every few seconds.
+  const confirmingOrderId =
+    step.kind === "awaiting-payment" && !step.redirectUrl ? step.orderId : null;
+  useEffect(() => {
+    if (!confirmingOrderId) return;
+    const timer = setInterval(() => void checkOrder(confirmingOrderId), 4000);
+    return () => clearInterval(timer);
+  }, [confirmingOrderId, checkOrder]);
+
   const selectTicket = (ticket: TLiveTicket) => {
     setSelectedId(ticket.id);
     setQuantity(1);
@@ -176,9 +213,19 @@ const LiveTicketCheckoutScreen = ({
       const created = await createOrder.mutateAsync({
         ticketId: selected.id,
         quantity,
-        ...(creditApplied > 0 ? { useCredit: true } : {})
+        ...(creditApplied > 0 ? { useCredit: true } : {}),
+        ...(needsCard
+          ? payingCard
+            ? { cardId: payingCard.id }
+            : { saveCard }
+          : {})
       });
       if (!created?.orderId) throw new Error("No order was created");
+      // A saved card the bank hasn't confirmed yet: wait here for it.
+      if (!created.redirectUrl && created.status?.toUpperCase() === "PENDING") {
+        setStep({ kind: "awaiting-payment", orderId: created.orderId });
+        return;
+      }
       if (created.redirectUrl) {
         setStep({
           kind: "awaiting-payment",
@@ -236,6 +283,35 @@ const LiveTicketCheckoutScreen = ({
       <View className="size-8" />
     </View>
   );
+
+  if (step.kind === "awaiting-payment" && !step.redirectUrl) {
+    return (
+      <View className="flex-1 bg-zinc-50" style={{ padding: horizontalPadding }}>
+        {header("Confirming payment", () => setStep({ kind: "select" }))}
+        <View className="mt-10 items-center gap-3 px-4">
+          <ActivityIndicator color="#00B2FF" />
+          <TextComponent className="text-center text-lg font-bold text-zinc-950">
+            Your bank is confirming the payment
+          </TextComponent>
+          <TextComponent className="text-center text-sm text-zinc-600">
+            This usually takes a few seconds. Your seats are held, and your tickets will be
+            in My Tickets as soon as it's done.
+          </TextComponent>
+        </View>
+        <Pressable
+          onPress={() => void checkOrder(step.orderId)}
+          disabled={isChecking}
+          className="mt-8 h-12 items-center justify-center rounded-lg bg-primary"
+        >
+          {isChecking ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <TextComponent className="font-bold text-white">Check again</TextComponent>
+          )}
+        </Pressable>
+      </View>
+    );
+  }
 
   if (step.kind === "awaiting-payment") {
     return (
@@ -466,6 +542,8 @@ const LiveTicketCheckoutScreen = ({
               <Switch
                 value={useCredit}
                 onValueChange={setUseCredit}
+                trackColor={{ true: BRAND.blueDeep, false: "#D4D4D8" }}
+                thumbColor={BRAND.white}
                 accessibilityLabel="Use Turnupz Credit"
               />
             </View>
@@ -496,6 +574,16 @@ const LiveTicketCheckoutScreen = ({
         </View>
       )}
 
+      {needsCard && (
+        <PayWith
+          cards={usableCards}
+          value={payWith}
+          onChange={setCardChoice}
+          saveCard={saveCard}
+          onSaveCardChange={setSaveCard}
+        />
+      )}
+
       <Pressable
         disabled={!selected || !selectedOnSale || isSubmitting}
         onPress={() => void pay()}
@@ -519,13 +607,119 @@ const LiveTicketCheckoutScreen = ({
           </TextComponent>
         )}
       </Pressable>
-      {!isRegistration && !isFree && !coveredByCredit && (
+      {needsCard && (
         <TextComponent className="mt-2 text-center text-[11px] text-zinc-400">
-          You'll pay securely on Flutterwave's page. We never see your card.
+          {payingCard
+            ? `Paying with your ${cardLabel(payingCard)}${creditApplied > 0 ? ", after your Turnupz Credit" : ""}.`
+            : "You'll pay securely on Flutterwave's page. We never see your card number."}
         </TextComponent>
       )}
     </ScrollView>
   );
 };
+
+/** A radio dot, filled when picked. */
+const Radio = ({ on }: { on: boolean }) => (
+  <View
+    className="size-5 rounded-full"
+    style={{ borderWidth: on ? 6 : 2, borderColor: on ? BRAND.blueDeep : "#C7CDD6" }}
+  />
+);
+
+/** The card picture: brand initials on its colour. */
+export const CardBadge = ({ brand }: { brand: string }) => {
+  const dark = /master/i.test(brand);
+  return (
+    <View
+      className="h-7 w-10 items-center justify-center rounded-md"
+      style={{ backgroundColor: dark ? "#111111" : /visa/i.test(brand) ? "#1A1F71" : BRAND.ink }}
+    >
+      <TextComponent className="text-[9px] font-extrabold italic text-white">
+        {/visa/i.test(brand) ? "VISA" : dark ? "●●" : brand.slice(0, 4).toUpperCase()}
+      </TextComponent>
+    </View>
+  );
+};
+
+/**
+ * Saved cards to pick from, or a new card on Flutterwave's page (which can be
+ * saved for next time).
+ */
+const PayWith = ({
+  cards,
+  value,
+  onChange,
+  saveCard,
+  onSaveCardChange
+}: {
+  cards: TSavedCard[];
+  value: string;
+  onChange: (value: string) => void;
+  saveCard: boolean;
+  onSaveCardChange: (value: boolean) => void;
+}) => (
+  <View className="mt-4">
+    <TextComponent className="mb-2 px-1 text-xs font-bold text-zinc-500">Pay with</TextComponent>
+    <View className="rounded-xl bg-white px-4 shadow-sm">
+      {cards.map((card) => (
+        <Pressable
+          key={card.id}
+          onPress={() => onChange(card.id)}
+          accessibilityRole="radio"
+          accessibilityState={{ checked: value === card.id }}
+          className="flex-row items-center gap-3 border-b border-zinc-100 py-3"
+        >
+          <CardBadge brand={card.brand} />
+          <View className="flex-1">
+            <TextComponent className="text-sm font-bold text-zinc-950">{cardLabel(card)}</TextComponent>
+            <TextComponent className="text-xs text-zinc-500">Saved card</TextComponent>
+          </View>
+          <Radio on={value === card.id} />
+        </Pressable>
+      ))}
+      <Pressable
+        onPress={() => onChange("new")}
+        accessibilityRole="radio"
+        accessibilityState={{ checked: value === "new" }}
+        className="flex-row items-center gap-3 py-3"
+      >
+        <View
+          className="h-7 w-10 items-center justify-center rounded-md"
+          style={{ borderWidth: 1.5, borderStyle: "dashed", borderColor: BRAND.blueDeep }}
+        >
+          <TextComponent className="font-bold" style={{ color: BRAND.blueDeep }}>+</TextComponent>
+        </View>
+        <View className="flex-1">
+          <TextComponent className="text-sm font-bold text-zinc-950">
+            {cards.length ? "Use a new card" : "Card, bank transfer or USSD"}
+          </TextComponent>
+          <TextComponent className="text-xs text-zinc-500">
+            {cards.length ? "Or pay by bank transfer or USSD" : "On Flutterwave's secure page"}
+          </TextComponent>
+        </View>
+        <Radio on={value === "new"} />
+      </Pressable>
+      {value === "new" && (
+        <View className="flex-row items-center gap-3 border-t border-zinc-100 py-3">
+          <View className="flex-1">
+            <TextComponent className="text-sm font-semibold text-zinc-950">
+              Save this card for next time
+            </TextComponent>
+            <TextComponent className="text-xs text-zinc-500">
+              If you pay by card, it goes in your wallet so next time is one tap.
+            </TextComponent>
+          </View>
+          <Switch
+            value={saveCard}
+            onValueChange={onSaveCardChange}
+            trackColor={{ true: BRAND.blueDeep, false: "#D4D4D8" }}
+            thumbColor={BRAND.white}
+            accessibilityLabel="Save this card for next time"
+          />
+        </View>
+      )}
+    </View>
+  </View>
+);
 
 export default memo(LiveTicketCheckoutScreen);

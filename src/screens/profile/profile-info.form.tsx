@@ -15,9 +15,10 @@ import { Field, PrimaryButton } from "./profile-settings.screen";
 import { TProfileUpdate, updateProfile } from "./profile-api";
 
 /**
- * "Profile Information", on the profile itself as in the original app: names,
- * username, date of birth and gender, plus bio, website and phone. Save only
- * shows once something has changed.
+ * Your details on the Edit profile page: what others see (names, username, bio,
+ * website), then private details only you see (phone, date of birth, gender,
+ * email). Save only shows once something has changed, and the page is told so it
+ * can ask before throwing changes away.
  */
 
 const GENDERS = [
@@ -48,7 +49,15 @@ const fromUser = (user: TUser): TForm => ({
   phone: user.phone ?? ""
 });
 
-const ProfileInfoForm = ({ user }: { user: TUser }) => {
+const ProfileInfoForm = ({
+  user,
+  onDirtyChange,
+  onSaved
+}: {
+  user: TUser;
+  onDirtyChange?: (dirty: boolean) => void;
+  onSaved?: () => void;
+}) => {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<TForm>(() => fromUser(user));
   const [saved, setSaved] = useState<TForm>(() => fromUser(user));
@@ -91,6 +100,9 @@ const ProfileInfoForm = ({ user }: { user: TUser }) => {
     (key) => form[key].trim() !== saved[key].trim()
   );
   const isDirty = changedKeys.length > 0;
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   const save = async () => {
     const next: Record<string, string> = {};
@@ -119,6 +131,7 @@ const ProfileInfoForm = ({ user }: { user: TUser }) => {
       await queryClient.invalidateQueries({ queryKey: ["me"] });
       setSaved(form);
       onSuccess("Profile updated");
+      onSaved?.();
     } catch (error) {
       const api = (error as TApiErrorResponseType)?.response?.data as
         | { errors?: Record<string, string> }
@@ -132,10 +145,8 @@ const ProfileInfoForm = ({ user }: { user: TUser }) => {
 
   return (
     <View className="gap-6">
-      <TextComponent className="text-base font-bold" style={{ color: BRAND.blueNavy }}>
-        Profile Information
-      </TextComponent>
       <View className="gap-4">
+        <TextComponent className="px-1 text-xs font-bold text-zinc-500">About you</TextComponent>
         <View className="flex-row gap-4">
           <View className="flex-1">
             <Field label="First Name" value={form.firstName} onChange={set("firstName")} error={errors.firstName} autoCapitalize="words" />
@@ -152,6 +163,26 @@ const ProfileInfoForm = ({ user }: { user: TUser }) => {
           error={errors.username || (usernameState === "taken" ? "That username is taken" : undefined)}
           note={usernameState === "checking" ? "Checking…" : usernameState === "free" ? "Available" : undefined}
         />
+        <Field label="Bio" value={form.bio} onChange={set("bio")} multiline maxLength={160} error={errors.bio} placeholder="A line about you" />
+        <Field
+          label="Website"
+          value={form.website}
+          onChange={set("website")}
+          keyboard="url"
+          autoCapitalize="none"
+          error={errors.website}
+          placeholder="yoursite.com or a social link"
+        />
+      </View>
+
+      <View className="gap-4">
+        <View className="px-1">
+          <TextComponent className="text-xs font-bold text-zinc-500">Private details</TextComponent>
+          <TextComponent className="mt-0.5 text-xs text-zinc-400">
+            Only you can see these. We use them for your tickets and to keep your account safe.
+          </TextComponent>
+        </View>
+        <Field label="Phone" value={form.phone} onChange={set("phone")} keyboard="phone-pad" error={errors.phone} placeholder="+234 801 234 5678" />
         <View className="gap-1.5">
           <TextComponent className="px-1 text-sm font-semibold text-zinc-700">Date of Birth</TextComponent>
           <Pressable
@@ -179,20 +210,9 @@ const ProfileInfoForm = ({ user }: { user: TUser }) => {
           error={errors.gender}
           onChange={(option) => set("gender")(String(option.value))}
         />
-        <Field label="Bio" value={form.bio} onChange={set("bio")} multiline maxLength={160} error={errors.bio} placeholder="A line about you" />
-        <Field
-          label="Website"
-          value={form.website}
-          onChange={set("website")}
-          keyboard="url"
-          autoCapitalize="none"
-          error={errors.website}
-          placeholder="yoursite.com or a social link"
-        />
-        <Field label="Phone" value={form.phone} onChange={set("phone")} keyboard="phone-pad" error={errors.phone} placeholder="+234 801 234 5678" />
         <Field label="Email" value={user.email ?? ""} onChange={() => undefined} note="Your sign-in email can't be changed here." />
-        {isDirty && <PrimaryButton label="Save" onPress={() => void save()} busy={saving} />}
       </View>
+      {isDirty && <PrimaryButton label="Save changes" onPress={() => void save()} busy={saving} />}
       <DateModalComponent
         visible={dateOpen}
         onClose={() => setDateOpen(false)}

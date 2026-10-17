@@ -10,7 +10,7 @@ import { BRAND } from "@/shared/utils/brand-colors";
 import { applyInviteCode, useReferralMe } from "./profile-api";
 
 /** The link a friend opens to sign up with this code. */
-const inviteLink = (code: string) =>
+export const inviteLink = (code: string) =>
   `${(WEB_APP_URL ?? "").replace(/\/$/, "")}/invite/${encodeURIComponent(code)}`;
 
 /**
