@@ -19,7 +19,8 @@ import {
   removeSavedCard,
   useCreditBalance,
   useCreditHistory,
-  useSavedCards
+  useSavedCards,
+  formatZero
 } from "@/screens/live/live-api";
 
 const STATE_LABEL: Record<TCreditGrant["state"], string> = {
@@ -148,7 +149,7 @@ const WalletScreen = ({ onBack }: { onBack: () => void }) => {
             ))
           ) : (
             <TextComponent className="mt-1 text-2xl font-extrabold text-white">
-              {hideBalance ? "•••••" : "No credit yet"}
+              {hideBalance ? "•••••" : formatZero()}
             </TextComponent>
           )}
           <TextComponent className="mt-3 text-xs leading-5 text-white/70">

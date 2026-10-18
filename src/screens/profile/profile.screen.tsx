@@ -41,7 +41,8 @@ import {
   useCreditBalance,
   useLiveEvents,
   useLiveUserTickets,
-  useLiveVenue
+  useLiveVenue,
+  formatZero
 } from "@/screens/live/live-api";
 import FollowButton from "./follow-button";
 import InviteFriendsCard, { inviteLink } from "./invite-friends.card";
@@ -156,7 +157,8 @@ const ProfileScreen = ({
   onOpenTickets
 }: {
   onOpenEvent: (eventId: string) => void;
-  onOpenTickets: () => void;
+  /** My tickets; with an event, that event's passes open straight away. */
+  onOpenTickets: (eventId?: string) => void;
 }) => {
   const queryClient = useQueryClient();
   const isSignedIn = !!useUserStore((state) => state.userToken);
@@ -598,7 +600,7 @@ const ProfileScreen = ({
                 ? maskAmount(creditRow?.available.formatted?.withCurrency)
                 : creditRow && creditRow.available.amount > 0
                   ? creditRow.available.formatted?.withCurrency
-                  : "None yet"}
+                  : creditRow?.available.formatted?.withCurrency ?? formatZero()}
             </TextComponent>
             <TextComponent className="mt-0.5 text-xs font-semibold" style={{ color: BRAND.blue }}>
               Open wallet ›
@@ -624,10 +626,10 @@ const ProfileScreen = ({
         <View className="mx-5 mt-4 flex-row" style={{ borderBottomWidth: 1, borderBottomColor: "#E3E7ED" }}>
           {(
             [
-              { id: "tickets", label: "Tickets", count: `${ticketCount}${more}` },
-              { id: "saved", label: "Saved", count: String(savedTotal) },
               { id: "posts", label: "Posts", count: "0" },
-              { id: "tagged", label: "Tagged", count: "0" }
+              { id: "tagged", label: "Tagged", count: "0" },
+              { id: "tickets", label: "Tickets", count: `${ticketCount}${more}` },
+              { id: "saved", label: "Saved", count: String(savedTotal) }
             ] as const
           ).map((tab) => {
             const on = eventsTab === tab.id;
@@ -667,7 +669,7 @@ const ProfileScreen = ({
               <EventRow
                 event={event}
                 note={note}
-                onPress={() => (eventsTab === "saved" ? onOpenEvent(event.id) : onOpenTickets())}
+                onPress={() => (eventsTab === "saved" ? onOpenEvent(event.id) : onOpenTickets(event.id))}
               />
             </React.Fragment>
           ))

@@ -1,4 +1,4 @@
-import { useCreditBalance } from "@/screens/live/live-api";
+import { formatZero, useCreditBalance } from "@/screens/live/live-api";
 import { maskAmount, useBalancePrivacyStore } from "@/shared/stores/balance-privacy.store";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import React, { memo, useState } from "react";
@@ -655,7 +655,7 @@ const ProfileSettingsScreen = ({
       ? creditRow.available.formatted?.withCurrency
       : credit.isLoading
         ? "…"
-        : "None yet";
+        : creditRow?.available.formatted?.withCurrency ?? formatZero();
   const sessions = useSessions();
   const [loggingOut, setLoggingOut] = useState(false);
   const back = () => setPage("menu");

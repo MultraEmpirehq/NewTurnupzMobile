@@ -1,7 +1,9 @@
 import NavIcon from "@/shared/components/nav-icons/nav-icons";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { ScreenActiveContext } from "@/shared/hooks/use-screen-active";
+import { useHomePlace } from "@/shared/hooks/use-home-place";
 import { StatusBar } from "expo-status-bar";
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
 import ContainerComponent from "@/shared/components/container/container.component";
@@ -18,13 +20,19 @@ import NotificationsScreen from "@/screens/notifications/notifications.screen";
 import ChatsScreen from "@/screens/chat/chats.screen";
 import PeopleModal from "@/screens/people/people-modal";
 import { useUnreadNotifications } from "@/screens/notifications/notifications-api";
-import EventOptionsSheet, { TEventOptionsTarget } from "@/screens/live/event-options.sheet";
+import EventOptionsSheet, {
+  TEventOptionsTarget
+} from "@/screens/live/event-options.sheet";
 import { useHiddenEventsStore } from "@/shared/stores/hidden-events.store";
 import useUserStore from "@/shared/stores/user.store";
 import { PerformerProfileScreen as LivePerformerProfileScreen } from "@/screens/live/explore-details";
-import BrandRefreshList, { TBrandRefreshListHandle } from "@/shared/components/brand-refresh/brand-refresh-list.component";
+import BrandRefreshList, {
+  TBrandRefreshListHandle
+} from "@/shared/components/brand-refresh/brand-refresh-list.component";
 import BrandLoader from "@/shared/components/brand-loader/brand-loader.component";
-import EventTicketCard, { TICKET_LIST_BACKGROUND } from "@/screens/live/event-ticket-card";
+import EventTicketCard, {
+  TICKET_LIST_BACKGROUND
+} from "@/screens/live/event-ticket-card";
 import { eventPlace, TLiveEvent, useLiveEvents } from "@/screens/live/live-api";
 
 type TFeedMediaKind = "image" | "video";
@@ -63,27 +71,57 @@ const BOTTOM_NAV_ITEMS: TBottomNavItem[] = [
   {
     id: "home",
     label: "Home",
-    renderIcon: (color, active) => <NavIcon name="home" size={NAV_ICON_SIZE} color={color} active={active} />
+    renderIcon: (color, active) => (
+      <NavIcon name="home" size={NAV_ICON_SIZE} color={color} active={active} />
+    )
   },
   {
     id: "search",
     label: "Explore",
-    renderIcon: (color, active) => <NavIcon name="explore" size={NAV_ICON_SIZE} color={color} active={active} />
+    renderIcon: (color, active) => (
+      <NavIcon
+        name="explore"
+        size={NAV_ICON_SIZE}
+        color={color}
+        active={active}
+      />
+    )
   },
   {
     id: "messages",
     label: "Messages",
-    renderIcon: (color, active) => <NavIcon name="messages" size={NAV_ICON_SIZE} color={color} active={active} />
+    renderIcon: (color, active) => (
+      <NavIcon
+        name="messages"
+        size={NAV_ICON_SIZE}
+        color={color}
+        active={active}
+      />
+    )
   },
   {
     id: "favorites",
     label: "Notifications",
-    renderIcon: (color, active) => <NavIcon name="notifications" size={NAV_ICON_SIZE} color={color} active={active} />
+    renderIcon: (color, active) => (
+      <NavIcon
+        name="notifications"
+        size={NAV_ICON_SIZE}
+        color={color}
+        active={active}
+      />
+    )
   },
   {
     id: "profile",
     label: "Profile",
-    renderIcon: (color, active) => <NavIcon name="profile" size={NAV_ICON_SIZE} color={color} active={active} />
+    renderIcon: (color, active) => (
+      <NavIcon
+        name="profile"
+        size={NAV_ICON_SIZE}
+        color={color}
+        active={active}
+      />
+    )
   }
 ];
 
@@ -233,9 +271,15 @@ const FeedCard = ({
   />
 );
 
-
 const RefinedHomeFeedDesignScreen = () => {
   const [activeTab, setActiveTab] = useState<TBottomNavId>("home");
+  // Tabs opened so far; they stay mounted (hidden) after you leave them.
+  const [visitedTabs, setVisitedTabs] = useState<TBottomNavId[]>(["home"]);
+  useEffect(() => {
+    setVisitedTabs((tabs) =>
+      tabs.includes(activeTab) ? tabs : [...tabs, activeTab]
+    );
+  }, [activeTab]);
   // Android back on another tab returns to Home; on Home it leaves the app.
   // Pages opened on top answer first (each has its own back handling).
   useHardwareBack(() => {
@@ -257,6 +301,10 @@ const RefinedHomeFeedDesignScreen = () => {
   };
   const [ticketsReturnTab, setTicketsReturnTab] =
     useState<TBottomNavId>("profile");
+  // An event whose passes open as soon as My tickets does (tapped on the profile).
+  const [ticketsOpenEventId, setTicketsOpenEventId] = useState<string | null>(
+    null
+  );
   // Hidden events and the card dots: the same store and sheet as Explore.
   const hiddenEventIds = useHiddenEventsStore((state) => state.hiddenEventIds);
   const syncHiddenEvents = useHiddenEventsStore((state) => state.sync);
@@ -270,9 +318,46 @@ const RefinedHomeFeedDesignScreen = () => {
   );
   // The home feed is live: published events from the API, ten at a time,
   // the next ten fetched as you scroll towards the end.
-  const liveEvents = useLiveEvents({ limit: String(HOME_FEED_BATCH) });
-  // The loader shows only while the feed's first page is on its way.
-  const isSplashVisible = liveEvents.isLoading && !liveEvents.data;
+  // Where the feed shows events from: your city if location is on (or your
+  // country when your city has none yet), otherwise everywhere.
+  const homePlace = useHomePlace();
+  const place = homePlace.place;
+  const [cityHasNone, setCityHasNone] = useState(false);
+  const [countryHasNone, setCountryHasNone] = useState(false);
+  useEffect(() => {
+    setCityHasNone(false);
+    setCountryHasNone(false);
+  }, [place?.city, place?.countryCode]);
+  const scope: "city" | "country" | "everywhere" =
+    !place || countryHasNone
+      ? "everywhere"
+      : place.city && !cityHasNone
+        ? "city"
+        : "country";
+  const liveEvents = useLiveEvents(
+    {
+      limit: String(HOME_FEED_BATCH),
+      ...(scope === "city"
+        ? { city: place?.city ?? "", countryCode: place?.countryCode ?? "" }
+        : {}),
+      ...(scope === "country" ? { countryCode: place?.countryCode ?? "" } : {})
+    },
+    homePlace.ready
+  );
+  // Nothing on in your city yet: widen to your country, then everywhere.
+  const firstPageEmpty =
+    !!liveEvents.data &&
+    !liveEvents.isFetching &&
+    !liveEvents.data.pages[0]?.events.length;
+  useEffect(() => {
+    if (!firstPageEmpty) return;
+    if (scope === "city") setCityHasNone(true);
+    else if (scope === "country") setCountryHasNone(true);
+  }, [firstPageEmpty, scope]);
+  // The loader shows only while the feed's first page (and your location, the
+  // first time) are on their way.
+  const isSplashVisible =
+    !homePlace.ready || (liveEvents.isLoading && !liveEvents.data);
   const feedEvents = useMemo(
     () =>
       (liveEvents.data?.pages ?? [])
@@ -287,11 +372,7 @@ const RefinedHomeFeedDesignScreen = () => {
   const [liveBookingEvent, setLiveBookingEvent] = useState<TLiveEvent | null>(
     null
   );
-  const isExploreTab = activeTab === "search";
   const isTicketsTab = activeTab === "tickets";
-  const isMessagesTab = activeTab === "messages";
-  const isNotificationsTab = activeTab === "favorites";
-  const isProfileTab = activeTab === "profile";
   const openHomeEventDetails = (event: TFeedEvent) => {
     setLiveEventId(event.id);
   };
@@ -312,63 +393,47 @@ const RefinedHomeFeedDesignScreen = () => {
     );
   }
 
-  if (liveBookingEvent) {
-    return (
-      <ContainerComponent isSafeAreaView className="bg-white" edges={["top"]}>
-        <View
-          className="flex-1 w-full self-center bg-white"
-          style={{ maxWidth: 430 }}
-        >
-          <LiveTicketCheckoutScreen
-            event={liveBookingEvent}
-            onBack={() => setLiveBookingEvent(null)}
-            onViewTickets={openLiveTickets}
-          />
-        </View>
-      </ContainerComponent>
-    );
-  }
+  // A page opened on top of the tabs: checkout, an event, or a performer. The
+  // tab underneath stays as it was, so going back is instant and keeps your place.
+  const overlay = liveBookingEvent ? (
+    <LiveTicketCheckoutScreen
+      event={liveBookingEvent}
+      onBack={() => setLiveBookingEvent(null)}
+      onViewTickets={openLiveTickets}
+    />
+  ) : liveEventId ? (
+    <LiveEventDetailScreen
+      eventId={liveEventId}
+      onBack={() => setLiveEventId(null)}
+      onBook={setLiveBookingEvent}
+      onOpenPerformer={(id) => {
+        setLivePerformerId(id);
+        setLiveEventId(null);
+      }}
+    />
+  ) : livePerformerId ? (
+    <LivePerformerProfileScreen
+      performerId={livePerformerId}
+      onBack={() => setLivePerformerId(null)}
+      onOpenEvent={(id) => {
+        setLivePerformerId(null);
+        setLiveEventId(id);
+      }}
+    />
+  ) : null;
 
-  if (liveEventId) {
-    return (
-      <ContainerComponent isSafeAreaView className="bg-white" edges={["top"]}>
-        <View
-          className="flex-1 w-full self-center bg-white"
-          style={{ maxWidth: 430 }}
-        >
-          <LiveEventDetailScreen
-            eventId={liveEventId}
-            onBack={() => setLiveEventId(null)}
-            onBook={setLiveBookingEvent}
-            onOpenPerformer={(id) => {
-              setLivePerformerId(id);
-              setLiveEventId(null);
-            }}
-          />
+  /**
+   * A tab, kept mounted once visited and hidden while you're elsewhere, so
+   * switching back shows it at once, scrolled where you left it.
+   */
+  const tabSlot = (id: TBottomNavId, content: React.ReactNode) =>
+    visitedTabs.includes(id) ? (
+      <ScreenActiveContext.Provider value={activeTab === id && !overlay}>
+        <View style={activeTab === id ? { flex: 1 } : { display: "none" }}>
+          {content}
         </View>
-      </ContainerComponent>
-    );
-  }
-  if (livePerformerId) {
-    return (
-      <ContainerComponent isSafeAreaView className="bg-white" edges={["top"]}>
-        <View
-          className="flex-1 w-full self-center bg-white"
-          style={{ maxWidth: 430 }}
-        >
-          <LivePerformerProfileScreen
-            performerId={livePerformerId}
-            onBack={() => setLivePerformerId(null)}
-            onOpenEvent={(id) => {
-              setLivePerformerId(null);
-              setLiveEventId(id);
-            }}
-          />
-        </View>
-      </ContainerComponent>
-    );
-  }
-
+      </ScreenActiveContext.Provider>
+    ) : null;
 
   return (
     <ContainerComponent isSafeAreaView className="bg-white" edges={["top"]}>
@@ -377,38 +442,8 @@ const RefinedHomeFeedDesignScreen = () => {
         className="flex-1 w-full self-center bg-white"
         style={{ maxWidth: 430 }}
       >
-        {isExploreTab ? (
-          <LiveExploreScreen
-            onBook={setLiveBookingEvent}
-            scrollToTopSignal={exploreTopSignal}
-          />
-        ) : isTicketsTab ? (
-          <LiveMyTicketsScreen onBack={() => setActiveTab(ticketsReturnTab)} />
-        ) : isMessagesTab ? (
-          <ChatsScreen
-            onOpenEvent={(eventId) => setLiveEventId(eventId)}
-            onOpenTickets={() => {
-              setTicketsReturnTab("messages");
-              setActiveTab("tickets");
-            }}
-          />
-        ) : isNotificationsTab ? (
-          <NotificationsScreen
-            onOpenEvent={(eventId) => setLiveEventId(eventId)}
-            onOpenTickets={() => {
-              setTicketsReturnTab("favorites");
-              setActiveTab("tickets");
-            }}
-          />
-        ) : isProfileTab ? (
-          <ProfileScreen
-            onOpenEvent={(eventId) => setLiveEventId(eventId)}
-            onOpenTickets={() => {
-              setTicketsReturnTab("profile");
-              setActiveTab("tickets");
-            }}
-          />
-        ) : (
+        {tabSlot(
+          "home",
           <>
             <View className="h-14 items-center justify-center border-b border-zinc-100 bg-white px-4">
               <CustomImage
@@ -489,6 +524,56 @@ const RefinedHomeFeedDesignScreen = () => {
             />
           </>
         )}
+        {tabSlot(
+          "search",
+          <LiveExploreScreen
+            onBook={setLiveBookingEvent}
+            scrollToTopSignal={exploreTopSignal}
+          />
+        )}
+        {tabSlot(
+          "messages",
+          <ChatsScreen
+            onOpenEvent={(eventId) => setLiveEventId(eventId)}
+            onOpenTickets={() => {
+              setTicketsReturnTab("messages");
+              setActiveTab("tickets");
+            }}
+          />
+        )}
+        {tabSlot(
+          "favorites",
+          <NotificationsScreen
+            onOpenEvent={(eventId) => setLiveEventId(eventId)}
+            onOpenTickets={() => {
+              setTicketsReturnTab("favorites");
+              setActiveTab("tickets");
+            }}
+          />
+        )}
+        {tabSlot(
+          "profile",
+          <ProfileScreen
+            onOpenEvent={(eventId) => setLiveEventId(eventId)}
+            onOpenTickets={(eventId) => {
+              setTicketsOpenEventId(eventId ?? null);
+              setTicketsReturnTab("profile");
+              setActiveTab("tickets");
+            }}
+          />
+        )}
+        {/* My tickets is a page of its own: opened fresh each time. */}
+        {isTicketsTab && (
+          <ScreenActiveContext.Provider value={!overlay}>
+            <LiveMyTicketsScreen
+              openEventId={ticketsOpenEventId}
+              onBack={() => {
+                setTicketsOpenEventId(null);
+                setActiveTab(ticketsReturnTab);
+              }}
+            />
+          </ScreenActiveContext.Provider>
+        )}
         {!isTicketsTab && (
           <PreviewBottomNav
             activeTab={activeTab}
@@ -503,6 +588,11 @@ const RefinedHomeFeedDesignScreen = () => {
         />
         {/* Someone's profile, their followers, finding people: opened from anywhere. */}
         <PeopleModal />
+        {overlay && (
+          <View style={StyleSheet.absoluteFill} className="bg-white">
+            {overlay}
+          </View>
+        )}
       </View>
     </ContainerComponent>
   );

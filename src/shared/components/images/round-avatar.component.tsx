@@ -1,6 +1,7 @@
 import React, { memo } from "react";
 import { View } from "react-native";
 import { Image } from "expo-image";
+import { sizedImageUri } from "@/shared/utils/cloudinary-image";
 import TextComponent from "@/shared/components/text/text.component";
 import { BRAND } from "@/shared/utils/brand-colors";
 
@@ -46,7 +47,7 @@ const RoundAvatar = ({
     >
       {uri ? (
         <Image
-          source={{ uri }}
+          source={{ uri: sizedImageUri(uri, size) }}
           contentFit="cover"
           transition={150}
           accessibilityIgnoresInvertColors

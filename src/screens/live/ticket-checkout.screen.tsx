@@ -26,6 +26,7 @@ import {
   cardLabel,
   fetchOrder,
   formatMoney,
+  formatZero,
   formatPrice,
   TLiveEvent,
   TLiveOrder,
@@ -76,8 +77,8 @@ const LiveTicketCheckoutScreen = ({
   const isRegistration = event.saleMethod === "register";
   const { data: allTickets, isLoading, error, refetch } = useLiveTickets(event.id);
   const createOrder = useCreateOrder();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [quantity, setQuantity] = useState(1);
+  /** How many of each ticket type: several types for tickets, one for registration. */
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [step, setStep] = useState<TStep>({ kind: "select" });
   const [isChecking, setIsChecking] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -97,11 +98,23 @@ const LiveTicketCheckoutScreen = ({
       ),
     [allTickets]
   );
-  const selected = tickets.find((ticket) => ticket.id === selectedId) ?? null;
-  const selectedMax = selected ? maxFor(selected) : 0;
-  const selectedOnSale = selected ? ticketSaleState(selected).status === "open" : false;
-  const total = selected ? formatPrice(selected.price, quantity) : "";
-  const isFree = !selected?.price?.amount;
+  const lines = useMemo(
+    () =>
+      tickets
+        .filter((ticket) => (quantities[ticket.id] ?? 0) > 0)
+        .map((ticket) => ({ ticket, quantity: quantities[ticket.id] })),
+    [tickets, quantities]
+  );
+  const selected = lines[0]?.ticket ?? null;
+  const quantity = lines.reduce((sum, line) => sum + line.quantity, 0);
+  const selectedOnSale =
+    lines.length > 0 && lines.every((line) => ticketSaleState(line.ticket).status === "open");
+  const orderAmount = lines.reduce(
+    (sum, line) => sum + (line.ticket.price?.amount ?? 0) * line.quantity,
+    0
+  );
+  const total = selected ? formatMoney(orderAmount, selected.price) : "";
+  const isFree = orderAmount <= 0;
 
   // Turnupz Credit in the ticket's currency, spent first when switched on.
   const { data: credit } = useCreditBalance(!isRegistration);
@@ -110,7 +123,6 @@ const LiveTicketCheckoutScreen = ({
   const creditAvailable =
     credit?.find((row) => row.currency.toUpperCase() === currency)?.available
       ?.amount ?? 0;
-  const orderAmount = (selected?.price?.amount ?? 0) * quantity;
   const creditApplied =
     !isFree && !isRegistration && useCredit
       ? Math.min(creditAvailable, orderAmount)
@@ -133,14 +145,18 @@ const LiveTicketCheckoutScreen = ({
   const payingCard = usableCards.find((card) => card.id === payWith) ?? null;
   const [saveCard, setSaveCard] = useState(true);
 
+  // Start with one of the first ticket that's on sale, so the summary isn't empty.
+  const [startedWithOne, setStartedWithOne] = useState(false);
   useEffect(() => {
-    if (!selectedId) {
-      const firstBuyable = tickets.find(
-        (ticket) => ticketSaleState(ticket).status === "open" && maxFor(ticket) > 0
-      );
-      if (firstBuyable) setSelectedId(firstBuyable.id);
+    if (startedWithOne) return;
+    const firstBuyable = tickets.find(
+      (ticket) => ticketSaleState(ticket).status === "open" && maxFor(ticket) > 0
+    );
+    if (firstBuyable) {
+      setQuantities({ [firstBuyable.id]: 1 });
+      setStartedWithOne(true);
     }
-  }, [selectedId, tickets]);
+  }, [startedWithOne, tickets]);
 
   const checkOrder = useCallback(async (orderId: string) => {
     setIsChecking(true);
@@ -185,13 +201,25 @@ const LiveTicketCheckoutScreen = ({
     return () => clearInterval(timer);
   }, [confirmingOrderId, checkOrder]);
 
-  const selectTicket = (ticket: TLiveTicket) => {
-    setSelectedId(ticket.id);
-    setQuantity(1);
+  /**
+   * Sets how many of one ticket type. Registration takes one type at a time, and
+   * an order can't mix currencies, so either of those starts the order afresh.
+   */
+  const setCount = (ticket: TLiveTicket, count: number) => {
+    const next = Math.max(0, Math.min(count, maxFor(ticket)));
+    setQuantities((current) => {
+      const otherCurrency =
+        !!currency && ticket.price?.currency?.code?.toUpperCase() !== currency;
+      const base = isRegistration || otherCurrency ? {} : { ...current };
+      if (next > 0) base[ticket.id] = next;
+      else delete base[ticket.id];
+      return base;
+    });
   };
 
   const pay = async () => {
     if (!selected || !selectedOnSale || quantity < 1) return;
+    const one = lines.length === 1;
     setIsSubmitting(true);
     try {
       if (isRegistration) {
@@ -212,8 +240,15 @@ const LiveTicketCheckoutScreen = ({
         return;
       }
       const created = await createOrder.mutateAsync({
-        ticketId: selected.id,
-        quantity,
+        // One ticket type keeps the original request; several go as items.
+        ...(one
+          ? { ticketId: selected.id, quantity }
+          : {
+              items: lines.map((line) => ({
+                ticketId: line.ticket.id,
+                quantity: line.quantity
+              }))
+            }),
         ...(creditApplied > 0 ? { useCredit: true } : {}),
         ...(needsCard
           ? payingCard
@@ -454,13 +489,17 @@ const LiveTicketCheckoutScreen = ({
       {tickets.map((ticket) => {
         const saleNote = describeTicketSaleState(ticketSaleState(ticket), event.timezone);
         const soldOut = maxFor(ticket) === 0 && (ticket.available ?? 1) === 0;
-        const isSelected = ticket.id === selectedId;
+        const count = quantities[ticket.id] ?? 0;
+        const isSelected = count > 0;
+        const max = maxFor(ticket);
         const unavailable = !!saleNote || soldOut;
         return (
           <Pressable
             key={ticket.id}
             disabled={unavailable}
-            onPress={() => selectTicket(ticket)}
+            onPress={() => {
+              if (!isSelected) setCount(ticket, 1);
+            }}
             className="mt-3"
             style={unavailable ? { opacity: 0.55 } : undefined}
           >
@@ -504,22 +543,21 @@ const LiveTicketCheckoutScreen = ({
                   {isSelected && !unavailable ? (
                     <View className="flex-row items-center gap-3">
                       <Pressable
-                        onPress={() => setQuantity((current) => Math.max(1, current - 1))}
-                        disabled={quantity <= 1}
-                        accessibilityLabel="One less"
+                        onPress={() => setCount(ticket, count - 1)}
+                        accessibilityLabel={count === 1 ? `Remove ${ticket.name}` : `One less ${ticket.name}`}
                         className="size-8 items-center justify-center rounded-full bg-zinc-100"
                       >
                         <TextComponent className="font-bold text-zinc-500">-</TextComponent>
                       </Pressable>
                       <TextComponent className="w-6 text-center font-bold text-zinc-950">
-                        {quantity}
+                        {count}
                       </TextComponent>
                       <Pressable
-                        onPress={() => setQuantity((current) => Math.min(selectedMax, current + 1))}
-                        disabled={quantity >= selectedMax}
-                        accessibilityLabel="One more"
+                        onPress={() => setCount(ticket, count + 1)}
+                        disabled={count >= max}
+                        accessibilityLabel={`One more ${ticket.name}`}
                         className={
-                          quantity >= selectedMax
+                          count >= max
                             ? "size-8 items-center justify-center rounded-full bg-zinc-300"
                             : "size-8 items-center justify-center rounded-full bg-primary"
                         }
@@ -530,19 +568,19 @@ const LiveTicketCheckoutScreen = ({
                   ) : (
                     !unavailable && (
                       <TextComponent className="text-xs font-bold" style={{ color: BRAND.blueDeep }}>
-                        Select
+                        {isRegistration ? "Select" : "Add"}
                       </TextComponent>
                     )
                   )}
                 </View>
               }
               note={
-                isSelected && !unavailable && quantity >= selectedMax && selectedMax > 0 ? (
+                isSelected && !unavailable && count >= max && max > 0 ? (
                   <View className="mx-4 mb-3 rounded-lg px-3 py-2" style={{ backgroundColor: BRAND.blueTint }}>
                     <TextComponent className="text-xs leading-4 text-zinc-700">
-                      {selectedMax === ticket.available
-                        ? `That's all that's left. You've got the last ${selectedMax === 1 ? "one" : selectedMax}.`
-                        : `You can get up to ${selectedMax} in one order, so others get a chance too.`}
+                      {max === ticket.available
+                        ? `That's all that's left. You've got the last ${max === 1 ? "one" : max}.`
+                        : `You can get up to ${max} in one order, so others get a chance too.`}
                     </TextComponent>
                   </View>
                 ) : null
@@ -554,12 +592,19 @@ const LiveTicketCheckoutScreen = ({
 
       {!!selected && (
         <View className="mt-4 rounded-xl bg-white p-4 shadow-sm">
-          <View className="flex-row justify-between">
-            <TextComponent className="text-xs text-zinc-500">
-              {quantity} × {selected.name}
-            </TextComponent>
-            <TextComponent className="text-sm font-bold text-zinc-950">{total}</TextComponent>
-          </View>
+          {lines.map((line, index) => (
+            <View
+              key={line.ticket.id}
+              className={index ? "mt-2 flex-row justify-between gap-3" : "flex-row justify-between gap-3"}
+            >
+              <TextComponent numberOfLines={1} className="flex-1 text-xs text-zinc-500">
+                {line.quantity} × {line.ticket.name}
+              </TextComponent>
+              <TextComponent className="text-sm font-bold text-zinc-950">
+                {formatPrice(line.ticket.price, line.quantity)}
+              </TextComponent>
+            </View>
+          ))}
           {!isFree && !isRegistration && (
             <View className="mt-3 flex-row items-center justify-between gap-3 border-t border-zinc-100 pt-3">
               <View className="flex-1">
@@ -569,7 +614,7 @@ const LiveTicketCheckoutScreen = ({
                 <TextComponent className="text-xs text-zinc-500">
                   {creditAvailable > 0
                     ? `${formatMoney(creditAvailable, selected.price)} available`
-                    : "You don't have any credit yet"}
+                    : `${formatZero(selected.price)} available`}
                 </TextComponent>
               </View>
               <Switch

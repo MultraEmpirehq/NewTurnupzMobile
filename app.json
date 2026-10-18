@@ -38,6 +38,12 @@
           "launchMode": "most-recent"
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Turnupz uses your location to show you events near you."
+        }
+      ],
       "./plugins/with-pod-deployment-target",
       "./plugins/with-android-release-signing"
     ]
