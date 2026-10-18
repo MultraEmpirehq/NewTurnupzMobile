@@ -1,5 +1,16 @@
 import React, { memo, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, TextInput, View } from "react-native";
+import { useQueryClient } from "@tanstack/react-query";
+import { postData } from "@/api";
+import { constructErrorMessage } from "@/api/functions";
+import {
+  ActivityIndicator,
+  Linking,
+  Modal,
+  Pressable,
+  ScrollView,
+  TextInput,
+  View
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { shareReceipt } from "./order-receipt-pdf";
 import * as Clipboard from "expo-clipboard";
@@ -77,24 +88,53 @@ const CopyButton = ({ text, what }: { text: string; what: string }) => (
     className="rounded-full px-3 py-1.5"
     style={{ backgroundColor: BRAND.blueTint }}
   >
-    <TextComponent className="text-xs font-bold" style={{ color: BRAND.blueDeep }}>
+    <TextComponent
+      className="text-xs font-bold"
+      style={{ color: BRAND.blueDeep }}
+    >
       Copy
     </TextComponent>
   </Pressable>
 );
 
-const Line = ({ label, value, strong }: { label: string; value: string; strong?: boolean }) => (
+const Line = ({
+  label,
+  value,
+  strong
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) => (
   <View className="flex-row items-center justify-between gap-3 py-1.5">
-    <TextComponent className={strong ? "flex-1 text-base font-bold text-zinc-950" : "flex-1 text-sm text-zinc-600"}>
+    <TextComponent
+      className={
+        strong
+          ? "flex-1 text-base font-bold text-zinc-950"
+          : "flex-1 text-sm text-zinc-600"
+      }
+    >
       {label}
     </TextComponent>
-    <TextComponent className={strong ? "text-base font-extrabold text-zinc-950" : "text-sm font-semibold text-zinc-900"}>
+    <TextComponent
+      className={
+        strong
+          ? "text-base font-extrabold text-zinc-950"
+          : "text-sm font-semibold text-zinc-900"
+      }
+    >
       {value}
     </TextComponent>
   </View>
 );
 
-const Card = ({ title, children }: { title?: string; children: React.ReactNode }) => (
+const Card = ({
+  title,
+  children
+}: {
+  title?: string;
+  children: React.ReactNode;
+}) => (
   <View className="mx-4 mt-3 rounded-2xl bg-white p-4">
     {!!title && (
       <TextComponent className="mb-1 text-xs font-extrabold tracking-wide text-zinc-400">
@@ -136,15 +176,17 @@ const OrderHelp = ({ order }: { order: TMyOrder }) => {
         className="mx-4 mt-3 h-12 items-center justify-center rounded-xl"
         style={{ backgroundColor: INK }}
       >
-        <TextComponent className="font-bold text-white">Get help with this order</TextComponent>
+        <TextComponent className="font-bold text-white">
+          Get help with this order
+        </TextComponent>
       </Pressable>
     );
   }
   return (
     <Card title="Get help">
       <TextComponent className="text-sm text-zinc-600">
-        Tell us what went wrong. We'll include your order number {reference}, and
-        the Turnupz team will reply in your Messages.
+        Tell us what went wrong. We'll include your order number {reference},
+        and the Turnupz team will reply in your Messages.
       </TextComponent>
       <TextInput
         value={message}
@@ -162,7 +204,11 @@ const OrderHelp = ({ order }: { order: TMyOrder }) => {
         className="mt-3 h-12 items-center justify-center rounded-xl"
         style={{ backgroundColor: message.trim() ? BRAND.blueDeep : "#D4D4D8" }}
       >
-        {sending ? <ActivityIndicator color="#fff" /> : <TextComponent className="font-bold text-white">Send</TextComponent>}
+        {sending ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <TextComponent className="font-bold text-white">Send</TextComponent>
+        )}
       </Pressable>
     </Card>
   );
@@ -170,6 +216,37 @@ const OrderHelp = ({ order }: { order: TMyOrder }) => {
 
 /** One order in full: the receipt, how it was paid, any refunds, its tickets, and help. */
 const OrderReceipt = ({ order }: { order: TMyOrder }) => {
+  const queryClient = useQueryClient();
+  const [reopening, setReopening] = useState(false);
+  const status = order.status?.toUpperCase();
+  const waiting = status === "PENDING";
+  // A receipt is proof of payment: paid (or free) orders, and refunded ones.
+  const hasReceipt = status === "COMPLETED" || status === "REFUNDED";
+  const completePayment = async () => {
+    setReopening(true);
+    try {
+      const { data } = await postData<
+        undefined,
+        { redirectUrl?: string; status?: string }
+      >(`/order/${order.id}/payment`);
+      if (data?.data?.redirectUrl) {
+        await Linking.openURL(data.data.redirectUrl);
+      } else {
+        onSuccess("Payment received. Your tickets are in My tickets.");
+      }
+    } catch (error) {
+      onError(
+        constructErrorMessage(
+          error as TApiErrorResponseType,
+          "We couldn't reopen the payment page."
+        )
+      );
+    } finally {
+      setReopening(false);
+      // Coming back from paying (or a lapsed hold) changes the order: look again.
+      void queryClient.invalidateQueries({ queryKey: ["my-orders"] });
+    }
+  };
   const event = order.ticket?.event;
   const badge = badgeOf(order);
   const reference = order.reference ?? order.id;
@@ -179,22 +256,37 @@ const OrderReceipt = ({ order }: { order: TMyOrder }) => {
       <View className="mx-4 mt-3 flex-row items-center gap-3 rounded-2xl bg-white p-4">
         <View className="size-14 overflow-hidden rounded-xl bg-zinc-100">
           {!!image && (
-            <CustomImage className="size-full" imageClassName="size-full" source={{ uri: image }} contentFit="cover" />
+            <CustomImage
+              className="size-full"
+              imageClassName="size-full"
+              source={{ uri: image }}
+              contentFit="cover"
+            />
           )}
         </View>
         <View className="flex-1">
-          <TextComponent numberOfLines={2} className="text-base font-bold text-zinc-950">
+          <TextComponent
+            numberOfLines={2}
+            className="text-base font-bold text-zinc-950"
+          >
             {event?.name ?? "Event"}
           </TextComponent>
           {!!event?.date && (
             <TextComponent numberOfLines={1} className="text-xs text-zinc-500">
-              {formatEventDay(event.date, event.timezone, { withYear: false })} ·{" "}
-              {formatEventClock(event.date, event.timezone)} · {eventPlace(event)}
+              {formatEventDay(event.date, event.timezone, { withYear: false })}{" "}
+              · {formatEventClock(event.date, event.timezone)} ·{" "}
+              {eventPlace(event)}
             </TextComponent>
           )}
         </View>
-        <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: badge.bg }}>
-          <TextComponent className="text-xs font-bold" style={{ color: badge.fg }}>
+        <View
+          className="rounded-full px-2.5 py-1"
+          style={{ backgroundColor: badge.bg }}
+        >
+          <TextComponent
+            className="text-xs font-bold"
+            style={{ color: badge.fg }}
+          >
             {badge.label}
           </TextComponent>
         </View>
@@ -203,18 +295,54 @@ const OrderReceipt = ({ order }: { order: TMyOrder }) => {
       <Card>
         <View className="flex-row items-center justify-between gap-3">
           <View className="flex-1">
-            <TextComponent className="text-xs text-zinc-500">Order number</TextComponent>
-            <TextComponent className="text-base font-extrabold tracking-wider text-zinc-950">{reference}</TextComponent>
+            <TextComponent className="text-xs text-zinc-500">
+              Order number
+            </TextComponent>
+            <TextComponent className="text-base font-extrabold tracking-wider text-zinc-950">
+              {reference}
+            </TextComponent>
           </View>
           <CopyButton text={reference} what="Order number" />
         </View>
-        <TextComponent className="mt-2 text-xs text-zinc-500">Ordered {orderedOn(order.createdAt)}</TextComponent>
+        <TextComponent className="mt-2 text-xs text-zinc-500">
+          Ordered {orderedOn(order.createdAt)}
+        </TextComponent>
         {!!order.statusReason && (
-          <TextComponent className="mt-2 text-sm leading-5 text-zinc-600">{order.statusReason}</TextComponent>
+          <TextComponent className="mt-2 text-sm leading-5 text-zinc-600">
+            {order.statusReason}
+          </TextComponent>
         )}
       </Card>
 
-      <Card title="What you bought">
+      {waiting && (
+        <Card>
+          <TextComponent className="text-base font-bold text-zinc-950">
+            Waiting for your payment
+          </TextComponent>
+          <TextComponent className="mt-1 text-sm leading-5 text-zinc-600">
+            {order.holdExpiresAt && new Date(order.holdExpiresAt) > new Date()
+              ? `Your seats are held until ${new Date(order.holdExpiresAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}. Finish paying to get your tickets.`
+              : "Finish paying to get your tickets. If the seats have gone in the meantime, you won't be charged."}
+          </TextComponent>
+          <Pressable
+            onPress={() => void completePayment()}
+            disabled={reopening}
+            accessibilityRole="button"
+            className="mt-3 h-12 items-center justify-center rounded-xl"
+            style={{ backgroundColor: BRAND.blueDeep }}
+          >
+            {reopening ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <TextComponent className="font-bold text-white">
+                Complete payment
+              </TextComponent>
+            )}
+          </Pressable>
+        </Card>
+      )}
+
+      <Card title={hasReceipt ? "What you bought" : "Your order"}>
         {(order.items ?? []).map((item) => (
           <Line
             key={item.ticketId}
@@ -229,7 +357,11 @@ const OrderReceipt = ({ order }: { order: TMyOrder }) => {
         <View className="mt-1 border-t border-zinc-100 pt-1">
           <Line
             label="Total"
-            value={order.total?.amount ? order.total.formatted?.withCurrency ?? "" : "Free"}
+            value={
+              order.total?.amount
+                ? (order.total.formatted?.withCurrency ?? "")
+                : "Free"
+            }
             strong
           />
         </View>
@@ -237,13 +369,23 @@ const OrderReceipt = ({ order }: { order: TMyOrder }) => {
 
       {(!!order.payment?.card || !!order.payment?.credit) && (
         <Card
-          title={order.status?.toUpperCase() === "PENDING" ? "Held for this order" : "How you paid"}
+          title={
+            order.status?.toUpperCase() === "PENDING"
+              ? "Held for this order"
+              : "How you paid"
+          }
         >
           {!!order.payment?.card && (
-            <Line label={order.payment.cardLabel ?? "Card"} value={order.payment.card.formatted?.withCurrency ?? ""} />
+            <Line
+              label={order.payment.cardLabel ?? "Card"}
+              value={order.payment.card.formatted?.withCurrency ?? ""}
+            />
           )}
           {!!order.payment?.credit && (
-            <Line label="Turnupz Credit" value={order.payment.credit.formatted?.withCurrency ?? ""} />
+            <Line
+              label="Turnupz Credit"
+              value={order.payment.credit.formatted?.withCurrency ?? ""}
+            />
           )}
         </Card>
       )}
@@ -252,8 +394,10 @@ const OrderReceipt = ({ order }: { order: TMyOrder }) => {
         <Card title="Refunds">
           {order.refunds.map((refund, index) => {
             const parts = [
-              refund.toCard.amount > 0 && `${refund.toCard.formatted?.withCurrency} to your card`,
-              refund.asCredit.amount > 0 && `${refund.asCredit.formatted?.withCurrency} as Turnupz Credit`
+              refund.toCard.amount > 0 &&
+                `${refund.toCard.formatted?.withCurrency} to your card`,
+              refund.asCredit.amount > 0 &&
+                `${refund.asCredit.formatted?.withCurrency} as Turnupz Credit`
             ].filter(Boolean);
             return (
               <View key={index} className="py-1.5">
@@ -275,44 +419,63 @@ const OrderReceipt = ({ order }: { order: TMyOrder }) => {
       )}
 
       {!!order.userTickets?.length && (
-        <Card title={order.userTickets.length > 1 ? `Your ${order.userTickets.length} tickets` : "Your ticket"}>
+        <Card
+          title={
+            order.userTickets.length > 1
+              ? `Your ${order.userTickets.length} tickets`
+              : "Your ticket"
+          }
+        >
           {order.userTickets.map((ticket) => (
-            <View key={ticket.id} className="flex-row items-center justify-between gap-3 py-1.5">
+            <View
+              key={ticket.id}
+              className="flex-row items-center justify-between gap-3 py-1.5"
+            >
               <View className="flex-1">
                 <TextComponent className="text-sm font-bold tracking-wider text-zinc-950">
                   {(ticket.code ?? ticket.id).toUpperCase()}
                 </TextComponent>
-                <TextComponent className="text-xs text-zinc-500">{ticket.ticket?.name ?? "Ticket"}</TextComponent>
+                <TextComponent className="text-xs text-zinc-500">
+                  {ticket.ticket?.name ?? "Ticket"}
+                </TextComponent>
               </View>
-              <CopyButton text={(ticket.code ?? ticket.id).toUpperCase()} what="Ticket code" />
+              <CopyButton
+                text={(ticket.code ?? ticket.id).toUpperCase()}
+                what="Ticket code"
+              />
             </View>
           ))}
         </Card>
       )}
 
-      <Pressable
-        onPress={() =>
-          void shareReceipt(order, badge.label).catch(() =>
-            onError("Couldn't make the receipt. Please try again.")
-          )
-        }
-        accessibilityRole="button"
-        className="mx-4 mt-3 h-12 flex-row items-center justify-center gap-2 rounded-xl bg-white"
-      >
-        <Svg width={18} height={18} viewBox="0 0 24 24">
-          <Path
-            d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"
-            fill="none"
-            stroke={BRAND.blueDeep}
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </Svg>
-        <TextComponent className="font-bold" style={{ color: BRAND.blueDeep }}>
-          Share or save receipt
-        </TextComponent>
-      </Pressable>
+      {hasReceipt && (
+        <Pressable
+          onPress={() =>
+            void shareReceipt(order, badge.label).catch(() =>
+              onError("Couldn't make the receipt. Please try again.")
+            )
+          }
+          accessibilityRole="button"
+          className="mx-4 mt-3 h-12 flex-row items-center justify-center gap-2 rounded-xl bg-white"
+        >
+          <Svg width={18} height={18} viewBox="0 0 24 24">
+            <Path
+              d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"
+              fill="none"
+              stroke={BRAND.blueDeep}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </Svg>
+          <TextComponent
+            className="font-bold"
+            style={{ color: BRAND.blueDeep }}
+          >
+            Share or save receipt
+          </TextComponent>
+        </Pressable>
+      )}
       <OrderHelp order={order} />
     </ScrollView>
   );
@@ -335,10 +498,21 @@ export const OrderSheet = memo(function OrderSheet({
   const shown = order ?? loaded.data ?? null;
   const visible = !!order || !!orderId;
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView edges={["bottom"]} className="flex-1" style={{ backgroundColor: TICKET_LIST_BACKGROUND }}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <SafeAreaView
+        edges={["bottom"]}
+        className="flex-1"
+        style={{ backgroundColor: TICKET_LIST_BACKGROUND }}
+      >
         <View className="h-14 flex-row items-center justify-between border-b border-black/5 bg-white px-4">
-          <TextComponent className="text-lg font-bold text-zinc-950">Order</TextComponent>
+          <TextComponent className="text-lg font-bold text-zinc-950">
+            Order
+          </TextComponent>
           <Pressable
             onPress={onClose}
             accessibilityRole="button"
@@ -347,7 +521,13 @@ export const OrderSheet = memo(function OrderSheet({
             className="size-9 items-center justify-center rounded-full bg-zinc-100"
           >
             <Svg width={16} height={16} viewBox="0 0 24 24">
-              <Path d="M6 6l12 12M18 6L6 18" fill="none" stroke={INK} strokeWidth={2.4} strokeLinecap="round" />
+              <Path
+                d="M6 6l12 12M18 6L6 18"
+                fill="none"
+                stroke={INK}
+                strokeWidth={2.4}
+                strokeLinecap="round"
+              />
             </Svg>
           </Pressable>
         </View>
@@ -356,7 +536,10 @@ export const OrderSheet = memo(function OrderSheet({
         ) : loaded.isLoading ? (
           <Loading />
         ) : (
-          <EmptyNote title="We couldn't find this order" body="Pull down on Orders to try again." />
+          <EmptyNote
+            title="We couldn't find this order"
+            body="Pull down on Orders to try again."
+          />
         )}
       </SafeAreaView>
       <OverlayToast />
@@ -365,26 +548,48 @@ export const OrderSheet = memo(function OrderSheet({
 });
 
 /** One row in Orders: the event, what was bought, the total and how it went. */
-const OrderRow = ({ order, onPress }: { order: TMyOrder; onPress: () => void }) => {
+const OrderRow = ({
+  order,
+  onPress
+}: {
+  order: TMyOrder;
+  onPress: () => void;
+}) => {
   const event = order.ticket?.event;
   const badge = badgeOf(order);
   const image = event?.image ?? event?.medias?.[0];
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" className="mx-4 mb-3 flex-row items-center gap-3 rounded-2xl bg-white p-3.5">
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      className="mx-4 mb-3 flex-row items-center gap-3 rounded-2xl bg-white p-3.5"
+    >
       <View className="size-12 overflow-hidden rounded-xl bg-zinc-100">
         {!!image && (
-          <CustomImage className="size-full" imageClassName="size-full" source={{ uri: image }} contentFit="cover" />
+          <CustomImage
+            className="size-full"
+            imageClassName="size-full"
+            source={{ uri: image }}
+            contentFit="cover"
+          />
         )}
       </View>
       <View className="flex-1">
-        <TextComponent numberOfLines={1} className="text-[15px] font-bold text-zinc-950">
+        <TextComponent
+          numberOfLines={1}
+          className="text-[15px] font-bold text-zinc-950"
+        >
           {event?.name ?? "Event"}
         </TextComponent>
         <TextComponent numberOfLines={1} className="text-xs text-zinc-500">
           {linesOf(order)}
         </TextComponent>
         <TextComponent numberOfLines={1} className="text-xs text-zinc-400">
-          {new Date(order.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+          {new Date(order.createdAt).toLocaleDateString(undefined, {
+            day: "numeric",
+            month: "short",
+            year: "numeric"
+          })}
           {order.reference ? ` · ${order.reference}` : ""}
         </TextComponent>
       </View>
@@ -392,8 +597,14 @@ const OrderRow = ({ order, onPress }: { order: TMyOrder; onPress: () => void }) 
         <TextComponent className="text-sm font-extrabold text-zinc-950">
           {order.total?.amount ? order.total.formatted?.withCurrency : "Free"}
         </TextComponent>
-        <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: badge.bg }}>
-          <TextComponent className="text-[11px] font-bold" style={{ color: badge.fg }}>
+        <View
+          className="rounded-full px-2 py-0.5"
+          style={{ backgroundColor: badge.bg }}
+        >
+          <TextComponent
+            className="text-[11px] font-bold"
+            style={{ color: badge.fg }}
+          >
             {badge.label}
           </TextComponent>
         </View>
@@ -409,7 +620,10 @@ const OrdersPage = ({ onBack }: { onBack: () => void }) => {
   const [open, setOpen] = useState<TMyOrder | null>(null);
   const list = (orders.data?.pages ?? []).flatMap((page) => page.orders);
   return (
-    <View className="flex-1" style={{ backgroundColor: TICKET_LIST_BACKGROUND }}>
+    <View
+      className="flex-1"
+      style={{ backgroundColor: TICKET_LIST_BACKGROUND }}
+    >
       <BackHeader title="Orders" onBack={onBack} />
       <BrandRefreshList
         data={list}
@@ -418,20 +632,30 @@ const OrdersPage = ({ onBack }: { onBack: () => void }) => {
         contentContainerStyle={{ paddingTop: 12, paddingBottom: 32 }}
         refreshing={orders.isRefetching}
         onRefresh={() => void orders.refetch()}
-        onEndReached={() => orders.hasNextPage && !orders.isFetchingNextPage && void orders.fetchNextPage()}
+        onEndReached={() =>
+          orders.hasNextPage &&
+          !orders.isFetchingNextPage &&
+          void orders.fetchNextPage()
+        }
         ListHeaderComponent={
           <TextComponent className="mx-5 mb-3 text-xs leading-5 text-zinc-500">
-            Your receipts and payments. Need help? Open an order and quote its order number.
+            Your receipts and payments. Need help? Open an order and quote its
+            order number.
           </TextComponent>
         }
         ListEmptyComponent={
           orders.isLoading ? (
             <Loading />
           ) : (
-            <EmptyNote title="No orders yet" body="Tickets you buy or register for will show here with their receipts." />
+            <EmptyNote
+              title="No orders yet"
+              body="Tickets you buy or register for will show here with their receipts."
+            />
           )
         }
-        renderItem={({ item }) => <OrderRow order={item} onPress={() => setOpen(item)} />}
+        renderItem={({ item }) => (
+          <OrderRow order={item} onPress={() => setOpen(item)} />
+        )}
       />
       <OrderSheet order={open} onClose={() => setOpen(null)} />
     </View>

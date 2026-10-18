@@ -996,6 +996,8 @@ export type TMyOrder = {
   reference?: string | null;
   status: string;
   statusReason?: string | null;
+  /** For an order waiting for payment: when its held seats are let go. */
+  holdExpiresAt?: string | null;
   quantity: number;
   createdAt: string;
   ticket?: { name?: string; event?: TLiveEvent };
