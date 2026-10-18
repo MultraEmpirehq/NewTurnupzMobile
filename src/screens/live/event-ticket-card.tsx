@@ -1,4 +1,5 @@
 import React, { memo } from "react";
+import { useTicketsHeldFor } from "./live-api";
 import { Pressable, View } from "react-native";
 import { Circle, Path, Svg } from "react-native-svg";
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
@@ -20,6 +21,8 @@ type TEventTicketCardProps = {
   category?: string;
   place?: string;
   badge?: string;
+  /** The event, so the card can show "Going" when you hold tickets for it. */
+  eventId?: string;
   onPress?: () => void;
   /** Shows the dots button for the event's options. */
   onMore?: () => void;
@@ -40,10 +43,12 @@ const EventTicketCard: React.FC<TEventTicketCardProps> = ({
   category,
   place,
   badge,
+  eventId,
   onPress,
   onMore,
   width
 }) => {
+  const going = useTicketsHeldFor(eventId) > 0;
   const dateBlock = formatEventDateBlock(date, timezone);
   return (
     <Pressable
@@ -77,11 +82,19 @@ const EventTicketCard: React.FC<TEventTicketCardProps> = ({
               </TextComponent>
             </View>
           )}
-          {!!badge && (
-            <View className="absolute right-3 top-3 rounded-full bg-black/55 px-3 py-1">
-              <TextComponent className="text-xs font-semibold text-white">
-                {badge}
-              </TextComponent>
+          {(going || !!badge) && (
+            <View className="absolute right-3 top-3 flex-row gap-1.5">
+              {going && (
+                // You already hold tickets for this one.
+                <View className="flex-row items-center gap-1 rounded-full px-3 py-1" style={{ backgroundColor: "#0577FA" }}>
+                  <TextComponent className="text-xs font-bold text-white">✓ Going</TextComponent>
+                </View>
+              )}
+              {!!badge && (
+                <View className="rounded-full bg-black/55 px-3 py-1">
+                  <TextComponent className="text-xs font-semibold text-white">{badge}</TextComponent>
+                </View>
+              )}
             </View>
           )}
         </View>

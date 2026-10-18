@@ -1,4 +1,5 @@
-import { formatZero, useCreditBalance } from "@/screens/live/live-api";
+import { formatZero, openSupportChat, useCreditBalance } from "@/screens/live/live-api";
+import OrdersPage from "./orders.screen";
 import { maskAmount, useBalancePrivacyStore } from "@/shared/stores/balance-privacy.store";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import React, { memo, useState } from "react";
@@ -22,6 +23,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import TextComponent from "@/shared/components/text/text.component";
 import { onError, onSuccess } from "@/shared/components/status/toast";
 import { constructErrorMessage } from "@/api/functions";
+import { deleteData } from "@/api";
 import useUser from "@/shared/hooks/use-user.hook";
 import {
   TAccessibilityOptions,
@@ -35,12 +37,10 @@ import {
   TSession,
   changePassword,
   logOut,
-  sendSupportMessage,
   signOutDevice,
   signOutOtherDevices,
   updateNotificationPreferences,
   useFaqs,
-  useMe,
   useNotificationPreferences,
   useSessions,
 } from "./profile-api";
@@ -61,7 +61,9 @@ type TPage =
   | "notifications"
   | "devices"
   | "accessibility"
-  | "help";
+  | "help"
+  | "orders"
+  | "delete";
 
 const errorText = (error: unknown, fallback: string) =>
   constructErrorMessage(error as TApiErrorResponseType, fallback);
@@ -172,7 +174,7 @@ export const Field = ({
   maxLength?: number;
   secure?: boolean;
   keyboard?: "default" | "email-address" | "phone-pad" | "url";
-  autoCapitalize?: "none" | "sentences" | "words";
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
   placeholder?: string;
 }) => (
   <View className="gap-1.5">
@@ -558,31 +560,104 @@ const AccessibilityPage = ({ onBack }: { onBack: () => void }) => {
   );
 };
 
+/* -------------------------------------------------------------------------- delete account */
+
+const DeleteAccountPage = ({ onBack }: { onBack: () => void }) => {
+  useHardwareBack(onBack);
+  const { logoutUser } = useUser();
+  const [reason, setReason] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const ready = confirm.trim().toUpperCase() === "DELETE";
+
+  const remove = async () => {
+    if (!ready) return;
+    setDeleting(true);
+    try {
+      await deleteData("/user/me", {
+        data: { confirm: "DELETE", ...(reason.trim() ? { reason: reason.trim() } : {}) }
+      });
+      onSuccess("Your account has been deleted");
+      await logoutUser();
+    } catch (error) {
+      onError(errorText(error, "Couldn't delete your account. Please try again."));
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Page title="Delete account" onBack={onBack}>
+      <View className="gap-4 px-4 pt-6">
+        <View className="rounded-2xl bg-white p-4">
+          <TextComponent className="text-base font-bold text-zinc-950">
+            Deleting your account can't be undone
+          </TextComponent>
+          {[
+            "Your profile, photo, followers and saved cards are removed, and you're signed out everywhere.",
+            "You lose access to your tickets, and any Turnupz Credit you have is lost.",
+            "Your orders are kept without your name, because we have to keep payment records.",
+            "If you've sold tickets to an upcoming event, cancel it or wait until it's over first.",
+            "You can sign up again with the same email later."
+          ].map((line) => (
+            <View key={line} className="mt-2.5 flex-row gap-2.5">
+              <View className="mt-[7px] size-1.5 rounded-full" style={{ backgroundColor: DANGER }} />
+              <TextComponent className="flex-1 text-sm leading-5 text-zinc-700">{line}</TextComponent>
+            </View>
+          ))}
+        </View>
+        <Field
+          label="Why are you leaving? (optional)"
+          value={reason}
+          onChange={setReason}
+          multiline
+          placeholder="It helps us make Turnupz better"
+        />
+        <Field
+          label="Type DELETE to confirm"
+          value={confirm}
+          onChange={setConfirm}
+          autoCapitalize="characters"
+          placeholder="DELETE"
+        />
+        <Pressable
+          onPress={() => void remove()}
+          disabled={!ready || deleting}
+          accessibilityRole="button"
+          className="h-12 items-center justify-center rounded-full"
+          style={{ backgroundColor: ready ? DANGER : "#d4d4d8" }}
+        >
+          {deleting ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <TextComponent className="text-base font-bold text-white">Delete my account</TextComponent>
+          )}
+        </Pressable>
+      </View>
+    </Page>
+  );
+};
+
 /* -------------------------------------------------------------------------- help */
 
 const HelpPage = ({ onBack }: { onBack: () => void }) => {
   useHardwareBack(onBack);
   const faqs = useFaqs();
-  const me = useMe();
   const [open, setOpen] = useState<string | null>(null);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
-  const name = me.data?.name || [me.data?.firstName, me.data?.lastName].filter(Boolean).join(" ");
 
   const send = async () => {
-    if (!message.trim() || !me.data?.email) return;
+    if (!message.trim()) return;
     setSending(true);
     try {
-      await sendSupportMessage({
-        name: name || me.data.email,
-        email: me.data.email,
-        subject: subject.trim() || undefined,
-        message: message.trim()
-      });
+      // Into your chat with the team, so the reply comes back in Messages.
+      await openSupportChat(
+        subject.trim() ? `${subject.trim()}:\n${message.trim()}` : message.trim()
+      );
       setSubject("");
       setMessage("");
-      onSuccess(`Sent. We'll reply to ${me.data.email}.`);
+      onSuccess("Sent. The Turnupz team will reply in your Messages.");
     } catch (error) {
       onError(errorText(error, "Couldn't send your message."));
     } finally {
@@ -623,7 +698,7 @@ const HelpPage = ({ onBack }: { onBack: () => void }) => {
           <Field label="Subject" value={subject} onChange={setSubject} placeholder="e.g. Refund for a cancelled event" />
           <Field label="Message" value={message} onChange={setMessage} multiline placeholder="Tell us what happened" />
           <TextComponent className="px-1 text-xs text-zinc-500">
-            We'll reply to {me.data?.email ?? "your email"}.
+            The Turnupz team will reply in your Messages.
           </TextComponent>
           <PrimaryButton label="Send" onPress={() => void send()} busy={sending} disabled={!message.trim()} />
         </View>
@@ -665,6 +740,8 @@ const ProfileSettingsScreen = ({
   if (page === "devices") return <DevicesPage onBack={back} />;
   if (page === "accessibility") return <AccessibilityPage onBack={back} />;
   if (page === "help") return <HelpPage onBack={back} />;
+  if (page === "orders") return <OrdersPage onBack={back} />;
+  if (page === "delete") return <DeleteAccountPage onBack={back} />;
 
   const openWeb = (path: string) =>
     void Linking.openURL(`${WEB_APP_URL}${path}`).catch(() => onError("Couldn't open the page."));
@@ -693,6 +770,11 @@ const ProfileSettingsScreen = ({
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <Section title="Account">
           <Row label="Change password" onPress={() => setPage("password")} />
+          <Row
+            label="Orders"
+            hint="Receipts, payments and order numbers"
+            onPress={() => setPage("orders")}
+          />
           <Row
             label="Wallet"
             hint="Your Turnupz Credit and saved cards"
@@ -727,6 +809,9 @@ const ProfileSettingsScreen = ({
           ) : (
             <Row label="Log out" tone="danger" onPress={confirmLogOut} last />
           )}
+        </Section>
+        <Section>
+          <Row label="Delete account" onPress={() => setPage("delete")} last />
         </Section>
         {!!version && (
           <TextComponent className="pt-6 text-center text-xs text-zinc-400">Turnupz {version}</TextComponent>

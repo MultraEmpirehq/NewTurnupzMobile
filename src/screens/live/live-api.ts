@@ -1,4 +1,7 @@
 import { Platform } from "react-native";
+import { useEffect } from "react";
+import { createMMKV } from "react-native-mmkv";
+import useUserStore from "@/shared/stores/user.store";
 import { useScreenActive } from "@/shared/hooks/use-screen-active";
 import { deleteData, getData, patchData, postData } from "@/api";
 import {
@@ -95,6 +98,8 @@ export type TLiveOrder = {
 
 export type TLiveUserTicket = {
   id: string;
+  /** The order it came from; only on tickets you bought yourself. */
+  orderId?: string;
   code?: string;
   qrCodeValue?: string;
   status?: string;
@@ -589,20 +594,56 @@ export const formatMoney = (amount: number, like?: TPrice | null) =>
       : ({ amount, currency: { code: "NGN" } } as TPrice)
   );
 
-export const useLiveUserTickets = () =>
-  useInfiniteQuery({
+/** Your tickets, kept on the phone so they open at the door with no signal. */
+const savedTickets = createMMKV({ id: "turnup-saved-tickets" });
+type TSavedTickets = {
+  pages: { tickets: TLiveUserTicket[]; pagination?: { nextPage?: number | null } }[];
+  pageParams: unknown[];
+};
+export const clearSavedTickets = () => savedTickets.clearAll();
+const readSavedTickets = (userId?: string) => {
+  if (!userId) return undefined;
+  try {
+    const raw = savedTickets.getString(`tickets:${userId}`);
+    return raw ? (JSON.parse(raw) as TSavedTickets) : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const fetchUserTicketsPage = async ({ pageParam }: { pageParam: unknown }) => {
+  const { data } = await getData<TLiveUserTicket[]>(
+    `/tickets/user?page=${pageParam}&limit=${PAGE_SIZE}`
+  );
+  return { tickets: data?.data ?? [], pagination: data?.pagination };
+};
+
+export const useLiveUserTickets = (enabled = true) => {
+  const userId = useUserStore((state) => state.user?.id);
+  const query = useInfiniteQuery({
     queryKey: ["live-user-tickets"],
+    enabled: enabled && !!userId,
     // Always checked again on opening: a purchase or transfer may have just landed.
     staleTime: 0,
+    // The copy kept on the phone shows at once (and offline) until fresh ones arrive.
+    initialData: () => readSavedTickets(userId),
+    initialDataUpdatedAt: 0,
     initialPageParam: 1,
-    queryFn: async ({ pageParam }) => {
-      const { data } = await getData<TLiveUserTicket[]>(
-        `/tickets/user?page=${pageParam}&limit=${PAGE_SIZE}`
-      );
-      return { tickets: data?.data ?? [], pagination: data?.pagination };
-    },
+    queryFn: fetchUserTicketsPage,
     getNextPageParam: (lastPage) => lastPage.pagination?.nextPage ?? undefined
   });
+  // Each fresh copy replaces the one on the phone.
+  useEffect(() => {
+    if (!userId || !query.data || !query.isSuccess || query.isFetching) return;
+    if (query.dataUpdatedAt === 0) return;
+    try {
+      savedTickets.set(`tickets:${userId}`, JSON.stringify(query.data));
+    } catch {
+      // Keeping a copy is a bonus; never break the screen over it.
+    }
+  }, [userId, query.data, query.isSuccess, query.isFetching, query.dataUpdatedAt]);
+  return query;
+};
 
 /** Report reasons; the keys are the API's. */
 export const REPORT_REASONS: { value: string; label: string }[] = [
@@ -947,3 +988,87 @@ export const useRefundedOrders = () =>
       return (data?.data ?? []).filter((order) => order.refundedTickets > 0);
     }
   });
+
+/** One of your purchases: what you bought, what it cost, how you paid, and its tickets. */
+export type TMyOrder = {
+  id: string;
+  /** The order number to quote to support, e.g. ORD-D7YS-YYKJ. */
+  reference?: string | null;
+  status: string;
+  statusReason?: string | null;
+  quantity: number;
+  createdAt: string;
+  ticket?: { name?: string; event?: TLiveEvent };
+  items?: { ticketId: string; name: string; quantity: number; unitPrice: TPrice }[];
+  total?: TPrice;
+  payment?: { card: TPrice | null; cardLabel: string | null; credit: TPrice | null };
+  refunds?: {
+    status: string;
+    tickets: number;
+    toCard: TPrice;
+    asCredit: TPrice;
+    requestedAt: string;
+    completedAt?: string | null;
+  }[];
+  userTickets?: { id: string; code?: string; status?: string; ticket?: { name?: string } }[];
+};
+
+/** Every order you've made, newest first. */
+export const useMyOrders = (enabled = true) =>
+  useInfiniteQuery({
+    queryKey: ["my-orders"],
+    enabled,
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const { data } = await getData<TMyOrder[]>(`/orders?page=${pageParam}&limit=${PAGE_SIZE}`);
+      return { orders: data?.data ?? [], pagination: data?.pagination };
+    },
+    getNextPageParam: (lastPage) => lastPage.pagination?.nextPage ?? undefined
+  });
+
+/** One order of yours, e.g. the one a ticket came from. */
+export const useMyOrder = (orderId?: string | null) =>
+  useQuery({
+    queryKey: ["my-orders", orderId],
+    enabled: !!orderId,
+    queryFn: async () =>
+      (await getData<TMyOrder[]>(`/orders?orderId=${orderId}`)).data?.data?.[0] ?? null
+  });
+
+/**
+ * Your chat with the Turnupz team (made the first time). A message sends
+ * straight away; replies come back in Messages.
+ */
+export const openSupportChat = async (message?: string) =>
+  (await postData<{ message?: string }, { id: string; isNew: boolean }>("/chats/support", {
+    ...(message ? { message } : {})
+  })).data?.data;
+
+/**
+ * How many tickets you hold for an event (0 if none). It only reads the tickets
+ * already loaded (or kept on the phone); it never fetches, so every card can
+ * ask without a request each.
+ */
+export const useTicketsHeldFor = (eventId?: string | null) => {
+  const userId = useUserStore((state) => state.user?.id);
+  const { data } = useInfiniteQuery({
+    queryKey: ["live-user-tickets"],
+    enabled: false,
+    initialData: () => readSavedTickets(userId),
+    initialDataUpdatedAt: 0,
+    initialPageParam: 1,
+    queryFn: fetchUserTicketsPage,
+    getNextPageParam: (lastPage) => lastPage.pagination?.nextPage ?? undefined,
+    select: (tickets) =>
+      eventId
+        ? tickets.pages
+            .flatMap((page) => page.tickets)
+            .filter(
+              (ticket) =>
+                ticket.ticket?.event?.id === eventId &&
+                (ticket.status === "UN_USED" || ticket.status === "USED" || !ticket.status)
+            ).length
+        : 0
+  });
+  return userId ? (data ?? 0) : 0;
+};

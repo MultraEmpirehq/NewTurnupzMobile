@@ -1070,6 +1070,7 @@ const LiveExploreScreen = ({
   const railCard = (event: TLiveEvent) => (
     <EventTicketCard
       width={railCardWidth}
+      eventId={event.id}
       name={event.name}
       date={event.date}
       timezone={event.timezone}
@@ -1573,6 +1574,7 @@ const LiveExploreScreen = ({
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
           <EventTicketCard
+            eventId={item.id}
             name={item.name}
             date={item.date}
             timezone={item.timezone}

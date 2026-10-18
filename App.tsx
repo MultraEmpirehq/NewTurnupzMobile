@@ -6,7 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { View } from "react-native";
 import { themes } from "@/shared/utils/colors";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import FlashMessage from "react-native-flash-message";
 import { FullWindowOverlay } from "react-native-screens";
 import ToastMessage from "@/shared/components/status/toast/custom-toast-message.component";
@@ -16,14 +16,7 @@ import { BRAND_FONTS } from "@/shared/utils/fonts";
 import BrandIntro from "@/shared/components/brand-intro/brand-intro.component";
 import { useIntroStore } from "@/shared/stores/intro.store";
 
-// Anything fetched in the last 30 seconds shows straight away without asking
-// the server again, kept for 10 minutes after its screen closes. A failed
-// request is retried once, not three times, so errors show quickly.
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { staleTime: 30_000, gcTime: 10 * 60_000, retry: 1 }
-  }
-});
+import { queryClient } from "@/shared/query-client";
 
 export default function App() {
   // Hold the first frame until Plus Jakarta Sans is ready so text doesn't flash in the
