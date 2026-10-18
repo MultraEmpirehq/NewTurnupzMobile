@@ -133,6 +133,7 @@ export const eventCard = (
 ) => (
   <EventTicketCard
     key={event.id}
+    eventId={event.id}
     name={event.name}
     date={event.date}
     timezone={event.timezone}

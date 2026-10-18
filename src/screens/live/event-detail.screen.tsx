@@ -25,6 +25,8 @@ import {
   PERFORMER_TYPE_LABELS,
   TLiveEvent,
   useLiveEvent
+,
+  useTicketsHeldFor
 } from "./live-api";
 import { PerformerAvatar } from "./explore-details";
 import ReportEventSheet from "./report-event.sheet";
@@ -61,11 +63,14 @@ const LiveEventDetailScreen = ({
   eventId,
   onBack,
   onBook,
+  onShowTickets,
   onOpenPerformer
 }: {
   eventId: string;
   onBack: () => void;
   onBook: (event: TLiveEvent) => void;
+  /** Your passes for this event (when you already hold tickets). */
+  onShowTickets?: (eventId: string) => void;
   /** Opens a performer's profile from the line-up. */
   onOpenPerformer?: (performerId: string) => void;
 }) => {
@@ -107,12 +112,19 @@ const LiveEventDetailScreen = ({
   const zoneNote = event ? eventZoneNote(event.timezone) : null;
   const isPast = event ? new Date(event.date) < new Date() : false;
 
+  // Tickets you already hold for this event: say so, and offer them first.
+  const held = useTicketsHeldFor(event?.id);
+  const isRegistration = event?.saleMethod === "register";
   const bookLabel =
     event?.saleMethod === "external_link"
       ? "Get Tickets"
-      : event?.saleMethod === "register"
-        ? "Register"
-        : "Book Ticket";
+      : isRegistration
+        ? held
+          ? "You're registered"
+          : "Register"
+        : held
+          ? "Get more tickets"
+          : "Book Ticket";
 
   const [leavingTo, setLeavingTo] = useState<string | null>(null);
 
@@ -218,16 +230,60 @@ const LiveEventDetailScreen = ({
             )}
           </View>
 
+          {held > 0 && (
+            <View
+              className="mt-5 flex-row items-center gap-3 rounded-xl px-3.5 py-3"
+              style={{ backgroundColor: "#E5F7FF" }}
+            >
+              <View className="size-8 items-center justify-center rounded-full" style={{ backgroundColor: "#0577FA" }}>
+                <TextComponent className="text-sm font-extrabold text-white">✓</TextComponent>
+              </View>
+              <View className="flex-1">
+                <TextComponent className="text-sm font-bold text-zinc-950">
+                  {isPast
+                    ? "You had tickets for this event"
+                    : isRegistration
+                      ? "You're registered"
+                      : "You're going"}
+                </TextComponent>
+                <TextComponent className="text-xs text-zinc-600">
+                  {held} {isRegistration ? (held === 1 ? "pass" : "passes") : held === 1 ? "ticket" : "tickets"} in My
+                  tickets
+                </TextComponent>
+              </View>
+              {!!onShowTickets && (
+                <Pressable
+                  onPress={() => event && onShowTickets(event.id)}
+                  accessibilityRole="button"
+                  className="rounded-full px-3.5 py-2"
+                  style={{ backgroundColor: "#0577FA" }}
+                >
+                  <TextComponent className="text-xs font-bold text-white">
+                    {held === 1 ? "Show ticket" : "Show tickets"}
+                  </TextComponent>
+                </Pressable>
+              )}
+            </View>
+          )}
+
           <Pressable
-            disabled={isPast}
+            disabled={isPast || (isRegistration && held > 0)}
             onPress={handleBook}
             className={
-              isPast
+              isPast || (isRegistration && held > 0)
                 ? "mt-5 h-12 items-center justify-center rounded-lg bg-zinc-300"
-                : "mt-5 h-12 items-center justify-center rounded-lg bg-primary"
+                : held > 0
+                  ? "mt-3 h-12 items-center justify-center rounded-lg border-2 border-primary bg-white"
+                  : "mt-5 h-12 items-center justify-center rounded-lg bg-primary"
             }
           >
-            <TextComponent className="font-bold text-white">
+            <TextComponent
+              className="font-bold"
+              style={{
+                color:
+                  held > 0 && !isPast && !(isRegistration && held > 0) ? "#00B2FF" : "#ffffff"
+              }}
+            >
               {isPast ? "This event has ended" : bookLabel}
             </TextComponent>
           </Pressable>

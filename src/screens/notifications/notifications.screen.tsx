@@ -1,4 +1,5 @@
 import React, { memo, useMemo, useState } from "react";
+import { useOpenChatStore } from "@/shared/stores/open-chat.store";
 import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, View } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
@@ -204,11 +205,15 @@ const TransferActions = ({ transferId }: { transferId: string }) => {
  */
 const NotificationsScreen = ({
   onOpenEvent,
-  onOpenTickets
+  onOpenTickets,
+  onOpenMessages
 }: {
   onOpenEvent: (eventId: string) => void;
   onOpenTickets: () => void;
+  /** Messages, with a chat to open (a reply from the Turnupz team). */
+  onOpenMessages: () => void;
 }) => {
+  const openChatWhenReady = useOpenChatStore((state) => state.openChatWhenReady);
   const isSignedIn = !!useUserStore((state) => state.userToken);
   const [filter, setFilter] = useState<TNotificationFilter>("all");
   const [showSettings, setShowSettings] = useState(false);
@@ -268,6 +273,9 @@ const NotificationsScreen = ({
       // The event page opens this post as soon as it has loaded.
       openPostWhenReady(item.data.postId);
       onOpenEvent(item.eventId);
+    } else if (item.data?.action === "open_chat" && typeof item.data.chatId === "string") {
+      openChatWhenReady(item.data.chatId);
+      onOpenMessages();
     } else if (item.eventId) onOpenEvent(item.eventId);
     else if (item.category === "ORDER_UPDATES" || item.category === "TICKET_TRANSFERS") onOpenTickets();
   };
