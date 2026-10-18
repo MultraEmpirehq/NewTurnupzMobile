@@ -14,7 +14,7 @@ import {
 import { UnauthenticatedStackParamList } from "@/navigation/unauthenticated-navigator/unauthenticated-navigator";
 import { RouteProp } from "@react-navigation/native";
 import { postData } from "@/api";
-import { onError, onSuccess } from "@/shared/components/status/toast";
+import { onError } from "@/shared/components/status/toast";
 import { constructErrorMessage } from "@/api/functions";
 import { EVerificationType } from "@/shared/utils/types";
 
@@ -103,7 +103,6 @@ const VerificationScreen = () => {
         { message: string; token: string; expiresAt: Date }
       >("/auth/otp/verify", payload);
       const newToken = data?.data?.token;
-      onSuccess("OTP verified successfully");
       if (type === EVerificationType.ACCOUNT_CREATION) {
         navigation.navigate("create-password", {
           token: newToken,

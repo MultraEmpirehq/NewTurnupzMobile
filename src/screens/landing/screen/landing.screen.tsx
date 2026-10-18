@@ -19,7 +19,7 @@ import { getData, postData } from "@/api";
 import useUserStore, { TUser } from "@/shared/stores/user.store";
 import { useIntroStore } from "@/shared/stores/intro.store";
 import useApp from "@/shared/hooks/use-app.hook";
-import { onError, onSuccess } from "@/shared/components/status/toast";
+import { onError } from "@/shared/components/status/toast";
 import {
   EVerificationType,
   TLoginResponseType,
@@ -133,7 +133,6 @@ const LandingScreen = () => {
         );
         performAuthOperations(data?.data?.accessToken, true);
         await performAuthVerificationCheck();
-        onSuccess("Login successful");
       } catch (error) {
         const errorMessage = constructErrorMessage(
           error as TApiErrorResponseType,
@@ -149,7 +148,6 @@ const LandingScreen = () => {
     async (accessToken: string) => {
       performAuthOperations(accessToken, true);
       await performAuthVerificationCheck();
-      onSuccess("Login successful");
     },
     [performAuthOperations, performAuthVerificationCheck]
   );

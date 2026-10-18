@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, View }
 import Svg, { Path } from "react-native-svg";
 import { useQueryClient } from "@tanstack/react-query";
 import TextComponent from "@/shared/components/text/text.component";
-import { onError, onSuccess } from "@/shared/components/status/toast";
+import { onError } from "@/shared/components/status/toast";
 import { constructErrorMessage } from "@/api/functions";
 import { BRAND } from "@/shared/utils/brand-colors";
 import { BackHeader } from "@/screens/live/explore-details";
@@ -67,7 +67,6 @@ const WalletScreen = ({ onBack }: { onBack: () => void }) => {
     try {
       const next = action === "default" ? await makeCardDefault(card.id) : await removeSavedCard(card.id);
       queryClient.setQueryData(["saved-cards"], next);
-      onSuccess(action === "default" ? `Your ${cardLabel(card)} now pays first` : "Card removed");
     } catch (error) {
       onError(constructErrorMessage(error as TApiErrorResponseType, "That didn't work. Please try again."));
     } finally {

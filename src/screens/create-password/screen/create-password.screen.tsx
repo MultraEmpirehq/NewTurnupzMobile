@@ -13,7 +13,6 @@ import { Controller, useForm } from "react-hook-form";
 import { joiResolver } from "@hookform/resolvers/joi";
 import { constructErrorMessage } from "@/api/functions";
 import { postData } from "@/api";
-import { onSuccess } from "@/shared/components/status/toast";
 import { TAuthBodyType, TLoginResponseType } from "../../../shared/utils/types";
 import useUserStore from "../../../shared/stores/user.store";
 import useApp from "../../../shared/hooks/use-app.hook";
@@ -77,7 +76,6 @@ const CreatePasswordScreen = () => {
         console.log("data", data?.data?.accessToken);
         performAuthOperations(data?.data?.accessToken, true);
         await performAuthVerificationCheck();
-        onSuccess("Password created successfully");
       } catch (error) {
         const errorMessage = constructErrorMessage(
           error as TApiErrorResponseType,

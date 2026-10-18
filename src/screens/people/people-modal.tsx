@@ -1,3 +1,4 @@
+import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useState } from "react";
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -296,6 +297,7 @@ const PeopleModal = () => {
         {page?.kind === "search" && <SearchPage />}
         <ChatThreadScreen chatId={chat?.id ?? null} title={chat?.title ?? ""} onClose={() => setChat(null)} />
       </SafeAreaView>
+      <OverlayToast />
     </Modal>
   );
 };

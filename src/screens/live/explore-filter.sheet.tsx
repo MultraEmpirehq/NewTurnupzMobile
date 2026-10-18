@@ -1,3 +1,4 @@
+import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useEffect, useMemo, useState } from "react";
 import { BRAND } from "@/shared/utils/brand-colors";
 import { Modal, Pressable, ScrollView, Switch, View } from "react-native";
@@ -542,6 +543,7 @@ const ExploreFilterSheet: React.FC<TExploreFilterSheetProps> = ({
           </Pressable>
         </View>
       </SafeAreaView>
+      <OverlayToast />
     </Modal>
   );
 };

@@ -1,3 +1,4 @@
+import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import { Modal, ModalProps } from "react-native";
 import React, { forwardRef, memo } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -35,6 +36,7 @@ const ModalLayout = forwardRef<Modal, TModalLayoutProp>(
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider className="flex-1">{children}</SafeAreaProvider>
         </GestureHandlerRootView>
+        <OverlayToast />
       </Modal>
     );
   }

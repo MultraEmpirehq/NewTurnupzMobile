@@ -1,3 +1,4 @@
+import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import React, { memo, useMemo, useState } from "react";
 import {
@@ -309,6 +310,7 @@ const PassViewer = ({
           scan. Tap to close.
         </TextComponent>
       </SafeAreaView>
+      <OverlayToast />
     </Modal>
   );
 };

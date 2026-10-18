@@ -7,9 +7,11 @@ import {
   Pressable,
   ScrollView,
   Switch,
+  StyleSheet,
   useWindowDimensions,
   View
 } from "react-native";
+import Svg, { Line, Path } from "react-native-svg";
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
 import TextComponent from "@/shared/components/text/text.component";
 import ChevronLeftIcon from "@/shared/assets/icons/chevron-left.icon";
@@ -18,7 +20,6 @@ import { constructErrorMessage } from "@/api/functions";
 import { postData } from "@/api";
 import useUserStore from "@/shared/stores/user.store";
 import { describeTicketSaleState, ticketSaleState } from "@/shared/utils/ticket-sales";
-import { formatEventClock } from "@/shared/utils/event-time";
 import { orderOutcome } from "@/shared/utils/order-status";
 import { BRAND } from "@/shared/utils/brand-colors";
 import {
@@ -460,63 +461,93 @@ const LiveTicketCheckoutScreen = ({
             key={ticket.id}
             disabled={unavailable}
             onPress={() => selectTicket(ticket)}
-            className={
-              isSelected
-                ? "mt-3 rounded-xl border-2 border-primary bg-white p-4 shadow"
-                : "mt-3 rounded-xl border-2 border-transparent bg-white p-4 shadow"
-            }
+            className="mt-3"
             style={unavailable ? { opacity: 0.55 } : undefined}
           >
-            <View className="flex-row items-center">
-              <View className="flex-1">
-                <TextComponent numberOfLines={2} className="font-bold text-zinc-950">
-                  {ticket.name}
-                </TextComponent>
-                <TextComponent className="mt-1 text-sm font-bold text-primary">
-                  {formatPrice(ticket.price)}
-                </TextComponent>
-                {!!saleNote && (
-                  <TextComponent className="mt-2 text-xs font-semibold text-sky-700">
-                    {saleNote}
-                  </TextComponent>
-                )}
-                {soldOut && (
-                  <TextComponent className="mt-2 text-xs font-semibold text-red-600">
-                    Sold out
-                  </TextComponent>
-                )}
-                {!unavailable && !!ticket.maxPerOrder && (
-                  <TextComponent className="mt-2 text-xs text-zinc-500">
-                    Up to {ticket.maxPerOrder} per order
-                  </TextComponent>
-                )}
-              </View>
-              {isSelected && !unavailable && (
-                <View className="flex-row items-center gap-3">
-                  <Pressable
-                    onPress={() => setQuantity((current) => Math.max(1, current - 1))}
-                    disabled={quantity <= 1}
-                    className="size-7 items-center justify-center rounded-full bg-zinc-100"
-                  >
-                    <TextComponent className="font-bold text-zinc-500">-</TextComponent>
-                  </Pressable>
-                  <TextComponent className="w-6 text-center font-bold text-zinc-950">
-                    {quantity}
-                  </TextComponent>
-                  <Pressable
-                    onPress={() => setQuantity((current) => Math.min(selectedMax, current + 1))}
-                    disabled={quantity >= selectedMax}
-                    className={
-                      quantity >= selectedMax
-                        ? "size-7 items-center justify-center rounded-full bg-zinc-300"
-                        : "size-7 items-center justify-center rounded-full bg-primary"
-                    }
-                  >
-                    <TextComponent className="font-bold text-white">+</TextComponent>
-                  </Pressable>
+            <TicketShape
+              selected={isSelected && !unavailable}
+              top={
+                <View className="flex-row items-start gap-3 px-4 pb-3.5 pt-4">
+                  <View className="flex-1">
+                    <TextComponent numberOfLines={2} className="text-[15px] font-bold text-zinc-950">
+                      {ticket.name}
+                    </TextComponent>
+                    {!!saleNote && (
+                      <TextComponent className="mt-1.5 text-xs font-semibold text-sky-700">
+                        {saleNote}
+                      </TextComponent>
+                    )}
+                  </View>
+                  {soldOut ? (
+                    <TicketChip label="Sold out" tone="danger" />
+                  ) : (
+                    !saleNote &&
+                    ticket.available != null && (
+                      <TicketChip
+                        label={`${ticket.available.toLocaleString()} left`}
+                        tone={ticket.available <= FEW_LEFT ? "warn" : "plain"}
+                      />
+                    )
+                  )}
                 </View>
-              )}
-            </View>
+              }
+              bottom={
+                <View className="min-h-[52px] flex-row items-center px-4 py-3">
+                  <View className="flex-1">
+                    <TextComponent className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                      Price
+                    </TextComponent>
+                    <TextComponent className="text-base font-extrabold" style={{ color: BRAND.blueDeep }}>
+                      {formatPrice(ticket.price)}
+                    </TextComponent>
+                  </View>
+                  {isSelected && !unavailable ? (
+                    <View className="flex-row items-center gap-3">
+                      <Pressable
+                        onPress={() => setQuantity((current) => Math.max(1, current - 1))}
+                        disabled={quantity <= 1}
+                        accessibilityLabel="One less"
+                        className="size-8 items-center justify-center rounded-full bg-zinc-100"
+                      >
+                        <TextComponent className="font-bold text-zinc-500">-</TextComponent>
+                      </Pressable>
+                      <TextComponent className="w-6 text-center font-bold text-zinc-950">
+                        {quantity}
+                      </TextComponent>
+                      <Pressable
+                        onPress={() => setQuantity((current) => Math.min(selectedMax, current + 1))}
+                        disabled={quantity >= selectedMax}
+                        accessibilityLabel="One more"
+                        className={
+                          quantity >= selectedMax
+                            ? "size-8 items-center justify-center rounded-full bg-zinc-300"
+                            : "size-8 items-center justify-center rounded-full bg-primary"
+                        }
+                      >
+                        <TextComponent className="font-bold text-white">+</TextComponent>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    !unavailable && (
+                      <TextComponent className="text-xs font-bold" style={{ color: BRAND.blueDeep }}>
+                        Select
+                      </TextComponent>
+                    )
+                  )}
+                </View>
+              }
+              note={
+                isSelected && !unavailable && quantity >= selectedMax && selectedMax > 0 ? (
+                  <View className="mx-4 mb-3 rounded-lg px-3 py-2" style={{ backgroundColor: BRAND.blueTint }}>
+                    <TextComponent className="text-xs leading-4 text-zinc-700">
+                      {selectedMax === ticket.available
+                        ? `That's all that's left. You've got the last ${selectedMax === 1 ? "one" : selectedMax}.`
+                        : `You can get up to ${selectedMax} in one order, so others get a chance too.`}
+                    </TextComponent>
+                  </View>
+                ) : null
+              }
+            />
           </Pressable>
         );
       })}
@@ -529,18 +560,21 @@ const LiveTicketCheckoutScreen = ({
             </TextComponent>
             <TextComponent className="text-sm font-bold text-zinc-950">{total}</TextComponent>
           </View>
-          {!isFree && !isRegistration && creditAvailable > 0 && (
+          {!isFree && !isRegistration && (
             <View className="mt-3 flex-row items-center justify-between gap-3 border-t border-zinc-100 pt-3">
               <View className="flex-1">
                 <TextComponent className="text-sm font-semibold text-zinc-950">
                   Use Turnupz Credit
                 </TextComponent>
                 <TextComponent className="text-xs text-zinc-500">
-                  {formatMoney(creditAvailable, selected.price)} available
+                  {creditAvailable > 0
+                    ? `${formatMoney(creditAvailable, selected.price)} available`
+                    : "You don't have any credit yet"}
                 </TextComponent>
               </View>
               <Switch
-                value={useCredit}
+                disabled={creditAvailable <= 0}
+                value={useCredit && creditAvailable > 0}
                 onValueChange={setUseCredit}
                 trackColor={{ true: BRAND.blueDeep, false: "#D4D4D8" }}
                 thumbColor={BRAND.white}
@@ -568,9 +602,6 @@ const LiveTicketCheckoutScreen = ({
                 : total}
             </TextComponent>
           </View>
-          <TextComponent className="mt-2 text-[10px] text-zinc-400">
-            Doors at {formatEventClock(event.date, event.timezone)}, venue time.
-          </TextComponent>
         </View>
       )}
 
@@ -617,6 +648,104 @@ const LiveTicketCheckoutScreen = ({
     </ScrollView>
   );
 };
+
+/** At or under this many left, the count turns orange. */
+const FEW_LEFT = 20;
+
+const NOTCH = 11;
+const CORNER = 14;
+
+/** The ticket's outline: rounded corners and a half-circle notch each side, at the tear line. */
+const ticketPath = (w: number, h: number, cut: number, inset: number) => {
+  const l = inset;
+  const r = w - inset;
+  const t = inset;
+  const b = h - inset;
+  return [
+    `M ${l + CORNER} ${t}`,
+    `H ${r - CORNER}`,
+    `A ${CORNER} ${CORNER} 0 0 1 ${r} ${t + CORNER}`,
+    `V ${cut - NOTCH}`,
+    `A ${NOTCH} ${NOTCH} 0 0 0 ${r} ${cut + NOTCH}`,
+    `V ${b - CORNER}`,
+    `A ${CORNER} ${CORNER} 0 0 1 ${r - CORNER} ${b}`,
+    `H ${l + CORNER}`,
+    `A ${CORNER} ${CORNER} 0 0 1 ${l} ${b - CORNER}`,
+    `V ${cut + NOTCH}`,
+    `A ${NOTCH} ${NOTCH} 0 0 0 ${l} ${cut - NOTCH}`,
+    `V ${t + CORNER}`,
+    `A ${CORNER} ${CORNER} 0 0 1 ${l + CORNER} ${t}`,
+    "Z"
+  ].join(" ");
+};
+
+/**
+ * A real-looking ticket: a dotted outline that follows the notches, and a
+ * dotted tear line between the details (top) and the price (bottom).
+ */
+const TicketShape = memo(
+  ({
+    top,
+    bottom,
+    note,
+    selected
+  }: {
+    top: React.ReactNode;
+    bottom: React.ReactNode;
+    /** Shown under the price, inside the ticket. */
+    note?: React.ReactNode;
+    selected: boolean;
+  }) => {
+    const [size, setSize] = useState({ w: 0, h: 0 });
+    const [cut, setCut] = useState(0);
+    const stroke = selected ? BRAND.blue : "#C5CEDA";
+    const inset = 1;
+    return (
+      <View onLayout={(e) => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+        {size.w > 0 && cut > 0 && (
+          <Svg style={StyleSheet.absoluteFill} width={size.w} height={size.h}>
+            <Path
+              d={ticketPath(size.w, size.h, cut, inset)}
+              fill={selected ? "#F2FAFF" : "#FFFFFF"}
+              stroke={stroke}
+              strokeWidth={1.6}
+              strokeDasharray="5 4"
+              strokeLinecap="round"
+            />
+            <Line
+              x1={NOTCH + 10}
+              x2={size.w - NOTCH - 10}
+              y1={cut}
+              y2={cut}
+              stroke={selected ? "#9ADCFF" : "#D9E0E8"}
+              strokeWidth={1.6}
+              strokeDasharray="1 6"
+              strokeLinecap="round"
+            />
+          </Svg>
+        )}
+        <View onLayout={(e) => setCut(e.nativeEvent.layout.height)}>{top}</View>
+        {bottom}
+        {note}
+      </View>
+    );
+  }
+);
+
+/** A small pill on the ticket: how many are left, or sold out. */
+const TicketChip = ({ label, tone }: { label: string; tone: "plain" | "warn" | "danger" }) => (
+  <View
+    className="rounded-full px-2.5 py-1"
+    style={{ backgroundColor: tone === "danger" ? "#FDECEC" : tone === "warn" ? "#FFF3E0" : "#F1F4F8" }}
+  >
+    <TextComponent
+      className="text-[11px] font-bold"
+      style={{ color: tone === "danger" ? "#DC2626" : tone === "warn" ? "#C2410C" : "#52606D" }}
+    >
+      {label}
+    </TextComponent>
+  </View>
+);
 
 /** A radio dot, filled when picked. */
 const Radio = ({ on }: { on: boolean }) => (

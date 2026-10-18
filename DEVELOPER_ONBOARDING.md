@@ -1,118 +1,135 @@
-# TurnUp Developer Onboarding
+# Turnupz Mobile: Developer Onboarding
 
-## Purpose
+Welcome. This gets you from a fresh clone to a running app, explains how the code is laid out, and lists the rules and gotchas that will save you time. Read it top to bottom once; after that, use the headings.
 
-This document is for new developers joining the TurnUp project. It answers:
+---
 
-- Which repository should I use?
-- Do I need the backend running locally?
-- What environment variables do I need?
-- How do I run the mobile app and see my changes?
-- What access do I need on day one?
+## 1. The three repos
 
-## Project Overview
+Turnupz is three codebases. The backend serves both apps.
 
-TurnUp has separate repositories for web, mobile and backend. The backend powers both the web app and the mobile app.
+| Area    | Repo                                                | Working branch (Oct 2026) |
+| ------- | --------------------------------------------------- | ------------------------- |
+| Mobile  | `github.com/MultraEmpirehq/NewTurnupzMobile` (this) | `dev`                     |
+| Web     | `github.com/MultraEmpirehq/Re-TurnupWeb`            | `feat/mobile-parity`      |
+| Backend | `github.com/Multra-Empire/TurnUpAppBE`              | `feat/saved-cards`        |
 
-| Area            | Repository                                            | Notes                         |
-| --------------- | ----------------------------------------------------- | ----------------------------- |
-| Mobile frontend | `https://github.com/MultraEmpirehq/NewTurnupzMobile`  | This repo                     |
-| Web frontend    | `https://github.com/MultraEmpirehq/Re-TurnupWeb`      | Latest web codebase           |
-| Backend         | `https://github.com/Multra-Empire/TurnUpAppBE`        | Shared backend for web/mobile |
+- The repos sit in **two GitHub orgs** (`MultraEmpirehq` and `Multra-Empire`). You need access to both.
+- The backend used to live at `Adesanza/TurnUpAppBE`. GitHub redirects the old URL, so older clones still work.
+- `TurnUpMobileApp` and `RE-turnupzweb` are **legacy**. Don't build on them.
+- If you can't clone something, you haven't been added yet (or you're on the wrong GitHub account). Ask; don't fork around it.
 
-Note that the repos are split across two GitHub organizations (`MultraEmpirehq` and `Multra-Empire`). Make sure you have access to both.
+### What you need on day one
 
-### Legacy repositories
+- Access to all three repos. Even if you only touch mobile, you'll read the backend for API shapes and validation rules.
+- The team's `.env` values for mobile (and backend, if you'll run it).
+- Expo/EAS access, if you'll make device builds.
+- For Play Store builds only: the upload keystore and its passwords. These are never committed or shared in chat; ask the lead.
 
-Older repos exist and should be treated as legacy unless the lead says otherwise:
+---
 
-- `TurnUpMobileApp` (the previous mobile app; replaced by `NewTurnupzMobile`)
-- `RE-turnupzweb` (older web codebase; replaced by `Re-TurnupWeb`)
+## 2. Stack
 
-Do not build on a repo or link that conflicts with the table above. Ask first.
-
-## Access Checklist
-
-A new developer should be granted access to:
-
-- All three repositories above (backend access is useful even for frontend work, to read API contracts and validation rules)
-- The Expo / EAS project, if you need to make device builds
-- The shared `.env` values for the mobile app
-- Deployment or hosting dashboards, if your role needs them
-
-If you cannot clone a repo, you are probably not added yet, or you are signed into the wrong GitHub account. Don't create a new repo to work around it. Ask to be added.
-
-## Backend / API
-
-The shared staging backend is live at `https://api.staging.turnupz.com/api/v1`. Both the web and mobile apps use it for development.
-
-- You do not need to run the backend locally for frontend work
-- Run it locally only if you are changing backend code or debugging backend behaviour. It listens on port `3111` (`http://localhost:3111/api/v1`)
-- The mobile app never talks to a database directly; everything goes through the API
-
-The old `https://turnupappbe.onrender.com/api/v1` URL from Slack no longer responds. Don't use it.
-
-## Mobile App
-
-### Stack
-
-- Expo SDK 54, React Native 0.81 (New Architecture enabled), React 19, TypeScript
-- React Navigation 7 (native stack)
-- Zustand for state, persisted with `react-native-mmkv`
-- TanStack React Query + axios for data fetching
-- NativeWind 4 (Tailwind) for styling
+- **Expo SDK 54**, **React Native 0.81** with the **New Architecture on** (Fabric), React 19, TypeScript
+- React Navigation 7 (native stack), though most in-app navigation is plain state (see §6)
+- **TanStack React Query** + axios for all server data
+- **Zustand** for app state, persisted with `react-native-mmkv`
+- **NativeWind 4** (Tailwind classes on RN components)
 - react-hook-form + joi for forms
-- Jest (`jest-expo`) + React Testing Library for tests
+- `react-native-flash-message` for toasts (wrapped; see §7)
+- Jest (`jest-expo`) + React Testing Library
 
-### Environment variables
+Expo Go **does not work**: we use native modules (MMKV/Nitro, Google sign-in, image manipulator). Use a dev build, a simulator build, or the web target.
 
-Variables are loaded from a `.env` file in the project root through `react-native-dotenv` and imported from `@env` (types live in `env.d.ts`). `.env` is gitignored, so get the values from the team.
+---
+
+## 3. Environment variables
+
+`.env` in the project root, loaded by `react-native-dotenv` and imported from `@env` (types in `env.d.ts`). It's gitignored; get values from the team.
 
 ```env
 BASE_URL=https://api.staging.turnupz.com/api/v1
 USER_AUTH_STORAGE_ID=turnup-user-store
-USER_AUTH_STORAGE_KEY=<ask the team>
+USER_AUTH_STORAGE_KEY=<ask>
+GOOGLE_WEB_CLIENT_ID=<ask>
+GOOGLE_IOS_CLIENT_ID=<ask, can be empty>
+WEB_APP_URL=<the web app's base URL>
 ```
 
-| Variable                | Used in                          | Purpose                                                   |
-| ----------------------- | -------------------------------- | --------------------------------------------------------- |
-| `BASE_URL`              | `src/api/index.ts`               | axios base URL for every API call                         |
-| `USER_AUTH_STORAGE_ID`  | `src/shared/stores/user.store.ts` | MMKV storage id for the persisted user session            |
-| `USER_AUTH_STORAGE_KEY` | `src/shared/stores/user.store.ts` | MMKV encryption key (falls back to a default if empty; not used on web) |
+| Variable                | Used for                                                                 |
+| ----------------------- | ------------------------------------------------------------------------ |
+| `BASE_URL`              | axios base URL for every request (`src/api/index.ts`)                    |
+| `USER_AUTH_STORAGE_ID`  | MMKV id for the persisted session (`user.store.ts`)                      |
+| `USER_AUTH_STORAGE_KEY` | MMKV encryption key (not used on web)                                    |
+| `GOOGLE_WEB_CLIENT_ID`  | Audience the backend verifies Google ID tokens against                   |
+| `GOOGLE_IOS_CLIENT_ID`  | iOS Google sign-in. Empty hides the Google button on iOS                 |
+| `WEB_APP_URL`           | Links that open the website: invite links, share links, email sign-up    |
 
-Things to know:
+Gotchas:
 
-- The names are `BASE_URL` etc., **not** `EXPO_PUBLIC_API_BASE_URL`. The `EXPO_PUBLIC_*` name shared in Slack isn't read by this repo.
-- `allowUndefined` is `false`, so the bundle fails if a variable is missing from `.env`.
-- Env values are inlined by Babel and cached. After editing `.env`, restart with a cleared cache: `npx expo start -c`.
+- `allowUndefined` is `false`. A missing variable fails the bundle.
+- Values are **inlined at build time and cached**. After changing `.env`, restart with `npx expo start -c`. For a native release build, also clear Metro's cache: `rm -rf "$TMPDIR"/metro-cache`.
+- It's `BASE_URL`, not `EXPO_PUBLIC_API_BASE_URL`. That older name isn't read anywhere.
 
-### Running the app
+### Which `BASE_URL`
+
+| You're running…                 | `BASE_URL`                               |
+| ------------------------------- | ---------------------------------------- |
+| Against staging (default)       | `https://api.staging.turnupz.com/api/v1` |
+| Local backend, iOS sim / web    | `http://localhost:3111/api/v1`           |
+| Local backend, Android emulator | `http://10.0.2.2:3111/api/v1`            |
+
+Android **release** builds block plain `http://`, so against a local backend use the **debug** build on Android. **Always put `BASE_URL` back to staging before any store build.**
+
+---
+
+## 4. Backend (only if you need it locally)
+
+For pure UI work, staging is enough. Run the backend locally when you change backend code, need test data, or want to debug a request end to end.
 
 ```bash
-npm install          # .npmrc sets legacy-peer-deps=true
-npm start            # expo start (dev server)
+cd turnupapp_be
+cp .env.example .env              # then fill in the values from the team
+docker compose up -d              # Postgres 16 on localhost:5436
+docker run -d --name turnup-redis -p 6379:6379 redis:7
+npm install
+npx prisma migrate deploy         # apply migrations
+npm run db:seed                   # test users, events, tickets (safe to rerun)
+npm run start:dev                 # API on http://localhost:3111/api/v1
 ```
 
-This project uses `expo-dev-client` and native modules (`react-native-mmkv` / Nitro), so **Expo Go won't work**. Choose one of these:
+- **Seed accounts** use the password `Testing@123`: `grace.etim@seed.example.com` (attendee with tickets, credit, saved cards), `segun.ogunleye@seed.example.com`, `yusuf.garba@seed.example.com` (vendor), and admin `admin@test.com`. Local only.
+- **Sessions are tied to the user agent.** If you log in with curl and then call the API with a different UA, you'll get `401`. Use `-A "okhttp/4.12.0"` consistently.
+- **After a migration that adds a table or enum value, restart `start:dev`.** The watcher keeps the old Prisma client otherwise.
+- Backend tests: `npx jest <path>`. A few `"should be defined"` placeholder specs fail on `main` already; ignore those, and don't add new failures.
 
-- **Web (fastest for UI work):** `npm run web`, or press `w` in the Expo terminal. MMKV runs unencrypted on web.
-- **Android emulator/device:** `npm run android` (`expo run:android`). This builds the native app locally and needs Android Studio / SDK.
-- **iOS simulator/device:** `npm run ios` (`expo run:ios`). Needs macOS + Xcode.
-- **Shared dev build:** install a development-client build from EAS (the `preview3` profile in `eas.json` has `developmentClient: true`), then run `npm start` and open the app on your device.
+---
 
-Other EAS profiles in `eas.json`: `preview` (internal APK), `preview2` (Android release build), `production`.
-
-#### iOS with Xcode 27
-
-Xcode 27 has no Simulator app. Simulators open in **DeviceHub** instead (`Xcode.app/Contents/Applications/DeviceHub.app`). Expo CLI still looks for the old Simulator app, so `npm run ios` stops with "Can't determine id of Simulator app". Until Expo supports DeviceHub, build and install by hand:
+## 5. Running the app
 
 ```bash
-npx expo prebuild -p ios            # once, or after native config changes
-xcrun simctl list devices available # pick a simulator UDID
+npm install            # .npmrc sets legacy-peer-deps=true
+```
+
+### Web (fastest for UI)
+
+```bash
+npm run web            # or: npx expo start --web
+```
+
+Good for layout and flows. It is **not** a faithful check for native behaviour: animations, modals, the keyboard and the back button all differ. Confirm on a simulator before calling something done.
+
+### iOS simulator (Xcode 27)
+
+Xcode 27 has no Simulator.app (simulators open in **DeviceHub**), so `npm run ios` fails with *"Can't determine id of Simulator app"*. Build by hand:
+
+```bash
+npx expo prebuild -p ios                  # first time, or after native config changes
+xcrun simctl list devices available       # pick a UDID
 xcrun simctl boot <UDID>
-open /Applications/Xcode.app/Contents/Applications/DeviceHub.app
+open -a DeviceHub
 
-cd ios
+cd ios && pod install                     # after adding a native package
 xcodebuild -workspace Turnup.xcworkspace -scheme Turnup \
   -configuration Release -sdk iphonesimulator \
   -destination "id=<UDID>" -derivedDataPath build/dd build
@@ -120,102 +137,147 @@ xcrun simctl install <UDID> build/dd/Build/Products/Release-iphonesimulator/Turn
 xcrun simctl launch <UDID> com.turnup.mobile
 ```
 
-A Release build bundles the JavaScript, so it runs without `npm start`. After a JS-only change, rerun `xcodebuild` and `install` (about 1–2 minutes).
+A Release build embeds the JS, so no Metro is needed. A JS-only change means rerunning `xcodebuild` and `install` (1–2 min). `plugins/with-pod-deployment-target.js` raises old pods to iOS 15.1 on every prebuild; don't hand-edit the Podfile for that.
 
-`.env` values are baked into the JavaScript at build time and cached. After changing `.env`, clear Metro's cache before rebuilding (`rm -rf "$TMPDIR"/metro-cache`), or the build keeps the old values.
-
-Google sign-in reads `GOOGLE_WEB_CLIENT_ID` and `GOOGLE_IOS_CLIENT_ID` from `.env`. `app.config.js` adds the iOS URL scheme only when the iOS ID is set. Until it's set, the Google button stays hidden on iOS. After setting it, run `npx expo prebuild -p ios --no-install && cd ios && pod install`, then rebuild.
-
-Xcode 27 also refuses any target below iOS 15, and a few pods still declare 9.0 / 12.4. The `plugins/with-pod-deployment-target.js` config plugin (registered in `app.json`) raises them to 15.1 on every prebuild, so don't hand-edit `ios/Podfile` for this.
-
-### Launch intro
-
-On launch, a 5-second branded intro (`src/shared/components/brand-intro/`) plays over the app while it loads underneath:
-
-- The web loader writes the wordmark.
-- Behind it, empty "story" cards of the booking flow glide past.
-- It ends on the web's flip ticket.
-
-Every timing lives in `intro-timeline.ts`. `useIntroStore` (`src/shared/stores/intro.store.ts`) reports when the intro has finished. Screens use it to hold back anything that would show over the intro: the sign-in email field only auto-focuses after it, so the keyboard doesn't cover it. With Reduce Motion on, the intro shortens to a brief fade.
-
-### Tests
+### Android emulator (debug build, live reload)
 
 ```bash
-npx jest             # run once
-npm test             # jest --watchAll
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+npx expo prebuild -p android --no-install     # after native changes
+cd android && ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+cd .. && npx expo start --dev-client --port 8081
+adb shell am start -a android.intent.action.VIEW \
+  -d "exp+turn-up-mobile://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081"
 ```
 
-The live-ticketing rules are covered in `src/screens/live/live-rules.test.ts`.
+- The first debug build takes 30+ minutes; after that, JS changes reload live.
+- To test the older three-button navigation: `adb shell cmd overlay enable com.android.internal.systemui.navbar.threebutton`
+- The emulator plus Metro plus a browser will saturate a laptop. If `adb` starts hanging, close something.
 
-### Project structure
+### Play Store build (AAB)
+
+```bash
+# bump android.versionCode in app.json first (it must increase every upload)
+npx expo prebuild -p android --no-install
+cd android && ./gradlew bundleRelease
+```
+
+Signing reads `TURNUPZ_UPLOAD_*` from `~/.gradle/gradle.properties`. Never commit those or the keystore. Check that `BASE_URL` is staging/production before building.
+
+---
+
+## 6. How the app is put together
 
 ```
-App.tsx                      # Providers: gesture handler, React Query, safe area, flash messages
+App.tsx                         Providers (gesture, React Query, safe area), fonts, the root toast
 src/
-  api/                       # axios instance (auth header + 401 handling), API functions and types
-  navigation/
-    navigator-wrapper/       # Picks the authenticated or unauthenticated navigator from the user store
-    unauthenticated-navigator/
-    authenticated-navigator/
-    tab-navigator/           # Older bottom-tab navigator (not currently mounted)
-  screens/<feature>/         # One folder per feature: screen/, components/, stores/, service/, ...
-    live/                    # Event detail, ticket checkout, my tickets, report event (live API)
+  api/                          axios instance: Bearer token, X-Device-Id, 401 → sign out
+  navigation/                   NavigationWrapper picks the signed-in / signed-out stack
+  screens/
+    landing/ verification/ create-password/ forgot-password/ onboarding/   Sign-in & sign-up
+    home/screen/refined-home-feed-design.screen.tsx   The signed-in shell (see below)
+    live/        Event detail, explore, checkout, my tickets, chat thread, sheets, live-api.ts
+    chat/        Messages tab (inbox)
+    notifications/  Notifications tab + its API hooks
+    profile/     Profile, edit profile, wallet, settings, invite, follow button
+    people/      Find people, someone's profile, followers/following (one global modal)
+    search/
   shared/
-    assets/  components/  hooks/  stores/  utils/
+    components/ hooks/ stores/ utils/ assets/
 ```
 
-Path aliases (from `tsconfig.json`): `@/*` → `src/*`, plus `@screens/*`, `@components/*`, `@utils/*`, `@stores/*`, `@api/*`, `@assets/*`, `@icons/*`, `@images/*`, `@styles/*`, `@svg/*`, `@hooks/*`, `@navigation/*`, `@types/*`.
+Path aliases (`tsconfig.json`): `@/*` → `src/*`, plus `@screens/*`, `@components/*`, `@utils/*`, `@stores/*`, `@api/*`, `@assets/*`, `@icons/*`, `@images/*`, `@hooks/*`, `@navigation/*`, `@types/*`, `@svg/*`, `@styles/*`.
 
-### How screens are shown
+### The signed-in shell
 
-`NavigationWrapper` reads `user` from the persisted user store:
+There is one authenticated route (`tab`), rendered by `RefinedHomeFeedDesignScreen`. It owns:
 
-- **No user → unauthenticated stack:** Landing, Verification, Forgot Password, Create Password, Onboarding
-- **User present → authenticated stack:**
-  - `tab`: the home feed (`refined-home-feed-design.screen.tsx`). It draws its own bottom bar and tabs, and it opens the live-ticketing screens (event detail, checkout, my tickets).
-  - `search`: the search screen.
+- `activeTab`: Home, Explore, Messages, Notifications, Profile (`PreviewBottomNav` draws the bar)
+- full-screen "pages" as state: `liveEventId`, `livePerformerId`, `liveBookingEvent` (checkout)
+- the global `EventOptionsSheet` (the ⋯ menu on event cards) and `PeopleModal`
 
-The older `TabNavigator` (Home / Tickets / Messages / Favorites / Profile) is still in the repo but isn't mounted. The home feed replaced it.
+So "navigating" to an event is `setLiveEventId(id)`, not `navigation.navigate`. Each screen takes callbacks like `onOpenEvent` / `onOpenTickets` / `onBack`. Follow that pattern rather than adding routes.
 
-Auth: the session token is stored in the user store, and an axios interceptor attaches it as `Bearer` on every request. A `401` on an authenticated request clears the store, which sends the user back to sign-in.
+People pages are a small stack in a Zustand store: `usePeopleNav().openPerson(username)`, `openConnections(...)`, `openSearch()`. Any screen can call it.
 
-### Previewing screens quickly
+### Data
 
-- Use the normal flow where you can. Sign in once and the session persists.
-- To force a sign-out during development, the commented-out `clearUserStore()` call in `App.tsx` can be enabled temporarily.
-- Do not commit temporary screen-forcing hacks.
+- Server data goes through React Query hooks in `src/screens/live/live-api.ts`, `profile/profile-api.ts`, `notifications/notifications-api.ts` and `people/people-api.ts`. Add new endpoints next to the feature that uses them.
+- Invalidate by key after mutations (`["me"]`, `["live-chats"]`, `["notifications"]`, `["saved-cards"]`, `["follows"]`, …).
+- The axios instance attaches the token and a per-install `X-Device-Id`. A `401` on an authenticated call clears the user store, which drops the user back to sign-in.
 
-### Git workflow
+---
 
-- Default branch: `main`. Work on feature branches (e.g. `feat/live-ticketing`) and open PRs into `main`.
-- There are Husky hook scripts in `.husky/`, but they aren't active: Husky isn't installed, and the scripts reference `yarn lint` (no `lint` script exists) and an `origin dev` branch (which doesn't exist). Ignore them until they're fixed.
-- Formatting follows `.prettierrc`. The `.eslintrc.js` config is present, but ESLint isn't installed as a dependency yet.
+## 7. Rules we follow (please read)
 
-## When You Get Stuck
+**Copy speaks to the user, not to developers.** Anything a person sees (labels, toasts, empty states, errors) is plain language that tells them what happened and what to do: "We couldn't send that. Check your connection and try again." No "API", "request failed", enum names or status codes. If the backend returns a message, it's written for users too; keep it that way.
 
-Check these in order:
+**Toasts only when they add something.** Use `onError` / `onSuccess` / `onInfo` from `@/shared/components/status/toast`. Show one when an action the user took fails, or when it succeeded in a way they can't otherwise see ("Sent to Tolu…", "Code copied"). Don't toast what's already visible on screen (a button changing to "Following", navigating after login), and never toast background loads. Errors last 6s, everything else 4s.
 
-1. Am I in `NewTurnupzMobile` (not the old `TurnUpMobileApp`)?
-2. Does `.env` exist, with all three variables set?
-3. Did I restart with `npx expo start -c` after changing `.env`?
-4. Am I using a dev build or web rather than Expo Go?
-5. Is `BASE_URL` pointing at staging (`https://api.staging.turnupz.com/api/v1`)?
-6. Do I have access to the right GitHub org and repo?
+**Every `<Modal>` gets an `<OverlayToast />`** (from `@/shared/components/status/toast/overlay-toast`) as its last child. On native, a Modal covers the root toast; this makes toasts show on top of it.
 
-## Open Items
+**Every page with a back arrow handles Android's back button** with `useHardwareBack(onBack)` from `@/shared/hooks/use-hardware-back`. Return `false` from the handler to let it fall through. Block it mid-payment, and confirm before discarding unsaved edits.
 
-These still need to be confirmed or fixed:
+**Don't rely on `Animated` for anything that must be visible.** On the New Architecture, some `Animated` timings never run (the toast library's fade-in left every toast at opacity 0). If an element starts hidden and animates in, it may never appear. Animate decoration, not visibility. Prefer simple timers or no animation, and **test on a simulator**: web won't show this bug.
 
-- Official archive status of `TurnUpMobileApp` and `RE-turnupzweb`
-- Where shared credentials and `.env` values are stored
-- Correct API base URL for local web development
-- Backend local setup steps
-- Fix or remove the Husky hooks; add ESLint + a `lint` script
+**Brand colours come from `BRAND`** (`@/shared/utils/brand-colors`): blue `#00B2FF`, deep blue `#0577FA`, ink, black, white, greys. Red and green are for status only (errors, success).
+
+**Rules that live on the server stay on the server.** The app hides a button for convenience (e.g. no "Transfer" on free tickets), but the backend is what enforces it. Never make a rule exist only in the UI.
+
+**Images:** pick photos with `expo-image-picker` and shrink them before upload (see `sendChatPhoto`: 1080px wide, JPEG 0.7). Keep bundled assets small. Nothing over ~100 KB without a reason.
+
+---
+
+## 8. Product rules worth knowing
+
+These come up in code review:
+
+- **Performers:** one record per name (matched ignoring case, spacing, punctuation and accents). Unverified performers have no page of their own. Approved ones get the blue tick.
+- **Free tickets can't be transferred.** This is enforced in the backend.
+- **Getting a ticket adds you to the event's group chat**, however you got it. An hourly backend job keeps groups in sync, and event chats go read-only 3 days after the event.
+- **Messaging people:** two people can message once they **follow each other**. Organisers can always be messaged about their event.
+- **Chat cost rules:** no "typing…" indicator, and "Seen" only in one-to-one chats.
+- **Profiles** never expose email, phone or birthday. Country shows only if the person turns it on. People can hide their Turnupz Credit balance (stored per device).
+- **Payments** go through Flutterwave. Saved cards store only Flutterwave's token (encrypted), never card numbers.
+
+---
+
+## 9. Tests
+
+```bash
+npx jest --watchAll=false       # once
+npm test                        # watch mode
+```
+
+Heads-up: **most mobile test suites currently fail** (10 of 11) because of test-setup problems that predate recent work. Fixing the Jest setup is an open task. Until then, `npx tsc --noEmit` must stay clean, and check your change on a simulator.
+
+---
+
+## 10. Git
+
+- Branch from the working branch (see §1), open a PR, keep commits focused, and write messages that say *why*.
+- Never commit `.env`, keystores, `google-services` secrets or service-account JSON.
+- The Husky hooks in `.husky/` aren't active (Husky isn't installed, and they call a missing `lint` script). ESLint isn't wired up yet either. Format with Prettier (`.prettierrc`).
+
+---
+
+## 11. When you're stuck
+
+1. Right repo and branch?
+2. `.env` has all six variables, and you restarted with a cleared cache (`npx expo start -c`)?
+3. `BASE_URL` right for where you're running (§3)?
+4. Using a dev or simulator build, not Expo Go?
+5. Something invisible or not animating on native? Read the `Animated` rule in §7.
+6. Toast not showing over a sheet? Is there an `<OverlayToast />` in that Modal?
+7. `401` against a local API? You switched user agents (§4).
+8. Backend changes not taking effect after a migration? Restart `start:dev`.
+
+## Open items
+
+- Fix the Jest setup so the existing suites run; then add tests for wallet, chats and people
+- Add ESLint and a `lint` script; remove or fix the Husky hooks
 - Rename the package (`package.json` `name` is still `to-do-app`)
-
-## Summary
-
-- Mobile: `NewTurnupzMobile` · Web: `Re-TurnupWeb` · Backend: `TurnUpAppBE`
-- The backend is live, so frontend work doesn't need a local backend
-- Create `.env` with `BASE_URL`, `USER_AUTH_STORAGE_ID` and `USER_AUTH_STORAGE_KEY`, then run `npm install && npm start`
-- Use web or a dev-client build; Expo Go isn't supported
+- Live chat delivery: chats currently poll (5s thread, 20s inbox); the backend has an SSE stream ready to use
+- Serve resized images from Cloudinary for lists and thumbnails

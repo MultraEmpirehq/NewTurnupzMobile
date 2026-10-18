@@ -1,3 +1,4 @@
+import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import { getEventPublicUrl } from "@/screens/home/service/event-actions.service";
 import React, { memo, useEffect, useState } from "react";
 import {
@@ -664,6 +665,7 @@ const EventOptionsSheet = ({
             </SafeAreaView>
           )}
         </KeyboardAvoidingView>
+        <OverlayToast />
       </Modal>
       <ChatThreadScreen
         chatId={thread?.id ?? null}

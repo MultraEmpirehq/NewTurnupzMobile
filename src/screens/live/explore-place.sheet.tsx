@@ -1,3 +1,4 @@
+import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -203,6 +204,7 @@ const ExplorePlaceSheet = ({
           </ScrollView>
         </View>
       </SafeAreaView>
+      <OverlayToast />
     </Modal>
   );
 };

@@ -427,7 +427,6 @@ const DevicesPage = ({ onBack }: { onBack: () => void }) => {
           setBusy(session.id);
           try {
             await signOutDevice(session.id);
-            onSuccess(`${session.device} signed out`);
             await sessions.refetch();
           } catch (error) {
             onError(errorText(error, "Couldn't sign that device out."));
@@ -447,8 +446,7 @@ const DevicesPage = ({ onBack }: { onBack: () => void }) => {
         onPress: async () => {
           setBusy("all");
           try {
-            const count = await signOutOtherDevices();
-            onSuccess(count === 1 ? "1 device signed out" : `${count} devices signed out`);
+            await signOutOtherDevices();
             await sessions.refetch();
           } catch (error) {
             onError(errorText(error, "Couldn't sign the other devices out."));

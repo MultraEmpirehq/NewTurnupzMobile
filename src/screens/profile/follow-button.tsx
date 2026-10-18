@@ -2,7 +2,7 @@ import React, { memo, useState } from "react";
 import { ActivityIndicator, Pressable } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import TextComponent from "@/shared/components/text/text.component";
-import { onError, onSuccess } from "@/shared/components/status/toast";
+import { onError } from "@/shared/components/status/toast";
 import useUserStore from "@/shared/stores/user.store";
 import { constructErrorMessage } from "@/api/functions";
 import {
@@ -50,7 +50,6 @@ const FollowButton = ({
           : current.filter((item) => !(item.targetType === type && item.targetId === id))
       );
       void queryClient.invalidateQueries({ queryKey: ["follows"] });
-      onSuccess(now ? `Following ${name}` : `Unfollowed ${name}`);
     } catch (error) {
       onError(
         constructErrorMessage(error as TApiErrorResponseType, "Couldn't update who you follow.")

@@ -19,6 +19,7 @@ import {
   useReceivedTransfers
 } from "@/screens/live/live-api";
 import { usePeopleNav } from "@/screens/people/people-modal";
+import { useBlogReadsStore } from "@/shared/stores/blog-reads.store";
 import {
   NOTIFICATION_FILTERS,
   TNotification,
@@ -212,6 +213,7 @@ const NotificationsScreen = ({
   const [filter, setFilter] = useState<TNotificationFilter>("all");
   const [showSettings, setShowSettings] = useState(false);
   const openPerson = usePeopleNav((state) => state.openPerson);
+  const openPostWhenReady = useBlogReadsStore((state) => state.openPostWhenReady);
   const list = useNotifications(filter, isSignedIn);
   const unread = useUnreadNotifications(isSignedIn);
   const { markRead, markAllRead } = useMarkRead();
@@ -262,6 +264,10 @@ const NotificationsScreen = ({
     if (!item.isRead) void markRead([item.id]);
     if (item.data?.action === "open_person" && typeof item.data.username === "string") {
       openPerson(item.data.username);
+    } else if (item.data?.action === "open_blog" && item.eventId && typeof item.data.postId === "string") {
+      // The event page opens this post as soon as it has loaded.
+      openPostWhenReady(item.data.postId);
+      onOpenEvent(item.eventId);
     } else if (item.eventId) onOpenEvent(item.eventId);
     else if (item.category === "ORDER_UPDATES" || item.category === "TICKET_TRANSFERS") onOpenTickets();
   };

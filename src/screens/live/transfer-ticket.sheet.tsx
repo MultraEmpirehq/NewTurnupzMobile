@@ -1,3 +1,4 @@
+import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -185,6 +186,7 @@ const TransferTicketSheet = ({
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+      <OverlayToast />
     </Modal>
   );
 };

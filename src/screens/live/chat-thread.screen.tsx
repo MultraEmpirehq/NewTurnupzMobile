@@ -1,3 +1,4 @@
+import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -454,6 +455,7 @@ const ChatThreadScreen = ({
           )}
         </KeyboardAvoidingView>
       </SafeAreaView>
+      <OverlayToast />
     </Modal>
   );
 };

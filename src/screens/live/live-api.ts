@@ -22,6 +22,18 @@ export type TPrice = {
   formatted?: { withCurrency?: string };
 };
 
+/** A post the organiser wrote for an event's attendees. */
+export type TBlogPost = {
+  id: string;
+  title: string;
+  excerpt?: string | null;
+  body: string;
+  /** Picture urls, first is the cover. */
+  images?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type TLiveEvent = {
   id: string;
   name: string;
@@ -47,13 +59,7 @@ export type TLiveEvent = {
   eventState?: string;
   eventCountry?: string;
   activities?: { name: string; description?: string; date?: string }[];
-  blogPosts?: {
-    id: string;
-    title: string;
-    excerpt?: string;
-    body: string;
-    image?: string;
-  }[];
+  blogPosts?: TBlogPost[];
   eventGuestsOfHonour?: {
     name?: string;
     firstName?: string;

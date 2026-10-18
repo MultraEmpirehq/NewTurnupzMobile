@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import ContainerComponent from "@/shared/components/container/container.component";
 import "@styles/global.css";
 import "@/shared/utils/css-interop";
@@ -7,6 +8,7 @@ import { themes } from "@/shared/utils/colors";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import FlashMessage from "react-native-flash-message";
+import { FullWindowOverlay } from "react-native-screens";
 import ToastMessage from "@/shared/components/status/toast/custom-toast-message.component";
 import NavigationWrapper from "@/navigation/navigator-wrapper/navigator-wrapper";
 import { useFonts } from "expo-font";
@@ -40,7 +42,15 @@ export default function App() {
             <ContainerComponent>
               <NavigationWrapper />
             </ContainerComponent>
-            <FlashMessage position="top" MessageComponent={ToastMessage} />
+            {/* On iPhone, inside a full-window overlay so toasts sit above every screen
+                (native screens otherwise cover them). */}
+            {Platform.OS === "ios" ? (
+              <FullWindowOverlay>
+                <FlashMessage position="top" MessageComponent={ToastMessage} />
+              </FullWindowOverlay>
+            ) : (
+              <FlashMessage position="top" MessageComponent={ToastMessage} />
+            )}
             {/* Plays over the app, which loads underneath in the meantime. */}
             {!introDone && <BrandIntro onFinish={finishIntro} />}
           </SafeAreaProvider>

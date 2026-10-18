@@ -13,7 +13,7 @@ import { Path, Svg } from "react-native-svg";
 import { useQueryClient } from "@tanstack/react-query";
 import TextComponent from "@/shared/components/text/text.component";
 import RoundAvatar from "@/shared/components/images/round-avatar.component";
-import { onError, onSuccess } from "@/shared/components/status/toast";
+import { onError } from "@/shared/components/status/toast";
 import useUserStore from "@/shared/stores/user.store";
 import { useHiddenEventsStore } from "@/shared/stores/hidden-events.store";
 import { BRAND } from "@/shared/utils/brand-colors";
@@ -248,7 +248,6 @@ const ProfileScreen = ({
     try {
       await uploadProfilePhoto(result.assets[0]);
       await queryClient.invalidateQueries({ queryKey: ["me"] });
-      onSuccess("Profile photo updated");
     } catch (error) {
       onError(
         constructErrorMessage(error as TApiErrorResponseType, "Couldn't upload that photo. Please try another.")

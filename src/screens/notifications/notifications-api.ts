@@ -20,7 +20,7 @@ export type TNotification = {
   href?: string;
   eventId?: string;
   /** e.g. { action: "accept_transfer", transferId } for a ticket sent to you. */
-  data?: { action?: string; transferId?: string } & Record<string, unknown>;
+  data?: { action?: string; transferId?: string; postId?: string } & Record<string, unknown>;
 };
 
 /** The chips at the top of the list, and which kinds each one shows. */

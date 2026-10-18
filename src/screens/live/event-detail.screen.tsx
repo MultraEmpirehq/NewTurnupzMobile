@@ -1,9 +1,8 @@
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import VerifiedName from "@/shared/components/verified-name/verified-name.component";
-import React, { memo, useMemo, useState } from "react";
+import React, { memo, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Linking,
   Pressable,
   ScrollView,
   useWindowDimensions,
@@ -29,6 +28,9 @@ import {
 } from "./live-api";
 import { PerformerAvatar } from "./explore-details";
 import ReportEventSheet from "./report-event.sheet";
+import LeavingTurnupzSheet from "./leaving-turnupz.sheet";
+import BlogPostScreen, { postedAgo } from "./blog-post.screen";
+import { useBlogReadsStore } from "@/shared/stores/blog-reads.store";
 
 const ACCENT = "#00B2FF";
 
@@ -71,6 +73,29 @@ const LiveEventDetailScreen = ({
   const { data: event, isLoading, error, refetch } = useLiveEvent(eventId);
   const [activeTab, setActiveTab] = useState<TTab>("Overview");
   const [isReporting, setIsReporting] = useState(false);
+  const [openPostId, setOpenPostId] = useState<string | null>(null);
+  const readPostIds = useBlogReadsStore((state) => state.readPostIds);
+  const pendingPostId = useBlogReadsStore((state) => state.pendingPostId);
+  const openPostWhenReady = useBlogReadsStore((state) => state.openPostWhenReady);
+  // Newest first.
+  const posts = useMemo(
+    () =>
+      [...(event?.blogPosts ?? [])].sort(
+        (a, b) => +new Date(b.createdAt ?? 0) - +new Date(a.createdAt ?? 0)
+      ),
+    [event]
+  );
+  const unreadPosts = posts.filter((post) => !readPostIds.includes(post.id)).length;
+  const openPost = posts.find((post) => post.id === openPostId) ?? null;
+  // Opened from a "posted a blog" notification: go straight to that post.
+  useEffect(() => {
+    if (!pendingPostId || !posts.length) return;
+    if (posts.some((post) => post.id === pendingPostId)) {
+      setActiveTab("Blogs");
+      setOpenPostId(pendingPostId);
+    }
+    openPostWhenReady(null);
+  }, [pendingPostId, posts, openPostWhenReady]);
   const { width } = useWindowDimensions();
   const isCompactPhone = width < 380;
   const horizontalPadding = isCompactPhone ? 12 : 16;
@@ -89,6 +114,8 @@ const LiveEventDetailScreen = ({
         ? "Register"
         : "Book Ticket";
 
+  const [leavingTo, setLeavingTo] = useState<string | null>(null);
+
   const handleBook = () => {
     if (!event) return;
     if (event.saleMethod === "external_link") {
@@ -96,7 +123,8 @@ const LiveEventDetailScreen = ({
         onError("The organiser hasn't added a ticket link yet.");
         return;
       }
-      void Linking.openURL(event.ticketUrl);
+      // Tell them they're leaving Turnupz before the seller's site opens.
+      setLeavingTo(event.ticketUrl);
       return;
     }
     onBook(event);
@@ -225,6 +253,8 @@ const LiveEventDetailScreen = ({
                     }
                   >
                     {tab}
+                    {/* Only what you haven't read yet; gone once you have. */}
+                    {tab === "Blogs" && unreadPosts > 0 ? ` ${unreadPosts}` : ""}
                   </TextComponent>
                 </Pressable>
               );
@@ -328,35 +358,70 @@ const LiveEventDetailScreen = ({
 
           {activeTab === "Blogs" && (
             <View className="mt-4 gap-3">
-              {(event.blogPosts ?? []).length === 0 ? (
-                <TextComponent className="text-sm text-zinc-500">No updates yet.</TextComponent>
+              {posts.length === 0 ? (
+                <TextComponent className="text-sm text-zinc-500">
+                  No blogs yet. The organiser's news and updates will show here.
+                </TextComponent>
               ) : (
-                (event.blogPosts ?? []).map((post) => (
-                  <View key={post.id} className="overflow-hidden rounded-xl bg-white shadow-sm">
-                    {!!post.image && (
-                      <CustomImage
-                        className="h-36 w-full"
-                        imageClassName="size-full"
-                        source={{ uri: post.image }}
-                        contentFit="cover"
-                      />
-                    )}
-                    <View className="p-4">
-                      <TextComponent className="text-lg font-bold text-zinc-950">
-                        {post.title}
-                      </TextComponent>
-                      <TextComponent className="mt-2 text-sm leading-5 text-zinc-600">
-                        {post.excerpt || post.body}
-                      </TextComponent>
-                    </View>
-                  </View>
-                ))
+                posts.map((post) => {
+                  const isNew = !readPostIds.includes(post.id);
+                  const cover = post.images?.[0];
+                  return (
+                    <Pressable
+                      key={post.id}
+                      onPress={() => setOpenPostId(post.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${isNew ? "New. " : ""}${post.title}. Read more`}
+                      className="overflow-hidden rounded-2xl border border-zinc-100 bg-white"
+                    >
+                      {!!cover && (
+                        <CustomImage className="h-36 w-full" imageClassName="size-full" source={{ uri: cover }} contentFit="cover" />
+                      )}
+                      <View className="p-4">
+                        <View className="flex-row items-center gap-1.5">
+                          {isNew && (
+                            <View className="rounded px-1.5 py-0.5" style={{ backgroundColor: "#00B2FF" }}>
+                              <TextComponent className="text-[9.5px] font-extrabold tracking-wide text-white">NEW</TextComponent>
+                            </View>
+                          )}
+                          <TextComponent numberOfLines={1} className="flex-1 text-xs font-semibold text-zinc-500">
+                            {[event.organizerName, postedAgo(post.createdAt)].filter(Boolean).join(" · ")}
+                          </TextComponent>
+                        </View>
+                        <TextComponent className="mt-1.5 text-base font-extrabold leading-6 text-zinc-950">
+                          {post.title}
+                        </TextComponent>
+                        <TextComponent numberOfLines={3} className="mt-1 text-sm leading-5 text-zinc-600">
+                          {post.excerpt || post.body}
+                        </TextComponent>
+                        <TextComponent className="mt-2 text-sm font-extrabold" style={{ color: "#0577FA" }}>
+                          Read more ›
+                        </TextComponent>
+                      </View>
+                    </Pressable>
+                  );
+                })
               )}
             </View>
           )}
         </ScrollView>
       )}
 
+      {!!event && (
+        <BlogPostScreen
+          post={openPost}
+          event={event}
+          bookLabel={bookLabel}
+          canBook={!isPast}
+          onBook={() => {
+            setOpenPostId(null);
+            // After the post has slid away (one modal at a time on iOS).
+            setTimeout(handleBook, 400);
+          }}
+          onClose={() => setOpenPostId(null)}
+        />
+      )}
+      <LeavingTurnupzSheet url={leavingTo} eventName={event?.name} onClose={() => setLeavingTo(null)} />
       {!!event && (
         <ReportEventSheet
           visible={isReporting}
