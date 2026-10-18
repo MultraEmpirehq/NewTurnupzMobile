@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { useScreenActive } from "@/shared/hooks/use-screen-active";
 import { deleteData, getData, patchData, postData } from "@/api";
 import {
   TTransferRecipient,
@@ -458,8 +459,11 @@ export const useCreateOrder = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (body: {
-      ticketId: string;
-      quantity: number;
+      /** One ticket type… */
+      ticketId?: string;
+      quantity?: number;
+      /** …or several for the same event. */
+      items?: { ticketId: string; quantity: number }[];
       /** Spend Turnupz Credit first; the rest goes to the payment page. */
       useCredit?: boolean;
       /** Pay with a saved card: charged straight away, no payment page. */
@@ -565,6 +569,19 @@ export const useCreditHistory = (enabled = true) =>
   });
 
 /** An amount in major units as money, in that currency's style. */
+/** Nothing, written as money: "₦0.00" (not "Free"), in a price's currency or Naira. */
+export const formatZero = (like?: { currency?: { code?: string; locale?: string } } | null) => {
+  const code = like?.currency?.code || "NGN";
+  try {
+    return new Intl.NumberFormat(like?.currency?.locale || "en-NG", {
+      style: "currency",
+      currency: code
+    }).format(0);
+  } catch {
+    return `${code} 0`;
+  }
+};
+
 export const formatMoney = (amount: number, like?: TPrice | null) =>
   formatPrice(
     like
@@ -575,6 +592,8 @@ export const formatMoney = (amount: number, like?: TPrice | null) =>
 export const useLiveUserTickets = () =>
   useInfiniteQuery({
     queryKey: ["live-user-tickets"],
+    // Always checked again on opening: a purchase or transfer may have just landed.
+    staleTime: 0,
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const { data } = await getData<TLiveUserTicket[]>(
@@ -656,16 +675,19 @@ export type TLiveChatMessage = {
 };
 
 /** The chats the signed-in person is in, most recent first. */
-export const useLiveChats = (enabled = true) =>
-  useQuery({
+export const useLiveChats = (enabled = true) => {
+  // Checked for new messages every 20 seconds, but only while it's on screen.
+  const onScreen = useScreenActive();
+  return useQuery({
     queryKey: ["live-chats"],
     queryFn: async () => {
       const { data } = await getData<TLiveChat[]>("/chats?limit=50");
       return data?.data ?? [];
     },
     enabled,
-    refetchInterval: 20000
+    refetchInterval: onScreen ? 20000 : false
   });
+};
 
 const MESSAGE_PAGE = 50;
 
