@@ -1,3 +1,5 @@
+import OverlayToast from "@/shared/components/status/toast/overlay-toast";
+import { getEventPublicUrl } from "@/screens/home/service/event-actions.service";
 import React, { memo, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -64,8 +66,8 @@ export type TEventOptionsTarget = {
 
 type TView = "actions" | "share" | "pick" | "report";
 
-const eventLink = (id: string) =>
-  `${WEB_APP_URL}/explore/event/${encodeURIComponent(id)}`;
+// Carries the sharer's username: a purchase through it earns them credit.
+const eventLink = (id: string) => getEventPublicUrl(id);
 
 const asShared = (event: TEventOptionsTarget): TSharedEvent => ({
   id: event.id,
@@ -663,6 +665,7 @@ const EventOptionsSheet = ({
             </SafeAreaView>
           )}
         </KeyboardAvoidingView>
+        <OverlayToast />
       </Modal>
       <ChatThreadScreen
         chatId={thread?.id ?? null}

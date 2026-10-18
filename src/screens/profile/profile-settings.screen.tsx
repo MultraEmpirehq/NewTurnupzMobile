@@ -1,4 +1,8 @@
-import React, { memo, useEffect, useState } from "react";
+import { formatZero, useCreditBalance } from "@/screens/live/live-api";
+import { maskAmount, useBalancePrivacyStore } from "@/shared/stores/balance-privacy.store";
+import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
+import React, { memo, useState } from "react";
+import { BRAND } from "@/shared/utils/brand-colors";
 import {
   ActivityIndicator,
   Alert,
@@ -11,16 +15,12 @@ import {
   TextInput,
   View
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
 import Constants from "expo-constants";
 import { Path, Svg } from "react-native-svg";
 import { WEB_APP_URL } from "@env";
 import { useQueryClient } from "@tanstack/react-query";
-import { useDebounce } from "use-debounce";
-import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
 import TextComponent from "@/shared/components/text/text.component";
 import { onError, onSuccess } from "@/shared/components/status/toast";
-import { getData } from "@/api";
 import { constructErrorMessage } from "@/api/functions";
 import useUser from "@/shared/hooks/use-user.hook";
 import {
@@ -32,7 +32,6 @@ import { BackHeader, Loading } from "@/screens/live/explore-details";
 import { TICKET_LIST_BACKGROUND } from "@/screens/live/event-ticket-card";
 import {
   TNotificationPreferences,
-  TProfileUpdate,
   TSession,
   changePassword,
   logOut,
@@ -40,13 +39,10 @@ import {
   signOutDevice,
   signOutOtherDevices,
   updateNotificationPreferences,
-  updateProfile,
-  uploadProfilePhoto,
   useFaqs,
   useMe,
   useNotificationPreferences,
   useSessions,
-  useWallet
 } from "./profile-api";
 
 /**
@@ -56,11 +52,11 @@ import {
 
 const INK = "#0b1d2a";
 const BLUE = "#00b2ff";
-const PINK = "#ff0088";
+// Red is kept only for errors and destructive actions.
+const DANGER = BRAND.danger;
 
 type TPage =
   | "menu"
-  | "edit"
   | "password"
   | "notifications"
   | "devices"
@@ -111,7 +107,7 @@ const Row = ({
     style={({ pressed }) => ({ backgroundColor: pressed ? "#f4f5f8" : "transparent" })}
   >
     <View className="flex-1">
-      <TextComponent className="text-base font-semibold" style={{ color: tone === "danger" ? PINK : INK }}>
+      <TextComponent className="text-base font-semibold" style={{ color: tone === "danger" ? DANGER : INK }}>
         {label}
       </TextComponent>
       {!!hint && <TextComponent className="mt-0.5 text-xs text-zinc-500">{hint}</TextComponent>}
@@ -148,12 +144,13 @@ const Toggle = ({
       onValueChange={onChange}
       disabled={disabled}
       trackColor={{ true: BLUE, false: "#e4e4e7" }}
+      thumbColor="#ffffff"
       accessibilityLabel={label}
     />
   </View>
 );
 
-const Field = ({
+export const Field = ({
   label,
   value,
   onChange,
@@ -198,23 +195,23 @@ const Field = ({
       autoCorrect={!secure && keyboard !== "url"}
       placeholder={placeholder}
       placeholderTextColor="#a1a1aa"
-      className={multiline ? "min-h-24 rounded-2xl bg-white px-4 py-3 text-base text-zinc-950" : "h-12 rounded-2xl bg-white px-4 text-base text-zinc-950"}
+      className={multiline ? "min-h-24 rounded-lg bg-white px-4 py-3 text-base text-zinc-950" : "h-12 rounded-lg bg-white px-4 text-base text-zinc-950"}
       style={{
-        fontFamily: "Avenir-Book",
+        fontFamily: "PlusJakartaSans-Regular",
         borderWidth: 1,
-        borderColor: error ? PINK : "rgba(0,0,0,0.06)",
+        borderColor: error ? DANGER : "rgba(0,0,0,0.12)",
         textAlignVertical: multiline ? "top" : "center"
       }}
     />
     {!!(error || note) && (
-      <TextComponent className="px-1 text-xs" style={{ color: error ? PINK : "#71717a" }}>
+      <TextComponent className="px-1 text-xs" style={{ color: error ? DANGER : "#71717a" }}>
         {error || note}
       </TextComponent>
     )}
   </View>
 );
 
-const PrimaryButton = ({
+export const PrimaryButton = ({
   label,
   onPress,
   busy,
@@ -255,208 +252,10 @@ const Page = ({
   </View>
 );
 
-/* ------------------------------------------------------------------ edit profile */
-
-const EditProfilePage = ({ onBack }: { onBack: () => void }) => {
-  const queryClient = useQueryClient();
-  const me = useMe();
-  const user = me.data;
-  const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
-    username: "",
-    bio: "",
-    website: "",
-    phone: ""
-  });
-  const [loadedFor, setLoadedFor] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [usernameState, setUsernameState] = useState<"idle" | "checking" | "free" | "taken">("idle");
-  const [username] = useDebounce(form.username.trim().toLowerCase(), 500);
-
-  if (user && loadedFor !== user.id) {
-    setLoadedFor(user.id);
-    setForm({
-      firstName: user.firstName ?? "",
-      lastName: user.lastName ?? "",
-      username: user.username ?? "",
-      bio: user.bio ?? "",
-      website: user.website ?? "",
-      phone: user.phone ?? ""
-    });
-  }
-
-  // Is the username free? Only asked when it changes from yours.
-  useEffect(() => {
-    if (!username || username === user?.username) {
-      setUsernameState("idle");
-      return;
-    }
-    let live = true;
-    setUsernameState("checking");
-    getData(`/auth/username?username=${encodeURIComponent(username)}`)
-      .then(() => live && setUsernameState("free"))
-      .catch(() => live && setUsernameState("taken"));
-    return () => {
-      live = false;
-    };
-  }, [username, user?.username]);
-
-  const set = (key: keyof typeof form) => (text: string) => {
-    setForm((current) => ({ ...current, [key]: text }));
-    setFieldErrors((current) => ({ ...current, [key]: "" }));
-  };
-
-  const pickPhoto = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8
-    });
-    if (result.canceled || !result.assets?.[0]) return;
-    setUploading(true);
-    try {
-      await uploadProfilePhoto(result.assets[0]);
-      await queryClient.invalidateQueries({ queryKey: ["me"] });
-      onSuccess("Profile photo updated");
-    } catch (error) {
-      onError(errorText(error, "Couldn't upload that photo. Please try another."));
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const save = async () => {
-    const errors: Record<string, string> = {};
-    if (!form.firstName.trim()) errors.firstName = "Enter your first name";
-    if (!form.lastName.trim()) errors.lastName = "Enter your last name";
-    if (!/^[a-z0-9._]{3,30}$/i.test(form.username.trim())) {
-      errors.username = "3 to 30 letters, numbers, dots or underscores";
-    }
-    if (usernameState === "taken") errors.username = "That username is taken";
-    setFieldErrors(errors);
-    if (Object.values(errors).some(Boolean)) return;
-
-    // Only what changed goes up; cleared bio, website or phone go up empty.
-    const next: TProfileUpdate = {
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
-      username: form.username.trim().toLowerCase(),
-      bio: form.bio.trim(),
-      website: form.website.trim(),
-      phone: form.phone.trim()
-    };
-    const changed = Object.fromEntries(
-      Object.entries(next).filter(
-        ([key, value]) => value !== ((user?.[key as keyof typeof user] as string | undefined) ?? "")
-      )
-    );
-    if (!Object.keys(changed).length) {
-      onBack();
-      return;
-    }
-    setSaving(true);
-    try {
-      await updateProfile(changed);
-      await queryClient.invalidateQueries({ queryKey: ["me"] });
-      onSuccess("Profile saved");
-      onBack();
-    } catch (error) {
-      const api = (error as TApiErrorResponseType)?.response?.data as
-        | { errors?: Record<string, string> }
-        | undefined;
-      if (api?.errors) setFieldErrors(api.errors);
-      onError(errorText(error, "Couldn't save your profile."));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const name = [form.firstName, form.lastName].filter(Boolean).join(" ") || "You";
-
-  return (
-    <Page title="Edit profile" onBack={onBack}>
-      {!user ? (
-        <Loading />
-      ) : (
-        <View className="gap-4 px-4 pt-6">
-          <Pressable onPress={() => void pickPhoto()} disabled={uploading} accessibilityRole="button" accessibilityLabel="Change profile photo" className="items-center gap-2">
-            <View className="size-28 items-center justify-center overflow-hidden rounded-full bg-[#e3f6ff]">
-              {user.profileImage ? (
-                <CustomImage className="size-full" imageClassName="size-full" source={{ uri: user.profileImage }} contentFit="cover" />
-              ) : (
-                <TextComponent className="text-4xl font-bold" style={{ color: BLUE }}>
-                  {name[0]?.toUpperCase()}
-                </TextComponent>
-              )}
-              {uploading && (
-                <View className="absolute inset-0 items-center justify-center bg-black/40">
-                  <ActivityIndicator color="#ffffff" />
-                </View>
-              )}
-            </View>
-            <TextComponent className="text-sm font-bold" style={{ color: BLUE }}>
-              {uploading ? "Uploading…" : "Change photo"}
-            </TextComponent>
-          </Pressable>
-          <View className="flex-row gap-3">
-            <View className="flex-1">
-              <Field label="First name" value={form.firstName} onChange={set("firstName")} error={fieldErrors.firstName} autoCapitalize="words" />
-            </View>
-            <View className="flex-1">
-              <Field label="Last name" value={form.lastName} onChange={set("lastName")} error={fieldErrors.lastName} autoCapitalize="words" />
-            </View>
-          </View>
-          <Field
-            label="Username"
-            value={form.username}
-            onChange={set("username")}
-            autoCapitalize="none"
-            error={fieldErrors.username || (usernameState === "taken" ? "That username is taken" : undefined)}
-            note={usernameState === "checking" ? "Checking…" : usernameState === "free" ? "Available" : undefined}
-          />
-          <Field
-            label="Bio"
-            value={form.bio}
-            onChange={set("bio")}
-            multiline
-            maxLength={160}
-            error={fieldErrors.bio}
-            placeholder="A line about you"
-          />
-          <Field
-            label="Website"
-            value={form.website}
-            onChange={set("website")}
-            keyboard="url"
-            autoCapitalize="none"
-            error={fieldErrors.website}
-            placeholder="yoursite.com or a social link"
-          />
-          <Field
-            label="Phone"
-            value={form.phone}
-            onChange={set("phone")}
-            keyboard="phone-pad"
-            error={fieldErrors.phone}
-            placeholder="+234 801 234 5678"
-          />
-          <Field label="Email" value={user.email ?? ""} onChange={() => undefined} note="Your sign-in email can't be changed here." />
-          <View className="pt-2">
-            <PrimaryButton label="Save" onPress={() => void save()} busy={saving} disabled={uploading} />
-          </View>
-        </View>
-      )}
-    </Page>
-  );
-};
-
 /* ---------------------------------------------------------------------- password */
 
 const PasswordPage = ({ onBack }: { onBack: () => void }) => {
+  useHardwareBack(onBack);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -512,12 +311,14 @@ const PasswordPage = ({ onBack }: { onBack: () => void }) => {
 /* ----------------------------------------------------------------- notifications */
 
 const NOTIFICATION_ROWS: { key: keyof TNotificationPreferences; label: string; hint: string }[] = [
-  { key: "eventUpdates", label: "Event updates", hint: "Changes and reminders for events you're going to" },
-  { key: "orderUpdates", label: "Orders and payments", hint: "Payment confirmations and refunds" },
-  { key: "ticketTransfers", label: "Ticket transfers", hint: "When someone sends you a ticket" }
+  { key: "orderUpdates", label: "My tickets and orders", hint: "Tickets ready, payments and refunds" },
+  { key: "ticketTransfers", label: "Tickets sent to me", hint: "When a friend sends you a ticket" },
+  { key: "eventUpdates", label: "Events I'm going to", hint: "Updates from the organiser, time or venue changes" },
+  { key: "creditUpdates", label: "Turnupz Credit and invites", hint: "When you earn credit, or it's about to run out" }
 ];
 
-const NotificationsPage = ({ onBack }: { onBack: () => void }) => {
+export const NotificationsPage = ({ onBack }: { onBack: () => void }) => {
+  useHardwareBack(onBack);
   const queryClient = useQueryClient();
   const prefs = useNotificationPreferences();
   const value = prefs.data;
@@ -535,7 +336,7 @@ const NotificationsPage = ({ onBack }: { onBack: () => void }) => {
   };
 
   return (
-    <Page title="Notifications" onBack={onBack}>
+    <Page title="Notification settings" onBack={onBack}>
       {!value ? (
         prefs.isLoading ? <Loading /> : (
           <TextComponent className="p-8 text-center text-sm text-zinc-500">We couldn't load your settings.</TextComponent>
@@ -544,8 +345,8 @@ const NotificationsPage = ({ onBack }: { onBack: () => void }) => {
         <>
           <Section>
             <Toggle
-              label="Push notifications"
-              hint="Alerts on this phone. Your inbox in the app keeps everything either way."
+              label="Notifications on this phone"
+              hint="Turn alerts off here any time. Everything still shows in Notifications."
               value={value.push}
               onChange={(next) => void change("push", next)}
               last
@@ -610,6 +411,7 @@ const DeviceIcon = ({ platform }: { platform: string }) => (
 );
 
 const DevicesPage = ({ onBack }: { onBack: () => void }) => {
+  useHardwareBack(onBack);
   const sessions = useSessions();
   const [busy, setBusy] = useState<string | null>(null);
   const list = sessions.data ?? [];
@@ -625,7 +427,6 @@ const DevicesPage = ({ onBack }: { onBack: () => void }) => {
           setBusy(session.id);
           try {
             await signOutDevice(session.id);
-            onSuccess(`${session.device} signed out`);
             await sessions.refetch();
           } catch (error) {
             onError(errorText(error, "Couldn't sign that device out."));
@@ -645,8 +446,7 @@ const DevicesPage = ({ onBack }: { onBack: () => void }) => {
         onPress: async () => {
           setBusy("all");
           try {
-            const count = await signOutOtherDevices();
-            onSuccess(count === 1 ? "1 device signed out" : `${count} devices signed out`);
+            await signOutOtherDevices();
             await sessions.refetch();
           } catch (error) {
             onError(errorText(error, "Couldn't sign the other devices out."));
@@ -694,10 +494,10 @@ const DevicesPage = ({ onBack }: { onBack: () => void }) => {
               </View>
               {!session.isCurrent &&
                 (busy === session.id ? (
-                  <ActivityIndicator color={PINK} />
+                  <ActivityIndicator color={DANGER} />
                 ) : (
                   <Pressable onPress={() => signOut(session)} hitSlop={8} accessibilityRole="button">
-                    <TextComponent className="text-sm font-bold" style={{ color: PINK }}>Sign out</TextComponent>
+                    <TextComponent className="text-sm font-bold" style={{ color: DANGER }}>Sign out</TextComponent>
                   </Pressable>
                 ))}
             </View>
@@ -711,12 +511,12 @@ const DevicesPage = ({ onBack }: { onBack: () => void }) => {
             disabled={busy === "all"}
             accessibilityRole="button"
             className="h-12 items-center justify-center rounded-full border bg-white"
-            style={{ borderColor: PINK }}
+            style={{ borderColor: DANGER }}
           >
             {busy === "all" ? (
-              <ActivityIndicator color={PINK} />
+              <ActivityIndicator color={DANGER} />
             ) : (
-              <TextComponent className="text-base font-bold" style={{ color: PINK }}>
+              <TextComponent className="text-base font-bold" style={{ color: DANGER }}>
                 Sign out all other devices
               </TextComponent>
             )}
@@ -737,6 +537,7 @@ const ACCESSIBILITY_ROWS: { key: keyof TAccessibilityOptions; label: string; hin
 ];
 
 const AccessibilityPage = ({ onBack }: { onBack: () => void }) => {
+  useHardwareBack(onBack);
   const options = useAccessibilityStore();
   return (
     <Page title="Accessibility" onBack={onBack}>
@@ -760,6 +561,7 @@ const AccessibilityPage = ({ onBack }: { onBack: () => void }) => {
 /* -------------------------------------------------------------------------- help */
 
 const HelpPage = ({ onBack }: { onBack: () => void }) => {
+  useHardwareBack(onBack);
   const faqs = useFaqs();
   const me = useMe();
   const [open, setOpen] = useState<string | null>(null);
@@ -833,22 +635,31 @@ const HelpPage = ({ onBack }: { onBack: () => void }) => {
 /* -------------------------------------------------------------------------- menu */
 
 const ProfileSettingsScreen = ({
-  startAt = "menu",
-  onBack
+  onBack,
+  onOpenWallet
 }: {
-  startAt?: "menu" | "edit";
   onBack: () => void;
+  /** The Wallet page: Turnupz Credit and saved cards. */
+  onOpenWallet: () => void;
 }) => {
+  useHardwareBack(onBack);
   const queryClient = useQueryClient();
   const { logoutUser } = useUser();
-  const [page, setPage] = useState<TPage>(startAt);
-  const wallet = useWallet();
+  const [page, setPage] = useState<TPage>("menu");
+  const credit = useCreditBalance();
+  const hideBalance = useBalancePrivacyStore((state) => state.hideBalance);
+  const creditRow = credit.data?.find((row) => row.available.amount > 0) ?? credit.data?.[0];
+  const creditText = hideBalance
+    ? maskAmount(creditRow?.available.formatted?.withCurrency)
+    : creditRow && creditRow.available.amount > 0
+      ? creditRow.available.formatted?.withCurrency
+      : credit.isLoading
+        ? "…"
+        : creditRow?.available.formatted?.withCurrency ?? formatZero();
   const sessions = useSessions();
   const [loggingOut, setLoggingOut] = useState(false);
-  // Opened straight on a page (Edit profile): Back leaves settings altogether.
-  const back = () => (startAt === "menu" ? setPage("menu") : onBack());
+  const back = () => setPage("menu");
 
-  if (page === "edit") return <EditProfilePage onBack={back} />;
   if (page === "password") return <PasswordPage onBack={back} />;
   if (page === "notifications") return <NotificationsPage onBack={back} />;
   if (page === "devices") return <DevicesPage onBack={back} />;
@@ -881,13 +692,12 @@ const ProfileSettingsScreen = ({
       <BackHeader title="Settings" onBack={onBack} />
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <Section title="Account">
-          <Row label="Edit profile" hint="Name, photo, bio and links" onPress={() => setPage("edit")} />
           <Row label="Change password" onPress={() => setPage("password")} />
           <Row
-            label="Wallet balance"
-            hint="Refunds and credit you can spend on tickets"
-            value={wallet.data?.balance?.formatted?.withCurrency ?? (wallet.isLoading ? "…" : "—")}
-            onPress={() => void wallet.refetch()}
+            label="Wallet"
+            hint="Your Turnupz Credit and saved cards"
+            value={creditText}
+            onPress={onOpenWallet}
             last
           />
         </Section>
@@ -912,7 +722,7 @@ const ProfileSettingsScreen = ({
         <Section>
           {loggingOut ? (
             <View className="items-center py-4">
-              <ActivityIndicator color={PINK} />
+              <ActivityIndicator color={DANGER} />
             </View>
           ) : (
             <Row label="Log out" tone="danger" onPress={confirmLogOut} last />

@@ -1,3 +1,4 @@
+import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useEffect, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, ScrollView, TextInput, View } from "react-native";
 import TextComponent from "@/shared/components/text/text.component";
@@ -125,6 +126,7 @@ const ReportEventSheet = ({
           </Pressable>
         </View>
       </View>
+      <OverlayToast />
     </Modal>
   );
 };

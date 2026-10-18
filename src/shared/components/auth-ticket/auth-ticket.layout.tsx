@@ -12,7 +12,7 @@ import ContainerComponent from "../container/container.component";
 import TextComponent from "../text/text.component";
 import BrandWordmark from "../brand-wordmark/brand-wordmark.component";
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
-import { BLUE, PINK } from "../brand-intro/intro-timeline";
+import { BLUE, BLUE_DEEP } from "../brand-intro/intro-timeline";
 
 /**
  * The sign-in stage, shared with the web: the brand's night sky (stars and two
@@ -43,8 +43,8 @@ const NightSky = () => {
             <Stop offset="1" stopColor={BLUE} stopOpacity="0" />
           </RadialGradient>
           <RadialGradient id={`${id}-pink`} cx="100%" cy="100%" r="80%">
-            <Stop offset="0" stopColor={PINK} stopOpacity="0.3" />
-            <Stop offset="1" stopColor={PINK} stopOpacity="0" />
+            <Stop offset="0" stopColor={BLUE_DEEP} stopOpacity="0.3" />
+            <Stop offset="1" stopColor={BLUE_DEEP} stopOpacity="0" />
           </RadialGradient>
         </Defs>
         <Rect width="100%" height="100%" fill={`url(#${id}-blue)`} />
@@ -125,7 +125,7 @@ const AuthTicketLayout: React.FC<TAuthTicketLayoutProps> = ({
             <View style={styles.ticket}>
               {/* The stub. */}
               <LinearGradient
-                colors={[BLUE, BLUE, PINK]}
+                colors={[BLUE, BLUE, BLUE_DEEP]}
                 locations={[0, 0.45, 1]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
     borderColor: "#e3eef7"
   },
   eyebrow: {
-    color: PINK,
+    color: BLUE_DEEP,
     fontSize: 13,
     fontWeight: "700",
     letterSpacing: 1.2

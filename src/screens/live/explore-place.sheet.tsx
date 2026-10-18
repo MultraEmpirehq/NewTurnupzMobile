@@ -1,3 +1,4 @@
+import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -145,7 +146,7 @@ const ExplorePlaceSheet = ({
             placeholder="Search a country or city"
             placeholderTextColor="#a1a1aa"
             className="mb-1 h-11 rounded-full bg-zinc-100 px-4 text-base text-zinc-950"
-            style={{ fontFamily: "Avenir-Book" }}
+            style={{ fontFamily: "PlusJakartaSans-Regular" }}
           />
           <ScrollView
             keyboardShouldPersistTaps="handled"
@@ -203,6 +204,7 @@ const ExplorePlaceSheet = ({
           </ScrollView>
         </View>
       </SafeAreaView>
+      <OverlayToast />
     </Modal>
   );
 };

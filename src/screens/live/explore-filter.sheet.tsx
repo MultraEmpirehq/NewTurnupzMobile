@@ -1,4 +1,6 @@
+import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useEffect, useMemo, useState } from "react";
+import { BRAND } from "@/shared/utils/brand-colors";
 import { Modal, Pressable, ScrollView, Switch, View } from "react-native";
 import { Calendar, DateData } from "react-native-calendars";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -13,7 +15,8 @@ import { TLiveCategory, TLiveLocation, TLiveVenue } from "./live-api";
  */
 
 const INK = "#0b1d2a";
-const PINK = "#ff0088";
+// Accents are the deeper brand blue (strictly blue, black, white and grey).
+const ACCENT = BRAND.blueDeep;
 const BLUE = "#00b2ff";
 
 export const WHEN_OPTIONS = [
@@ -308,7 +311,7 @@ const ExploreFilterSheet: React.FC<TExploreFilterSheetProps> = ({
           >
             <TextComponent
               className="text-base font-semibold"
-              style={{ color: PINK }}
+              style={{ color: ACCENT }}
             >
               Reset
             </TextComponent>
@@ -352,11 +355,11 @@ const ExploreFilterSheet: React.FC<TExploreFilterSheetProps> = ({
                   markedDates={markedDates}
                   onDayPress={pickDay}
                   theme={{
-                    todayTextColor: PINK,
+                    todayTextColor: ACCENT,
                     arrowColor: BLUE,
-                    textDayFontFamily: "Avenir-Book",
-                    textMonthFontFamily: "Avenir-Black",
-                    textDayHeaderFontFamily: "Avenir-Roman"
+                    textDayFontFamily: "PlusJakartaSans-Regular",
+                    textMonthFontFamily: "PlusJakartaSans-Bold",
+                    textDayHeaderFontFamily: "PlusJakartaSans-Medium"
                   }}
                 />
                 <TextComponent className="text-center text-xs text-zinc-500">
@@ -540,6 +543,7 @@ const ExploreFilterSheet: React.FC<TExploreFilterSheetProps> = ({
           </Pressable>
         </View>
       </SafeAreaView>
+      <OverlayToast />
     </Modal>
   );
 };

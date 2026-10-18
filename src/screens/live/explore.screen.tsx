@@ -1,4 +1,6 @@
+import VerifiedName from "@/shared/components/verified-name/verified-name.component";
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import { BRAND } from "@/shared/utils/brand-colors";
 import {
   ActivityIndicator,
   Pressable,
@@ -80,7 +82,8 @@ import {
  */
 
 const INK = "#0b1d2a";
-const PINK = "#ff0088";
+// Accents are the deeper brand blue (strictly blue, black, white and grey).
+const ACCENT = BRAND.blueDeep;
 const BLUE = "#00b2ff";
 
 const PRESETS = [
@@ -159,7 +162,7 @@ const Chip = ({
 }: {
   label: string;
   active: boolean;
-  tone?: "ink" | "pink";
+  tone?: "ink" | "accent";
   onPress: () => void;
 }) => (
   <Pressable
@@ -169,19 +172,19 @@ const Chip = ({
     className="rounded-full px-4 py-2"
     style={{
       backgroundColor: active
-        ? tone === "pink"
-          ? PINK
+        ? tone === "accent"
+          ? ACCENT
           : INK
-        : tone === "pink"
-          ? "#ffe4f1"
+        : tone === "accent"
+          ? BRAND.blueTintDeep
           : "#ffffff",
-      borderWidth: active || tone === "pink" ? 0 : 1,
+      borderWidth: active || tone === "accent" ? 0 : 1,
       borderColor: "rgba(11,29,42,0.08)"
     }}
   >
     <TextComponent
       className="text-sm font-medium"
-      style={{ color: active ? "#ffffff" : tone === "pink" ? PINK : INK }}
+      style={{ color: active ? "#ffffff" : tone === "accent" ? ACCENT : INK }}
     >
       {label}
     </TextComponent>
@@ -277,7 +280,7 @@ const SectionEmpty = ({ text, onPlace }: { text: string; onPlace: () => void }) 
     className="mx-4 flex-row items-center justify-between gap-3 rounded-2xl border border-dashed border-black/10 bg-white px-4 py-4"
   >
     <TextComponent className="flex-1 text-sm text-zinc-500">{text}</TextComponent>
-    <TextComponent className="text-sm font-bold" style={{ color: PINK }}>
+    <TextComponent className="text-sm font-bold" style={{ color: ACCENT }}>
       Change location
     </TextComponent>
   </Pressable>
@@ -355,7 +358,7 @@ const PlannerTile = ({
     </View>
     <View className="flex-row items-center gap-2 px-3 py-3">
       <LinearGradient
-        colors={[BLUE, PINK]}
+        colors={[BLUE, ACCENT]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         className="size-9 items-center justify-center rounded-full"
@@ -486,12 +489,11 @@ const PerformerRailCard = ({
         </TextComponent>
       </View>
     </View>
-    <TextComponent
-      numberOfLines={1}
+    <VerifiedName
+      name={performer.name}
+      verified={performer.isVerified}
       className="text-base font-bold text-zinc-950"
-    >
-      {performer.name}
-    </TextComponent>
+    />
     <TextComponent numberOfLines={1} className="text-xs text-zinc-500">
       {PERFORMER_TYPE_LABELS[performer.type]}
       {performer.country ? ` · ${performer.country}` : ""}
@@ -849,7 +851,7 @@ const LiveExploreScreen = ({
       <View className="gap-1 px-4">
         <TextComponent
           className="text-xs font-bold tracking-widest"
-          style={{ color: PINK }}
+          style={{ color: ACCENT }}
         >
           EXPLORE
         </TextComponent>
@@ -891,7 +893,7 @@ const LiveExploreScreen = ({
           returnKeyType="search"
           autoCorrect={false}
           className="flex-1 text-base text-zinc-950"
-          style={{ fontFamily: "Avenir-Book" }}
+          style={{ fontFamily: "PlusJakartaSans-Regular" }}
         />
         {!!search && (
           <Pressable
@@ -942,7 +944,7 @@ const LiveExploreScreen = ({
           {sheetCount > 0 && (
             <View
               className="absolute -right-1 -top-1 size-5 items-center justify-center rounded-full"
-              style={{ backgroundColor: PINK }}
+              style={{ backgroundColor: ACCENT }}
             >
               <TextComponent className="text-[10px] font-bold text-white">
                 {sheetCount}
@@ -999,7 +1001,7 @@ const LiveExploreScreen = ({
               <TextComponent
                 className="text-[11px] font-semibold"
                 style={{
-                  color: active ? "#ffffff" : weekend ? PINK : "#71717a"
+                  color: active ? "#ffffff" : weekend ? ACCENT : "#71717a"
                 }}
               >
                 {index === 0 ? "TODAY" : WEEKDAYS[day.getDay()]}
@@ -1029,7 +1031,7 @@ const LiveExploreScreen = ({
           <Chip
             key={preset.value}
             label={preset.label}
-            tone="pink"
+            tone="accent"
             active={when === preset.value}
             onPress={() =>
               setWhen(when === preset.value ? undefined : preset.value)
@@ -1044,7 +1046,7 @@ const LiveExploreScreen = ({
             <Chip
               key={helper.key}
               label={`📍 ${helper.label.replace(/^In /, "")}`}
-              tone="pink"
+              tone="accent"
               active={active}
               onPress={() =>
                 update({
@@ -1217,7 +1219,7 @@ const LiveExploreScreen = ({
           hitSlop={8}
           accessibilityRole="button"
         >
-          <TextComponent className="text-sm font-bold" style={{ color: PINK }}>
+          <TextComponent className="text-sm font-bold" style={{ color: ACCENT }}>
             {activeCount === 0
               ? "Back to events"
               : activeCount > 1
@@ -1514,7 +1516,7 @@ const LiveExploreScreen = ({
             >
               <View className="flex-row items-center gap-3">
                 <LinearGradient
-                  colors={[BLUE, PINK]}
+                  colors={[BLUE, ACCENT]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   className="size-12 items-center justify-center rounded-2xl"

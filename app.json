@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Turn up",
+    "name": "Turnupz",
     "slug": "turn-up-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,7 +8,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "backgroundColor": "#fbf9ff",
+      "backgroundColor": "#f7fbff",
       "resizeMode": "contain"
     },
     "ios": {
@@ -18,11 +18,14 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./src/shared/assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundImage": "./src/shared/assets/images/adaptive-background.png",
+        "monochromeImage": "./src/shared/assets/images/monochrome-icon.png",
+        "backgroundColor": "#0577FA"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.turnup.mobile"
+      "package": "com.turnup.mobile",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./src/shared/assets/images/favicon.png",
@@ -35,7 +38,14 @@
           "launchMode": "most-recent"
         }
       ],
-      "./plugins/with-pod-deployment-target"
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Turnupz uses your location to show you events near you."
+        }
+      ],
+      "./plugins/with-pod-deployment-target",
+      "./plugins/with-android-release-signing"
     ]
   }
 }

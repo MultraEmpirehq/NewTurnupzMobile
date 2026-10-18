@@ -5,6 +5,7 @@ import FullNameComponent from "../full-name/full-name.component";
 import UsernameComponent from "../username/username.component";
 import GenderComponent from "../gender/gender.component";
 import DateOfBirthComponent from "../date-of-birth/date-of-birth.component";
+import InviteCodeComponent from "../invite-code/invite-code.component";
 
 const SlideContentComponent = () => {
   return (
@@ -13,6 +14,7 @@ const SlideContentComponent = () => {
       <UsernameComponent />
       <DateOfBirthComponent />
       <GenderComponent />
+      <InviteCodeComponent />
     </ContainerComponent>
   );
 };

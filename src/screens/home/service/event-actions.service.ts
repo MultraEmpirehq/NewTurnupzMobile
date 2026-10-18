@@ -1,3 +1,5 @@
+import { WEB_APP_URL } from "@env";
+import useUserStore from "@/shared/stores/user.store";
 import { reportEvent } from "@/screens/live/live-api";
 
 export type TEventReportPayload = {
@@ -16,9 +18,13 @@ export type TOrganizerConversationDraft = {
   kind: "private";
 };
 
-// The web's event page; "/events/:id" doesn't exist there.
-export const getEventPublicUrl = (eventId: string) =>
-  `https://turnupz.com/explore/event/${encodeURIComponent(eventId)}`;
+// The web's event page; "/events/:id" doesn't exist there. It carries the
+// sharer's username, so a purchase through it earns them share-link credit.
+export const getEventPublicUrl = (eventId: string) => {
+  const base = `${(WEB_APP_URL ?? "https://turnupz.com").replace(/\/$/, "")}/explore/event/${encodeURIComponent(eventId)}`;
+  const username = useUserStore.getState().user?.username;
+  return username ? `${base}?ref=${encodeURIComponent(username)}` : base;
+};
 
 export const createOrganizerConversationDraft = ({
   eventId,

@@ -1,4 +1,7 @@
+import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
+import VerifiedName from "@/shared/components/verified-name/verified-name.component";
 import React, { memo, useMemo, useState } from "react";
+import { BRAND } from "@/shared/utils/brand-colors";
 import {
   ActivityIndicator,
   FlatList,
@@ -39,7 +42,8 @@ import {
  */
 
 const INK = "#0b1d2a";
-const PINK = "#ff0088";
+// Accents are the deeper brand blue (strictly blue, black, white and grey).
+const ACCENT = BRAND.blueDeep;
 const BLUE = "#00b2ff";
 
 const initialsOf = (name: string) =>
@@ -69,7 +73,7 @@ export const PerformerAvatar = ({
     />
   ) : (
     <LinearGradient
-      colors={[BLUE, PINK]}
+      colors={[BLUE, ACCENT]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{
@@ -86,7 +90,10 @@ export const PerformerAvatar = ({
     </LinearGradient>
   );
 
-export const BackHeader = ({ title, onBack }: { title: string; onBack: () => void }) => (
+/** Android's back button does the same as the arrow. */
+export const BackHeader = ({ title, onBack }: { title: string; onBack: () => void }) => {
+  useHardwareBack(onBack);
+  return (
   <View className="h-14 flex-row items-center gap-2 border-b border-black/5 bg-white px-3">
     <Pressable
       onPress={onBack}
@@ -103,7 +110,8 @@ export const BackHeader = ({ title, onBack }: { title: string; onBack: () => voi
       {title}
     </TextComponent>
   </View>
-);
+  );
+};
 
 export const Loading = () => (
   <View className="items-center py-16">
@@ -162,7 +170,8 @@ const PodiumSpot = ({
       <View>
         <View
           className="rounded-full p-1"
-          style={{ backgroundColor: place === 1 ? "#ffd166" : place === 2 ? "#d9dee7" : "#f1b98b" }}
+          // The podium ring: brand blue for first, greys for second and third.
+          style={{ backgroundColor: place === 1 ? BRAND.blue : place === 2 ? "#a1a1aa" : "#d4d4d8" }}
         >
           <PerformerAvatar performer={performer} size={size} />
         </View>
@@ -173,14 +182,19 @@ const PodiumSpot = ({
           <TextComponent className="text-xs font-bold text-white">{place}</TextComponent>
         </View>
       </View>
-      <TextComponent numberOfLines={1} className="mt-4 px-1 text-sm font-bold text-zinc-950">
-        {performer.name}
-      </TextComponent>
+      <View className="mt-4 px-1">
+        <VerifiedName
+          name={performer.name}
+          verified={performer.isVerified}
+          centered
+          className="text-sm font-bold text-zinc-950"
+        />
+      </View>
       <TextComponent numberOfLines={1} className="text-[11px] text-zinc-500">
         {PERFORMER_TYPE_LABELS[performer.type]}
       </TextComponent>
       <LinearGradient
-        colors={place === 1 ? [BLUE, PINK] : ["#e9eef6", "#dfe6f0"]}
+        colors={place === 1 ? [BLUE, ACCENT] : ["#e9eef6", "#dfe6f0"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{ height, alignSelf: "stretch", marginTop: 10, marginHorizontal: 6, borderTopLeftRadius: 14, borderTopRightRadius: 14 }}
@@ -337,7 +351,7 @@ export const PerformerProfileScreen = memo(
             ListHeaderComponent={
               <View className="gap-5 pb-5">
                 <LinearGradient
-                  colors={["#e3f6ff", "#ffe8f3"]}
+                  colors={["#e3f6ff", BRAND.blueTintDeep]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={{ alignItems: "center", paddingTop: 28, paddingBottom: 22, gap: 10 }}
@@ -345,7 +359,13 @@ export const PerformerProfileScreen = memo(
                   <View className="rounded-full bg-white p-1.5">
                     <PerformerAvatar performer={performer} size={112} />
                   </View>
-                  <TextComponent className="text-2xl font-bold text-zinc-950">{performer.name}</TextComponent>
+                  <VerifiedName
+                    name={performer.name}
+                    verified={performer.isVerified}
+                    tickSize={22}
+                    centered
+                    className="text-2xl font-bold text-zinc-950"
+                  />
                   <View className="flex-row items-center gap-2">
                     <View className="rounded-full px-3 py-1" style={{ backgroundColor: INK }}>
                       <TextComponent className="text-xs font-semibold text-white">
@@ -520,7 +540,7 @@ export const VenueDetailScreen = memo(
                     placeholder="Search events at this venue"
                     placeholderTextColor="#a1a1aa"
                     className="flex-1 text-base text-zinc-950"
-                    style={{ fontFamily: "Avenir-Book" }}
+                    style={{ fontFamily: "PlusJakartaSans-Regular" }}
                   />
                 </View>
               </View>
@@ -651,7 +671,7 @@ export const PlannersScreen = memo(
                   placeholder="Search planners"
                   placeholderTextColor="#a1a1aa"
                   className="flex-1 text-base text-zinc-950"
-                  style={{ fontFamily: "Avenir-Book" }}
+                  style={{ fontFamily: "PlusJakartaSans-Regular" }}
                 />
               </View>
             </View>

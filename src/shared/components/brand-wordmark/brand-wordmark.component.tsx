@@ -6,7 +6,7 @@ import {
   LOGO_VIEWBOX,
   LOGO_WIDTH
 } from "../brand-intro/logo-paths";
-import { BLUE, PINK } from "../brand-intro/intro-timeline";
+import { BLUE, BLUE_DEEP } from "../brand-intro/intro-timeline";
 
 /**
  * The Turnupz wordmark, inked in the brand gradient as on the web; pass a colour
@@ -34,7 +34,7 @@ const BrandWordmark: React.FC<{ height?: number; color?: string }> = ({
           gradientUnits="userSpaceOnUse"
         >
           <Stop offset="0" stopColor={BLUE} />
-          <Stop offset="1" stopColor={PINK} />
+          <Stop offset="1" stopColor={BLUE_DEEP} />
         </LinearGradient>
       </Defs>
       {LOGO_PATHS.map((d) => (

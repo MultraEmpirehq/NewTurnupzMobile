@@ -20,7 +20,7 @@ const STATUS: Record<
   TSentTransfer["status"],
   { label: string; bg: string; fg: string }
 > = {
-  PENDING: { label: "Waiting to be claimed", bg: "#fff7e6", fg: "#9a6700" },
+  PENDING: { label: "Waiting to be claimed", bg: "#e5f7ff", fg: "#006b99" },
   CLAIMED: { label: "Claimed", bg: "#e8f8ef", fg: "#15803d" },
   CANCELLED: { label: "Cancelled", bg: "#f1f2f5", fg: "#52525b" }
 };

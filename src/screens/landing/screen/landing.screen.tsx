@@ -19,7 +19,7 @@ import { getData, postData } from "@/api";
 import useUserStore, { TUser } from "@/shared/stores/user.store";
 import { useIntroStore } from "@/shared/stores/intro.store";
 import useApp from "@/shared/hooks/use-app.hook";
-import { onError, onSuccess } from "@/shared/components/status/toast";
+import { onError } from "@/shared/components/status/toast";
 import {
   EVerificationType,
   TLoginResponseType,
@@ -75,7 +75,7 @@ const LandingScreen = () => {
     handleSubmit,
     getValues,
     resetField,
-    formState: { isValid, isSubmitting }
+    formState: { isSubmitting }
   } = useForm<TAuthBodyType>({
     defaultValues: canLogin
       ? authDefaultValues
@@ -133,7 +133,6 @@ const LandingScreen = () => {
         );
         performAuthOperations(data?.data?.accessToken, true);
         await performAuthVerificationCheck();
-        onSuccess("Login successful");
       } catch (error) {
         const errorMessage = constructErrorMessage(
           error as TApiErrorResponseType,
@@ -149,7 +148,6 @@ const LandingScreen = () => {
     async (accessToken: string) => {
       performAuthOperations(accessToken, true);
       await performAuthVerificationCheck();
-      onSuccess("Login successful");
     },
     [performAuthOperations, performAuthVerificationCheck]
   );
@@ -187,7 +185,7 @@ const LandingScreen = () => {
               accessibilityRole="button"
               hitSlop={8}
             >
-              <TextComponent className="text-sm font-bold text-[#ff0088]">
+              <TextComponent className="text-sm font-bold text-[#0577FA]">
                 Change
               </TextComponent>
             </Pressable>
@@ -263,9 +261,11 @@ const LandingScreen = () => {
             </View>
           </View>
         )}
+        {/* Always tappable: a wrong or missing entry shows its message under
+            the field, rather than leaving a greyed-out button. */}
         <ButtonComponent
           onPress={handleSubmit(onSubmit)}
-          disabled={isSubmitting || !isValid}
+          disabled={isSubmitting}
           isLoading={isSubmitting}
           className="h-12 rounded-full bg-[#00b2ff] py-0"
         >

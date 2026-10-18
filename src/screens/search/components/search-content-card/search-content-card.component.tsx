@@ -11,9 +11,11 @@ const SearchContentCardComponent: React.FC<TEventDetailsType> = ({
   name = "Event Name",
   image,
   eventGuestsOfHonour,
+  performers,
   date = new Date()
 }) => {
-  const performer = eventGuestsOfHonour?.[0]?.name;
+  // The headliner; older events only had guests of honour.
+  const performer = performers?.[0]?.name ?? eventGuestsOfHonour?.[0]?.name;
   return (
     <View className="flex-row items-center gap-3">
       <CustomImageComponent

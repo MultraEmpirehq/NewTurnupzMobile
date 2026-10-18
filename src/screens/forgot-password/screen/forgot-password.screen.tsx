@@ -103,7 +103,7 @@ const ForgotPasswordScreen = () => {
         />
         <ButtonComponent
           onPress={handleSubmit(onSubmit)}
-          disabled={isSubmitting || !isValid}
+          disabled={isSubmitting}
           isLoading={isSubmitting}
           className="h-12 rounded-full bg-[#00b2ff] py-0"
         >

@@ -4,6 +4,7 @@ import { BASE_URL } from "@env";
 import axios, { AxiosRequestConfig } from "axios";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import { installId } from "@/shared/utils/device-id";
 
 const controller = new AbortController();
 
@@ -35,10 +36,12 @@ api.interceptors.response.use(
 api.interceptors.request.use(
   (config) => {
     const token = useUserStore.getState().userToken;
+    config.headers = config.headers ?? {};
     if (token) {
-      config.headers = config.headers ?? {};
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Which install this is, so credit can't be farmed with several accounts.
+    if (Platform.OS !== "web") config.headers["X-Device-Id"] = installId();
     return config;
   },
   (error) => {

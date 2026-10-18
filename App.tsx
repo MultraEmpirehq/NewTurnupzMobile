@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import ContainerComponent from "@/shared/components/container/container.component";
 import "@styles/global.css";
 import "@/shared/utils/css-interop";
@@ -7,23 +8,32 @@ import { themes } from "@/shared/utils/colors";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import FlashMessage from "react-native-flash-message";
+import { FullWindowOverlay } from "react-native-screens";
+import ToastMessage from "@/shared/components/status/toast/custom-toast-message.component";
 import NavigationWrapper from "@/navigation/navigator-wrapper/navigator-wrapper";
 import { useFonts } from "expo-font";
 import { BRAND_FONTS } from "@/shared/utils/fonts";
 import BrandIntro from "@/shared/components/brand-intro/brand-intro.component";
 import { useIntroStore } from "@/shared/stores/intro.store";
 
-const queryClient = new QueryClient();
+// Anything fetched in the last 30 seconds shows straight away without asking
+// the server again, kept for 10 minutes after its screen closes. A failed
+// request is retried once, not three times, so errors show quickly.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 30_000, gcTime: 10 * 60_000, retry: 1 }
+  }
+});
 
 export default function App() {
-  // Hold the first frame until Avenir is ready so text doesn't flash in the
+  // Hold the first frame until Plus Jakarta Sans is ready so text doesn't flash in the
   // system font; if loading fails, carry on with the system font. The wait uses
   // the intro's base colour, so splash → intro reads as one piece.
   const [fontsLoaded, fontError] = useFonts(BRAND_FONTS);
   const introDone = useIntroStore((state) => state.introDone);
   const finishIntro = useIntroStore((state) => state.setIntroDone);
   if (!fontsLoaded && !fontError) {
-    return <View style={{ flex: 1, backgroundColor: "#fbf9ff" }} />;
+    return <View style={{ flex: 1, backgroundColor: "#f7fbff" }} />;
   }
 
   // const clearUserStore = useUserStore((state) => state.clearUserStore);
@@ -39,7 +49,15 @@ export default function App() {
             <ContainerComponent>
               <NavigationWrapper />
             </ContainerComponent>
-            <FlashMessage position="top" duration={7000} />
+            {/* On iPhone, inside a full-window overlay so toasts sit above every screen
+                (native screens otherwise cover them). */}
+            {Platform.OS === "ios" ? (
+              <FullWindowOverlay>
+                <FlashMessage position="top" MessageComponent={ToastMessage} />
+              </FullWindowOverlay>
+            ) : (
+              <FlashMessage position="top" MessageComponent={ToastMessage} />
+            )}
             {/* Plays over the app, which loads underneath in the meantime. */}
             {!introDone && <BrandIntro onFinish={finishIntro} />}
           </SafeAreaProvider>

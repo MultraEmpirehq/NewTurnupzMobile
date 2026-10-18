@@ -8,11 +8,11 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import {
   BLUE,
   DURATION,
-  PEACH,
-  PINK,
+  BLUE_SOFT,
+  BLUE_DEEP,
   RASTERIZE,
   T,
-  VIOLET,
+  BLUE_NAVY,
   easeIn,
   easeOut,
   phase
@@ -60,7 +60,7 @@ const IntroStage: React.FC<TStageProps> = ({ t, width, height }) => {
 
 const MESH = [
   {
-    color: PINK,
+    color: BLUE_DEEP,
     x: 0.05,
     y: 0.08,
     size: 1.1,
@@ -78,7 +78,7 @@ const MESH = [
     offset: 2
   },
   {
-    color: PEACH,
+    color: BLUE_SOFT,
     x: 0.12,
     y: 0.86,
     size: 1.05,
@@ -87,7 +87,7 @@ const MESH = [
     offset: 4
   },
   {
-    color: VIOLET,
+    color: BLUE_NAVY,
     x: 0.88,
     y: 0.95,
     size: 1.0,

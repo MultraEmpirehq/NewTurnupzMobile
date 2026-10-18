@@ -2,7 +2,6 @@ import { useCallback } from "react";
 import { getData, setHeaderAuthorization } from "../../api";
 import { constructErrorMessage } from "../../api/functions";
 import useUserStore, { TUser } from "../stores/user.store";
-import { onInfo } from "../components/status/toast";
 const useUser = () => {
   const setUserDetails = useUserStore((state) => state.setUser);
   const setUserNotVerifiedDetails = useUserStore(
@@ -45,7 +44,6 @@ const useUser = () => {
   const logoutUser = useCallback(async () => {
     setHeaderAuthorization();
     clearUserStore();
-    onInfo("You have successfully signed out");
   }, []);
 
   return {

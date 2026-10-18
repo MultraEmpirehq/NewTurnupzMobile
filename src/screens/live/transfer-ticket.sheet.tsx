@@ -1,3 +1,4 @@
+import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -108,7 +109,7 @@ const TransferTicketSheet = ({
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View className="rounded-t-3xl bg-white px-5 pb-10 pt-5">
           <TextComponent className="text-lg font-bold" style={{ color: INK }}>
-            Send this ticket
+            Transfer this ticket
           </TextComponent>
           <TextComponent className="mt-1 text-sm text-zinc-500">
             {ticket?.ticket?.name ?? "Ticket"} for {eventName}. Send it to their
@@ -180,11 +181,12 @@ const TransferTicketSheet = ({
             {transfer.isPending ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <TextComponent className="font-bold text-white">Send ticket</TextComponent>
+              <TextComponent className="font-bold text-white">Transfer ticket</TextComponent>
             )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+      <OverlayToast />
     </Modal>
   );
 };
