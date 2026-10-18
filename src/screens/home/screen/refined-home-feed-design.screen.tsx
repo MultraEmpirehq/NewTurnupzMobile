@@ -1,4 +1,5 @@
 import NavIcon from "@/shared/components/nav-icons/nav-icons";
+import { useLiveUserTickets } from "@/screens/live/live-api";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -259,6 +260,7 @@ const FeedCard = ({
   onOpenDetails?: (event: TFeedEvent) => void;
 }) => (
   <EventTicketCard
+    eventId={event.id}
     name={event.name}
     date={event.date}
     timezone={event.timezone}
@@ -310,6 +312,12 @@ const RefinedHomeFeedDesignScreen = () => {
   const syncHiddenEvents = useHiddenEventsStore((state) => state.sync);
   const isSignedIn = !!useUserStore((state) => state.userToken);
   const unreadNotifications = useUnreadNotifications(isSignedIn);
+  // Your tickets, loaded once when the app opens (all of them), so event pages
+  // and cards know what you're going to, and a fresh copy is kept for offline.
+  const myTickets = useLiveUserTickets(isSignedIn);
+  useEffect(() => {
+    if (myTickets.hasNextPage && !myTickets.isFetchingNextPage) void myTickets.fetchNextPage();
+  }, [myTickets.hasNextPage, myTickets.isFetchingNextPage]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isSignedIn) void syncHiddenEvents();
   }, [isSignedIn, syncHiddenEvents]);
@@ -406,6 +414,12 @@ const RefinedHomeFeedDesignScreen = () => {
       eventId={liveEventId}
       onBack={() => setLiveEventId(null)}
       onBook={setLiveBookingEvent}
+      onShowTickets={(eventId) => {
+        setLiveEventId(null);
+        setTicketsOpenEventId(eventId);
+        setTicketsReturnTab(activeTab === "tickets" ? "home" : activeTab);
+        setActiveTab("tickets");
+      }}
       onOpenPerformer={(id) => {
         setLivePerformerId(id);
         setLiveEventId(null);
@@ -545,6 +559,7 @@ const RefinedHomeFeedDesignScreen = () => {
           "favorites",
           <NotificationsScreen
             onOpenEvent={(eventId) => setLiveEventId(eventId)}
+            onOpenMessages={() => setActiveTab("messages")}
             onOpenTickets={() => {
               setTicketsReturnTab("favorites");
               setActiveTab("tickets");

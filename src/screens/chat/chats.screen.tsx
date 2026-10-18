@@ -1,4 +1,5 @@
-import React, { memo, useMemo, useState } from "react";
+import React, { memo, useEffect, useMemo, useState } from "react";
+import { useOpenChatStore } from "@/shared/stores/open-chat.store";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, TextInput, View } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
@@ -60,6 +61,23 @@ const ChatsScreen = ({
   const [filter, setFilter] = useState<TFilter>("all");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<TLiveChat | null>(null);
+  // A chat asked for from elsewhere (a "Message from the Turnupz team" notification).
+  const pendingChatId = useOpenChatStore((state) => state.pendingChatId);
+  const openChatWhenReady = useOpenChatStore((state) => state.openChatWhenReady);
+  useEffect(() => {
+    if (!pendingChatId) return;
+    const chat = (chats.data ?? []).find((c) => c.id === pendingChatId);
+    if (chat) {
+      setOpen(chat);
+      openChatWhenReady(null);
+    } else if (!chats.isFetching) {
+      void chats.refetch().then((result) => {
+        const found = (result.data ?? []).find((c) => c.id === pendingChatId);
+        if (found) setOpen(found);
+        openChatWhenReady(null);
+      });
+    }
+  }, [pendingChatId, chats.data, chats.isFetching]); // eslint-disable-line react-hooks/exhaustive-deps
   const openSearch = usePeopleNav((state) => state.openSearch);
 
   const pending = (received.data ?? []).filter((transfer) => transfer.status === "PENDING");
@@ -67,13 +85,15 @@ const ChatsScreen = ({
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return (chats.data ?? []).filter((chat) => {
-      if (chat.type === "SUPPORT") return false;
+    const list = (chats.data ?? []).filter((chat) => {
+      // Your chat with the Turnupz team shows under All, at the top.
+      if (chat.type === "SUPPORT" && filter !== "all") return false;
       if (filter === "events" && chat.type !== "EVENT_GROUP") return false;
       if (filter === "organisers" && chat.type !== "DIRECT") return false;
       if (filter === "friends" && chat.type !== "PERSON") return false;
       return !needle || `${chat.eventName} ${chat.preview ?? ""}`.toLowerCase().includes(needle);
     });
+    return [...list.filter((c) => c.type === "SUPPORT"), ...list.filter((c) => c.type !== "SUPPORT")];
   }, [chats.data, filter, query]);
 
   const unreadEvents = (chats.data ?? []).filter((chat) => chat.type === "EVENT_GROUP" && (chat.unreadCount ?? 0) > 0).length;

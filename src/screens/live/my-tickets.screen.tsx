@@ -21,6 +21,7 @@ import TextComponent from "@/shared/components/text/text.component";
 import { formatEventClock, formatEventDay } from "@/shared/utils/event-time";
 import { TICKET_LIST_BACKGROUND } from "./event-ticket-card";
 import TransferTicketSheet from "./transfer-ticket.sheet";
+import { OrderSheet } from "@/screens/profile/orders.screen";
 import { ReceivedTransferRow, SentTransferRow } from "./sent-transfers";
 import { BackHeader, EmptyNote, Loading } from "./explore-details";
 import {
@@ -235,10 +236,13 @@ const PassViewer = ({
   group,
   colour,
   onClose,
-  onSend
+  onSend,
+  onViewOrder
 }: {
   group: TEventTickets | null;
   colour: string;
+  /** The order a ticket came from (only on tickets you bought). */
+  onViewOrder: (orderId: string) => void;
   onClose: () => void;
   /** Transfers one pass to someone; offered only on passes that can be. */
   onSend: (ticket: TLiveUserTicket) => void;
@@ -323,17 +327,31 @@ const PassViewer = ({
                     colour={colour}
                   />
                 </Pressable>
-                {canTransfer(ticket) && !isPast(group.event) && (
-                  <Pressable
-                    onPress={() => onSend(ticket)}
-                    accessibilityRole="button"
-                    className="h-11 flex-row items-center justify-center rounded-full bg-white/10 px-6"
-                  >
-                    <TextComponent className="font-semibold text-white">
-                      Transfer
-                    </TextComponent>
-                  </Pressable>
-                )}
+                <View className="flex-row gap-2">
+                  {canTransfer(ticket) && !isPast(group.event) && (
+                    <Pressable
+                      onPress={() => onSend(ticket)}
+                      accessibilityRole="button"
+                      className="h-11 flex-row items-center justify-center rounded-full bg-white/10 px-6"
+                    >
+                      <TextComponent className="font-semibold text-white">
+                        Transfer
+                      </TextComponent>
+                    </Pressable>
+                  )}
+                  {/* Receipts and help live with the order (only yours, not one sent to you). */}
+                  {!!ticket.orderId && (
+                    <Pressable
+                      onPress={() => onViewOrder(ticket.orderId!)}
+                      accessibilityRole="button"
+                      className="h-11 flex-row items-center justify-center rounded-full bg-white/10 px-6"
+                    >
+                      <TextComponent className="font-semibold text-white">
+                        View order
+                      </TextComponent>
+                    </Pressable>
+                  )}
+                </View>
               </View>
             ))}
           </ScrollView>
@@ -681,6 +699,8 @@ const LiveMyTicketsScreen = ({
   const showPast = tab === "past";
   const [open, setOpen] = useState<TEventTickets | null>(null);
   const [sending, setSending] = useState<TLiveUserTicket | null>(null);
+  // An order opened from a pass ("View order").
+  const [viewingOrderId, setViewingOrderId] = useState<string | null>(null);
   // The event the ticket being sent is for (the passes close before sending).
   const [sendingEventName, setSendingEventName] = useState("this event");
   const sent = useSentTransfers();
@@ -810,6 +830,15 @@ const LiveMyTicketsScreen = ({
       style={{ backgroundColor: TICKET_LIST_BACKGROUND }}
     >
       <BackHeader title="My tickets" onBack={onBack} />
+      {/* No connection, but the copy on the phone still gets you in. */}
+      {!!error && !!data && (
+        <View className="mx-4 mt-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: "#FFF3E0" }}>
+          <TextComponent className="text-xs font-semibold leading-4" style={{ color: "#9A3412" }}>
+            You're offline. These are the tickets saved on your phone, and they
+            still work at the door.
+          </TextComponent>
+        </View>
+      )}
       {tab === "refunds" ? (
         <BrandRefreshList
           data={refundedItems}
@@ -923,6 +952,11 @@ const LiveMyTicketsScreen = ({
         />
       )}
       <PassViewer
+        onViewOrder={(orderId) => {
+          // One sheet at a time on iOS: let the passes slide away first.
+          setOpen(null);
+          setTimeout(() => setViewingOrderId(orderId), 450);
+        }}
         group={open}
         colour={open ? colourOf(open, list.indexOf(open)) : INK}
         onClose={() => setOpen(null)}
@@ -934,6 +968,7 @@ const LiveMyTicketsScreen = ({
           setTimeout(() => setSending(ticket), 450);
         }}
       />
+      <OrderSheet orderId={viewingOrderId} onClose={() => setViewingOrderId(null)} />
       <TransferTicketSheet
         ticket={sending}
         eventName={sendingEventName}

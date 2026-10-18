@@ -2,6 +2,8 @@ import { useCallback } from "react";
 import { getData, setHeaderAuthorization } from "../../api";
 import { constructErrorMessage } from "../../api/functions";
 import useUserStore, { TUser } from "../stores/user.store";
+import { queryClient } from "../query-client";
+import { clearSavedTickets } from "@/screens/live/live-api";
 const useUser = () => {
   const setUserDetails = useUserStore((state) => state.setUser);
   const setUserNotVerifiedDetails = useUserStore(
@@ -44,6 +46,9 @@ const useUser = () => {
   const logoutUser = useCallback(async () => {
     setHeaderAuthorization();
     clearUserStore();
+    // Nothing of theirs stays on the phone for whoever signs in next.
+    queryClient.clear();
+    clearSavedTickets();
   }, []);
 
   return {
