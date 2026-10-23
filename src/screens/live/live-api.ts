@@ -38,10 +38,27 @@ export type TBlogPost = {
   updatedAt?: string;
 };
 
+/** One day of a multi-day event, in order. */
+export type TLiveEventDay = {
+  id: string;
+  startsAt: string;
+  endsAt?: string | null;
+  /** Shown instead of the date when set, e.g. "Opening night". */
+  label?: string | null;
+  position: number;
+  /** Who performs that day, headliner first (on the event's detail). */
+  performers?: TLivePerformerSummary[];
+};
+
 export type TLiveEvent = {
   id: string;
   name: string;
+  /** When it starts: the first day, for a multi-day event. */
   date: string;
+  /** A multi-day event's days; empty or missing for a one-day event. */
+  days?: TLiveEventDay[];
+  /** When a multi-day event ends; null for a one-day event. */
+  endDate?: string | null;
   timezone?: string;
   image?: string;
   medias?: string[];
@@ -84,6 +101,8 @@ export type TLiveTicket = {
   salesEndAt?: string | null;
   maxPerOrder?: number | null;
   isOnSale?: boolean;
+  /** For a multi-day event: the days it admits on. Empty means every day. */
+  dayIds?: string[];
 };
 
 export type TLiveOrder = {

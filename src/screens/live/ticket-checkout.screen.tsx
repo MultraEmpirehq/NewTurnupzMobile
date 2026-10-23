@@ -20,6 +20,7 @@ import { constructErrorMessage } from "@/api/functions";
 import { postData } from "@/api";
 import useUserStore from "@/shared/stores/user.store";
 import { describeTicketSaleState, ticketSaleState } from "@/shared/utils/ticket-sales";
+import { ticketDaysLabel } from "@/shared/utils/event-days";
 import { orderOutcome } from "@/shared/utils/order-status";
 import { BRAND } from "@/shared/utils/brand-colors";
 import {
@@ -488,6 +489,8 @@ const LiveTicketCheckoutScreen = ({
 
       {tickets.map((ticket) => {
         const saleNote = describeTicketSaleState(ticketSaleState(ticket), event.timezone);
+        // Which days of a multi-day event it gets you in on.
+        const daysNote = ticketDaysLabel(ticket.dayIds, event);
         const soldOut = maxFor(ticket) === 0 && (ticket.available ?? 1) === 0;
         const count = quantities[ticket.id] ?? 0;
         const isSelected = count > 0;
@@ -511,6 +514,11 @@ const LiveTicketCheckoutScreen = ({
                     <TextComponent numberOfLines={2} className="text-[15px] font-bold text-zinc-950">
                       {ticket.name}
                     </TextComponent>
+                    {!!daysNote && (
+                      <TextComponent className="mt-1 text-xs font-bold" style={{ color: "#0577FA" }}>
+                        {daysNote}
+                      </TextComponent>
+                    )}
                     {!!saleNote && (
                       <TextComponent className="mt-1.5 text-xs font-semibold text-sky-700">
                         {saleNote}

@@ -19,6 +19,12 @@ import BrandRefreshList from "@/shared/components/brand-refresh/brand-refresh-li
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
 import TextComponent from "@/shared/components/text/text.component";
 import { formatEventClock, formatEventDay } from "@/shared/utils/event-time";
+import {
+  eventDateRange,
+  eventEndsAt,
+  isMultiDay,
+  ticketDaysLabel
+} from "@/shared/utils/event-days";
 import { TICKET_LIST_BACKGROUND } from "./event-ticket-card";
 import TransferTicketSheet from "./transfer-ticket.sheet";
 import { OrderSheet } from "@/screens/profile/orders.screen";
@@ -56,12 +62,17 @@ const NOT_USED = { label: "Not used", bg: "#f1f2f5", fg: "#52525b" };
 
 type TEventTickets = { event: TLiveEvent; tickets: TLiveUserTicket[] };
 
-/** An event counts as past six hours after it starts. */
+/** An event counts as past six hours after it starts (after its last day, for a multi-day event). */
 const isPast = (event: TLiveEvent) =>
-  new Date(event.date).getTime() < Date.now() - 6 * 60 * 60 * 1000;
+  eventEndsAt(event).getTime() < Date.now() - 6 * 60 * 60 * 1000;
 
-/** A ticket's state; once the event is over an unused ticket is "Not used", never "Ready". */
+/**
+ * A ticket's state; once the event is over an unused ticket is "Not used", never
+ * "Ready". A multi-day pass stays ready while it has days left: it's scanned in
+ * once each day.
+ */
 const statusOf = (ticket: TLiveUserTicket, event?: TLiveEvent) => {
+  if (event && isMultiDay(event) && !isPast(event)) return STATUS.UN_USED;
   const status = STATUS[ticket.status ?? "UN_USED"] ?? STATUS.UN_USED;
   return event && isPast(event) && status === STATUS.UN_USED
     ? NOT_USED
@@ -70,6 +81,7 @@ const statusOf = (ticket: TLiveUserTicket, event?: TLiveEvent) => {
 
 /** "Today", "Tomorrow", or the day itself, then the time, on the venue's clock. */
 const whenOf = (event: TLiveEvent) => {
+  if (isMultiDay(event)) return eventDateRange(event);
   const start = new Date(event.date);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -153,7 +165,10 @@ const Pass = ({
   const past = isPast(event);
   const status = statusOf(ticket, event);
   const code = (ticket.code || ticket.id).toUpperCase();
-  const usable = !past && (ticket.status === "UN_USED" || !ticket.status);
+  // A multi-day pass is scanned once a day, so it stays live until the last day.
+  const usable =
+    !past && (isMultiDay(event) || ticket.status === "UN_USED" || !ticket.status);
+  const daysNote = ticketDaysLabel(ticket.ticket?.dayIds, event);
   return (
     <View style={{ width }} className="overflow-hidden rounded-3xl bg-white">
       <PassHeader event={event} colour={colour} />
@@ -195,6 +210,11 @@ const Pass = ({
             >
               {ticket.ticket?.name ?? "Ticket"}
             </TextComponent>
+            {!!daysNote && (
+              <TextComponent numberOfLines={2} className="mt-0.5 text-xs font-bold" style={{ color: "#0577FA" }}>
+                {daysNote}
+              </TextComponent>
+            )}
           </View>
           <View className="items-end">
             <TextComponent className="text-[11px] uppercase tracking-wider text-zinc-400">
