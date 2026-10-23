@@ -257,6 +257,8 @@ export type TLivePerformerSummary = {
   image?: string | null;
   /** Approved by the Turnupz team: shown with the verified tick. */
   isVerified?: boolean;
+  /** Top of the bill; an event or a day can have several. */
+  isHeadliner?: boolean;
 };
 
 export type TLivePerformer = TLivePerformerSummary & {

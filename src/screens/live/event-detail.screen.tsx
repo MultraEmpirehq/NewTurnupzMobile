@@ -104,13 +104,13 @@ const EventSchedule = ({
               showsHorizontalScrollIndicator={false}
               contentContainerClassName="mt-3 gap-4 pr-4"
             >
-              {day.performers.map((performer, index) => (
+              {day.performers.map((performer) => (
                 <Pressable
                   key={performer.id}
                   onPress={() => onOpenPerformer?.(performer.id)}
                   disabled={!onOpenPerformer || performer.isVerified === false}
                   accessibilityRole="button"
-                  accessibilityLabel={`${performer.name}${index === 0 ? ", headliner" : ""}`}
+                  accessibilityLabel={`${performer.name}${performer.isHeadliner ? ", headliner" : ""}`}
                   className="w-[72px] items-center gap-1.5"
                 >
                   <PerformerAvatar performer={performer} size={56} />
@@ -123,7 +123,7 @@ const EventSchedule = ({
                     className="text-center text-[11px] font-bold text-zinc-900"
                   />
                   <TextComponent className="text-[10px] text-zinc-500">
-                    {index === 0 && day.performers!.length > 1
+                    {performer.isHeadliner && day.performers!.length > 1
                       ? "Headliner"
                       : PERFORMER_TYPE_LABELS[performer.type]}
                   </TextComponent>
@@ -437,14 +437,14 @@ const LiveEventDetailScreen = ({
                     showsHorizontalScrollIndicator={false}
                     contentContainerClassName="mt-3 gap-4 pr-4"
                   >
-                    {event.performers.map((performer, index) => (
+                    {event.performers.map((performer) => (
                       <Pressable
                         key={performer.id}
                         onPress={() => onOpenPerformer?.(performer.id)}
                         // Only verified performers have a page to open.
                         disabled={!onOpenPerformer || performer.isVerified === false}
                         accessibilityRole="button"
-                        accessibilityLabel={`${performer.name}${index === 0 ? ", headliner" : ""}`}
+                        accessibilityLabel={`${performer.name}${performer.isHeadliner ? ", headliner" : ""}`}
                         className="w-[84px] items-center gap-1.5"
                       >
                         <PerformerAvatar performer={performer} size={72} />
@@ -457,7 +457,9 @@ const LiveEventDetailScreen = ({
                           className="text-center text-xs font-bold text-zinc-900"
                         />
                         <TextComponent className="text-[10px] text-zinc-500">
-                          {index === 0 ? "Headliner" : PERFORMER_TYPE_LABELS[performer.type]}
+                          {performer.isHeadliner && event.performers!.length > 1
+                            ? "Headliner"
+                            : PERFORMER_TYPE_LABELS[performer.type]}
                         </TextComponent>
                       </Pressable>
                     ))}
