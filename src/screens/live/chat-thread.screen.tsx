@@ -1,11 +1,11 @@
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useMemo, useState } from "react";
+import SafeModal from "@/shared/components/modals/safe-modal";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   TextInput,
@@ -34,6 +34,7 @@ import {
   useLiveChats,
   useLiveUserTickets
 } from "./live-api";
+import GroupInfo from "./group-info";
 
 /**
  * One chat, in the redesign. An event's group chat pins your tickets and the
@@ -116,6 +117,7 @@ const ChatThreadScreen = ({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [attachEvent, setAttachEvent] = useState(true);
+  const [showInfo, setShowInfo] = useState(false);
 
   const isGroup = chat?.type === "EVENT_GROUP";
   // Opened from an event's "Message organiser" before the list has caught up.
@@ -202,6 +204,7 @@ const ChatThreadScreen = ({
   const options = () => {
     if (!chatId || !chat) return;
     Alert.alert(title, undefined, [
+      ...(isGroup ? [{ text: "Group info and members", onPress: () => setShowInfo(true) }] : []),
       {
         text: chat.muted ? "Turn alerts back on" : "Mute this chat",
         onPress: () => {
@@ -299,7 +302,7 @@ const ChatThreadScreen = ({
   const showQuickQuestions = isDirect && !iAmOrganiser && canPost && !draft && list.length < 4;
 
   return (
-    <Modal visible={!!chatId} animationType="slide" onRequestClose={onClose}>
+    <SafeModal visible={!!chatId} animationType="slide" onRequestClose={showInfo ? () => setShowInfo(false) : onClose}>
       <SafeAreaView className="flex-1" style={{ backgroundColor: "#F7F8FB" }} edges={["top", "bottom"]}>
         <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
           {/* Header */}
@@ -316,10 +319,22 @@ const ChatThreadScreen = ({
             ) : (
               <Avatar name={title} size={40} dark={isDirect && !iAmOrganiser} />
             )}
-            <View className="flex-1">
+            {/* A group chat's name opens who's in it. */}
+            <Pressable
+              onPress={() => setShowInfo(true)}
+              disabled={!isGroup || !chat}
+              accessibilityRole={isGroup ? "button" : undefined}
+              accessibilityHint={isGroup ? "Shows the members" : undefined}
+              className="flex-1"
+            >
               <TextComponent numberOfLines={1} className="text-[15px] font-extrabold text-zinc-950">{title}</TextComponent>
-              {!!headerSubtitle && <TextComponent numberOfLines={1} className="text-[11.5px] font-semibold text-zinc-500">{headerSubtitle}</TextComponent>}
-            </View>
+              {!!headerSubtitle && (
+                <TextComponent numberOfLines={1} className="text-[11.5px] font-semibold text-zinc-500">
+                  {headerSubtitle}
+                  {isGroup && chat ? " · Members ›" : ""}
+                </TextComponent>
+              )}
+            </Pressable>
             {!!chat && (
               <Pressable onPress={options} accessibilityRole="button" accessibilityLabel="Chat options" hitSlop={10} className="size-9 items-center justify-center">
                 <TextComponent className="text-lg font-extrabold text-zinc-400">⋯</TextComponent>
@@ -454,9 +469,12 @@ const ChatThreadScreen = ({
             </View>
           )}
         </KeyboardAvoidingView>
+        {showInfo && isGroup && !!chat && (
+          <GroupInfo chat={chat} iAmOrganiser={iAmOrganiser} onOpenEvent={onOpenEvent} onClose={() => setShowInfo(false)} />
+        )}
       </SafeAreaView>
       <OverlayToast />
-    </Modal>
+    </SafeModal>
   );
 };
 

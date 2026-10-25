@@ -10,7 +10,7 @@ import useUserStore from "@/shared/stores/user.store";
 import { BRAND } from "@/shared/utils/brand-colors";
 import ChatThreadScreen from "@/screens/live/chat-thread.screen";
 import { TLiveChat, useAcceptTransfer, useLiveChats, useReceivedTransfers } from "@/screens/live/live-api";
-import { usePeopleNav } from "@/screens/people/people-modal";
+import { usePeopleNav } from "@/screens/people/people-nav";
 
 /**
  * Messages: every chat you're in. You join an event's group chat as soon as

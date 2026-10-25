@@ -58,6 +58,10 @@ const TextComponent = forwardRef<
       className={cn(getTextClassName({ size }), className)}
       ref={ref}
       style={[textStyle, brandFontStyle(className, textStyle)]}
+      // The phone's text size still counts, but only so far: past this, words
+      // outgrow their boxes and get cut off (common on Android). The app's own
+      // Larger text setting makes text bigger in a way the layouts allow for.
+      maxFontSizeMultiplier={1.25}
       {...props}
     >
       {children}

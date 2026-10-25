@@ -1,5 +1,6 @@
 import React, { memo } from "react";
-import { Linking, Modal, Pressable, View } from "react-native";
+import SafeModal from "@/shared/components/modals/safe-modal";
+import { Linking, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import TextComponent from "@/shared/components/text/text.component";
@@ -47,7 +48,7 @@ const LeavingTurnupzSheet = ({
   };
 
   return (
-    <Modal visible={!!url} transparent animationType="slide" onRequestClose={onClose}>
+    <SafeModal visible={!!url} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable className="flex-1" style={{ backgroundColor: "rgba(7,20,29,0.45)" }} onPress={onClose} accessibilityLabel="Close" />
       <View className="rounded-t-3xl bg-white px-5 pt-3" style={{ paddingBottom: insets.bottom + 16 }}>
         <View className="mb-4 h-1 w-10 self-center rounded-full bg-zinc-200" />
@@ -94,7 +95,7 @@ const LeavingTurnupzSheet = ({
         </Pressable>
       </View>
       <OverlayToast />
-    </Modal>
+    </SafeModal>
   );
 };
 

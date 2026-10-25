@@ -21,9 +21,11 @@ import {
   formatEventTime
 } from "@/shared/utils/event-time";
 import {
+  recordEventView,
   eventPlace,
   PERFORMER_TYPE_LABELS,
   TLiveEvent,
+  TLiveEventDay,
   useLiveEvent
 ,
   useTicketsHeldFor
@@ -33,6 +35,12 @@ import ReportEventSheet from "./report-event.sheet";
 import LeavingTurnupzSheet from "./leaving-turnupz.sheet";
 import BlogPostScreen, { postedAgo } from "./blog-post.screen";
 import { useBlogReadsStore } from "@/shared/stores/blog-reads.store";
+import {
+  eventDateRange,
+  eventDayName,
+  eventEndsAt,
+  isMultiDay
+} from "@/shared/utils/event-days";
 
 const ACCENT = "#00B2FF";
 
@@ -50,6 +58,88 @@ const ClockIcon = () => (
     <Circle cx={12} cy={12} r={8} stroke={ACCENT} strokeWidth={2} />
     <Path d="M12 8V12L15 14" stroke={ACCENT} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
   </Svg>
+);
+
+/**
+ * A multi-day event's programme: each day with its times and who's on, headliner
+ * first. Stands in for the single line-up a one-day event shows.
+ */
+const EventSchedule = ({
+  days,
+  timezone,
+  onOpenPerformer
+}: {
+  days: TLiveEventDay[];
+  timezone?: string;
+  onOpenPerformer?: (performerId: string) => void;
+}) => (
+  <View className="mt-6">
+    <TextComponent className="text-base font-bold text-primary">Schedule</TextComponent>
+    <View className="mt-3 gap-3">
+      {days.map((day, dayIndex) => (
+        <View key={day.id} className="rounded-2xl border border-zinc-100 bg-white p-4">
+          <View className="flex-row items-center justify-between gap-3">
+            <View className="flex-1">
+              <TextComponent className="text-[10px] font-extrabold tracking-widest text-primary">
+                DAY {dayIndex + 1}
+              </TextComponent>
+              <TextComponent numberOfLines={1} className="mt-0.5 text-base font-bold text-zinc-950">
+                {eventDayName(day, timezone)}
+              </TextComponent>
+            </View>
+            <View className="items-end">
+              {!!day.label && (
+                <TextComponent className="text-xs text-zinc-500">
+                  {formatEventDay(day.startsAt, timezone, { withYear: false })}
+                </TextComponent>
+              )}
+              <TextComponent className="text-xs font-semibold text-zinc-700">
+                {formatEventClock(day.startsAt, timezone)}
+                {day.endsAt ? ` – ${formatEventClock(day.endsAt, timezone)}` : ""}
+              </TextComponent>
+            </View>
+          </View>
+          {day.performers?.length ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerClassName="mt-3 gap-4 pr-4"
+            >
+              {day.performers.map((performer) => (
+                <Pressable
+                  key={performer.id}
+                  onPress={() => onOpenPerformer?.(performer.id)}
+                  disabled={!onOpenPerformer || performer.isVerified === false}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${performer.name}${performer.isHeadliner ? ", headliner" : ""}`}
+                  className="w-[72px] items-center gap-1.5"
+                >
+                  <PerformerAvatar performer={performer} size={56} />
+                  <VerifiedName
+                    name={performer.name}
+                    verified={performer.isVerified}
+                    numberOfLines={2}
+                    tickSize={11}
+                    centered
+                    className="text-center text-[11px] font-bold text-zinc-900"
+                  />
+                  <TextComponent className="text-[10px] text-zinc-500">
+                    {performer.isHeadliner && day.performers!.length > 1
+                      ? "Headliner"
+                      : PERFORMER_TYPE_LABELS[performer.type]}
+                  </TextComponent>
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : (
+            <TextComponent className="mt-2 text-sm text-zinc-500">
+              Line-up to be announced.
+            </TextComponent>
+          )}
+        </View>
+      ))}
+    </View>
+  </View>
 );
 
 const TABS = ["Overview", "Media", "Activities", "Blogs"] as const;
@@ -76,6 +166,10 @@ const LiveEventDetailScreen = ({
 }) => {
   useHardwareBack(onBack);
   const { data: event, isLoading, error, refetch } = useLiveEvent(eventId);
+  // Counted once per opening, for the organiser's page views.
+  useEffect(() => {
+    recordEventView(eventId);
+  }, [eventId]);
   const [activeTab, setActiveTab] = useState<TTab>("Overview");
   const [isReporting, setIsReporting] = useState(false);
   const [openPostId, setOpenPostId] = useState<string | null>(null);
@@ -110,7 +204,9 @@ const LiveEventDetailScreen = ({
     [event]
   );
   const zoneNote = event ? eventZoneNote(event.timezone) : null;
-  const isPast = event ? new Date(event.date) < new Date() : false;
+  // A multi-day event is on until its last day is over.
+  const isPast = event ? eventEndsAt(event) < new Date() : false;
+  const multiDay = isMultiDay(event);
 
   // Tickets you already hold for this event: say so, and offer them first.
   const held = useTicketsHeldFor(event?.id);
@@ -209,13 +305,17 @@ const LiveEventDetailScreen = ({
             <View className="flex-row items-center">
               <CalendarIcon />
               <TextComponent className="ml-2 text-sm text-zinc-700">
-                {formatEventDay(event.date, event.timezone)}
+                {multiDay
+                  ? `${eventDateRange(event)} · ${event.days!.length} days`
+                  : formatEventDay(event.date, event.timezone)}
               </TextComponent>
             </View>
             <View className="flex-row items-center">
               <ClockIcon />
               <TextComponent className="ml-2 text-sm font-semibold text-primary">
-                {formatEventClock(event.date, event.timezone)}
+                {multiDay
+                  ? `Starts ${formatEventClock(event.date, event.timezone)}`
+                  : formatEventClock(event.date, event.timezone)}
               </TextComponent>
               {!!zoneNote && (
                 <TextComponent className="ml-2 text-xs text-zinc-500">
@@ -325,7 +425,14 @@ const LiveEventDetailScreen = ({
               <TextComponent className="mt-2 text-sm leading-5 text-zinc-950">
                 {event.description || "The organiser hasn't added a description yet."}
               </TextComponent>
-              {!!event.performers?.length && (
+              {multiDay && (
+                <EventSchedule
+                  days={event.days!}
+                  timezone={event.timezone}
+                  onOpenPerformer={onOpenPerformer}
+                />
+              )}
+              {!multiDay && !!event.performers?.length && (
                 <>
                   <TextComponent className="mt-6 text-base font-bold text-primary">
                     Line-up
@@ -335,14 +442,14 @@ const LiveEventDetailScreen = ({
                     showsHorizontalScrollIndicator={false}
                     contentContainerClassName="mt-3 gap-4 pr-4"
                   >
-                    {event.performers.map((performer, index) => (
+                    {event.performers.map((performer) => (
                       <Pressable
                         key={performer.id}
                         onPress={() => onOpenPerformer?.(performer.id)}
                         // Only verified performers have a page to open.
                         disabled={!onOpenPerformer || performer.isVerified === false}
                         accessibilityRole="button"
-                        accessibilityLabel={`${performer.name}${index === 0 ? ", headliner" : ""}`}
+                        accessibilityLabel={`${performer.name}${performer.isHeadliner ? ", headliner" : ""}`}
                         className="w-[84px] items-center gap-1.5"
                       >
                         <PerformerAvatar performer={performer} size={72} />
@@ -355,7 +462,9 @@ const LiveEventDetailScreen = ({
                           className="text-center text-xs font-bold text-zinc-900"
                         />
                         <TextComponent className="text-[10px] text-zinc-500">
-                          {index === 0 ? "Headliner" : PERFORMER_TYPE_LABELS[performer.type]}
+                          {performer.isHeadliner && event.performers!.length > 1
+                            ? "Headliner"
+                            : PERFORMER_TYPE_LABELS[performer.type]}
                         </TextComponent>
                       </Pressable>
                     ))}

@@ -1,7 +1,8 @@
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useEffect, useMemo, useState } from "react";
 import { BRAND } from "@/shared/utils/brand-colors";
-import { Modal, Pressable, ScrollView, Switch, View } from "react-native";
+import SafeModal from "@/shared/components/modals/safe-modal";
+import { Pressable, ScrollView, Switch, View } from "react-native";
 import { Calendar, DateData } from "react-native-calendars";
 import { SafeAreaView } from "react-native-safe-area-context";
 import TextComponent from "@/shared/components/text/text.component";
@@ -285,7 +286,7 @@ const ExploreFilterSheet: React.FC<TExploreFilterSheetProps> = ({
   const today = toKey(Date.now());
 
   return (
-    <Modal
+    <SafeModal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
@@ -544,7 +545,7 @@ const ExploreFilterSheet: React.FC<TExploreFilterSheetProps> = ({
         </View>
       </SafeAreaView>
       <OverlayToast />
-    </Modal>
+    </SafeModal>
   );
 };
 

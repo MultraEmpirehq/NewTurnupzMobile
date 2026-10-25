@@ -1,15 +1,15 @@
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import SafeModal from "@/shared/components/modals/safe-modal";
 import {
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
   View
 } from "react-native";
-import QRCode from "react-native-qrcode-svg";
+import LiveTicketQr from "./live-ticket-qr";
 import { BRAND } from "@/shared/utils/brand-colors";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { LinearTransition } from "react-native-reanimated";
@@ -19,6 +19,12 @@ import BrandRefreshList from "@/shared/components/brand-refresh/brand-refresh-li
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
 import TextComponent from "@/shared/components/text/text.component";
 import { formatEventClock, formatEventDay } from "@/shared/utils/event-time";
+import {
+  eventDateRange,
+  eventEndsAt,
+  isMultiDay,
+  ticketDaysLabel
+} from "@/shared/utils/event-days";
 import { TICKET_LIST_BACKGROUND } from "./event-ticket-card";
 import TransferTicketSheet from "./transfer-ticket.sheet";
 import { OrderSheet } from "@/screens/profile/orders.screen";
@@ -56,12 +62,17 @@ const NOT_USED = { label: "Not used", bg: "#f1f2f5", fg: "#52525b" };
 
 type TEventTickets = { event: TLiveEvent; tickets: TLiveUserTicket[] };
 
-/** An event counts as past six hours after it starts. */
+/** An event counts as past six hours after it starts (after its last day, for a multi-day event). */
 const isPast = (event: TLiveEvent) =>
-  new Date(event.date).getTime() < Date.now() - 6 * 60 * 60 * 1000;
+  eventEndsAt(event).getTime() < Date.now() - 6 * 60 * 60 * 1000;
 
-/** A ticket's state; once the event is over an unused ticket is "Not used", never "Ready". */
+/**
+ * A ticket's state; once the event is over an unused ticket is "Not used", never
+ * "Ready". A multi-day pass stays ready while it has days left: it's scanned in
+ * once each day.
+ */
 const statusOf = (ticket: TLiveUserTicket, event?: TLiveEvent) => {
+  if (event && isMultiDay(event) && !isPast(event)) return STATUS.UN_USED;
   const status = STATUS[ticket.status ?? "UN_USED"] ?? STATUS.UN_USED;
   return event && isPast(event) && status === STATUS.UN_USED
     ? NOT_USED
@@ -70,6 +81,7 @@ const statusOf = (ticket: TLiveUserTicket, event?: TLiveEvent) => {
 
 /** "Today", "Tomorrow", or the day itself, then the time, on the venue's clock. */
 const whenOf = (event: TLiveEvent) => {
+  if (isMultiDay(event)) return eventDateRange(event);
   const start = new Date(event.date);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -153,7 +165,10 @@ const Pass = ({
   const past = isPast(event);
   const status = statusOf(ticket, event);
   const code = (ticket.code || ticket.id).toUpperCase();
-  const usable = !past && (ticket.status === "UN_USED" || !ticket.status);
+  // A multi-day pass is scanned once a day, so it stays live until the last day.
+  const usable =
+    !past && (isMultiDay(event) || ticket.status === "UN_USED" || !ticket.status);
+  const daysNote = ticketDaysLabel(ticket.ticket?.dayIds, event);
   return (
     <View style={{ width }} className="overflow-hidden rounded-3xl bg-white">
       <PassHeader event={event} colour={colour} />
@@ -171,15 +186,13 @@ const Pass = ({
             </TextComponent>
           </View>
         ) : (
-          <View
-            className="rounded-2xl bg-white p-3"
-            style={{ opacity: usable ? 1 : 0.35 }}
-          >
-            <QRCode
-              value={ticket.qrCodeValue || ticket.code || ticket.id}
-              size={Math.min(220, width - 90)}
-            />
-          </View>
+          // Live: changes every 30 seconds, so a screenshot won't get in.
+          <LiveTicketQr
+            ticket={ticket}
+            size={Math.min(200, width - 110)}
+            usable={usable}
+            holderName={ticket.currentHolderName}
+          />
         )}
         <TextComponent className="mt-3 text-xs font-semibold tracking-widest text-zinc-500">
           {code}
@@ -195,6 +208,11 @@ const Pass = ({
             >
               {ticket.ticket?.name ?? "Ticket"}
             </TextComponent>
+            {!!daysNote && (
+              <TextComponent numberOfLines={2} className="mt-0.5 text-xs font-bold" style={{ color: "#0577FA" }}>
+                {daysNote}
+              </TextComponent>
+            )}
           </View>
           <View className="items-end">
             <TextComponent className="text-[11px] uppercase tracking-wider text-zinc-400">
@@ -253,7 +271,7 @@ const PassViewer = ({
   const count = group?.tickets.length ?? 0;
 
   return (
-    <Modal
+    <SafeModal
       visible={!!group}
       animationType="slide"
       presentationStyle="fullScreen"
@@ -381,7 +399,7 @@ const PassViewer = ({
         </TextComponent>
       </SafeAreaView>
       <OverlayToast />
-    </Modal>
+    </SafeModal>
   );
 };
 
@@ -593,10 +611,7 @@ const WalletCard = ({
             className="mt-3 items-center overflow-hidden"
             style={{ height: QR_PEEK }}
           >
-            <QRCode
-              value={ticket.qrCodeValue || ticket.code || ticket.id}
-              size={176}
-            />
+            <LiveTicketQr ticket={ticket} size={176} usable={!past} compact />
             <LinearGradient
               colors={["rgba(255,255,255,0)", "#ffffff"]}
               style={{
