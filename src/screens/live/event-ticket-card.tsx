@@ -108,7 +108,7 @@ const EventTicketCard: React.FC<TEventTicketCardProps> = ({
               )}
               {!!category && !sponsored && (
                 <View className="rounded-full bg-white/90 px-3 py-1">
-                  <TextComponent className="text-xs font-semibold text-zinc-900">
+                  <TextComponent numberOfLines={1} className="text-xs font-semibold text-zinc-900">
                     {category}
                   </TextComponent>
                 </View>
@@ -170,10 +170,11 @@ const EventTicketCard: React.FC<TEventTicketCardProps> = ({
 
         <View className="flex-row items-center gap-4 py-4 pl-5 pr-3">
           <View className="w-12 items-center rounded-2xl bg-[#eef6ff] py-2">
-            <TextComponent className="text-[11px] font-semibold text-zinc-900">
+            {/* One line each, shrinking to fit: never "DE" / "1". */}
+            <TextComponent numberOfLines={1} adjustsFontSizeToFit className="text-[11px] font-semibold text-zinc-900">
               {dateBlock?.month ?? "TBA"}
             </TextComponent>
-            <TextComponent className="text-xl font-bold leading-6 text-zinc-900">
+            <TextComponent numberOfLines={1} adjustsFontSizeToFit className="text-xl font-bold leading-6 text-zinc-900">
               {dateBlock?.day ?? "--"}
             </TextComponent>
           </View>

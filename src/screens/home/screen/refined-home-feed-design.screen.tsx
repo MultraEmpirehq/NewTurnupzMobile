@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { ScreenActiveContext } from "@/shared/hooks/use-screen-active";
 import { useHomePlace } from "@/shared/hooks/use-home-place";
 import { StatusBar } from "expo-status-bar";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
 import ContainerComponent from "@/shared/components/container/container.component";
 import TextComponent from "@/shared/components/text/text.component";
@@ -179,16 +180,19 @@ const PreviewBottomNav = ({
     (state) => state.screenReaderHints
   );
   const highContrast = useAccessibilityStore((state) => state.highContrast);
+  // Above Android's navigation buttons and the iPhone home bar, not under them.
+  const insets = useSafeAreaInsets();
   return (
     <View
+      style={{ height: (buttonLabels ? 76 : 68) + insets.bottom, paddingBottom: insets.bottom }}
       className={
         highContrast
           ? buttonLabels
-            ? "h-[76px] flex-row items-center justify-between border-t-2 border-white bg-black px-3"
-            : "h-[68px] flex-row items-center justify-around border-t-2 border-white bg-black px-2"
+            ? "flex-row items-center justify-between border-t-2 border-white bg-black px-3"
+            : "flex-row items-center justify-around border-t-2 border-white bg-black px-2"
           : buttonLabels
-            ? "h-[76px] flex-row items-center justify-between border-t border-zinc-200 bg-white px-3"
-            : "h-[68px] flex-row items-center justify-around border-t border-zinc-200 bg-white px-2"
+            ? "flex-row items-center justify-between border-t border-zinc-200 bg-white px-3"
+            : "flex-row items-center justify-around border-t border-zinc-200 bg-white px-2"
       }
     >
       {BOTTOM_NAV_ITEMS.map((item) => {
