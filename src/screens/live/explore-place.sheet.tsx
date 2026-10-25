@@ -1,6 +1,7 @@
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, TextInput, View } from "react-native";
+import SafeModal from "@/shared/components/modals/safe-modal";
+import { Pressable, ScrollView, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Path, Svg } from "react-native-svg";
 import TextComponent from "@/shared/components/text/text.component";
@@ -115,7 +116,7 @@ const ExplorePlaceSheet = ({
   };
 
   return (
-    <Modal
+    <SafeModal
       visible={visible}
       transparent
       animationType="slide"
@@ -205,7 +206,7 @@ const ExplorePlaceSheet = ({
         </View>
       </SafeAreaView>
       <OverlayToast />
-    </Modal>
+    </SafeModal>
   );
 };
 

@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { createMMKV } from "react-native-mmkv";
 import { USER_AUTH_STORAGE_ID, USER_AUTH_STORAGE_KEY } from "@env";
 import { DEFAULT_STORAGE_ENCRYPTION_KEY } from "../utils/constant";
+import { useOrganiserStore } from "./organiser.store";
 
 // MMKV can't encrypt in a browser, so the web preview stores without it; phones
 // keep the session encrypted.
@@ -43,7 +44,8 @@ export type TUser = {
   mobileNumber?: string;
   isMobileNumberVerified?: boolean;
   isEmailVerified?: boolean;
-  role?: "";
+  /** "USER", "VENDOR" or "ADMIN". */
+  role?: string;
   createdAt?: Date;
   gender?: UserGender;
   dateOfBirth?: Date;
@@ -92,7 +94,11 @@ const useUserStore = create<IUserStore>()(
       setFetchingUserDetailsError: (fetchingUserDetailsError) =>
         set({ fetchingUserDetailsError }),
       setUserToken: (userToken) => set({ userToken }),
-      clearUserStore: () => set(initialState),
+      clearUserStore: () => {
+        // The next person to sign in starts as an attendee.
+        useOrganiserStore.getState().reset();
+        set(initialState);
+      },
       setUserNotVerifiedDetails: (userNotVerifiedDetails) =>
         set({ userNotVerifiedDetails })
     }),

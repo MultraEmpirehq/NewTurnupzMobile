@@ -1,12 +1,12 @@
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import { getEventPublicUrl } from "@/screens/home/service/event-actions.service";
 import React, { memo, useEffect, useState } from "react";
+import SafeModal from "@/shared/components/modals/safe-modal";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Linking,
   Platform,
-  Modal,
   Pressable,
   ScrollView,
   Share,
@@ -639,7 +639,7 @@ const EventOptionsSheet = ({
 
   return (
     <>
-      <Modal
+      <SafeModal
         visible={!!event}
         transparent
         animationType="slide"
@@ -666,7 +666,7 @@ const EventOptionsSheet = ({
           )}
         </KeyboardAvoidingView>
         <OverlayToast />
-      </Modal>
+      </SafeModal>
       <ChatThreadScreen
         chatId={thread?.id ?? null}
         title={thread?.title ?? ""}

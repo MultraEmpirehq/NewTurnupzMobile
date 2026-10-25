@@ -21,6 +21,7 @@ import {
   formatEventTime
 } from "@/shared/utils/event-time";
 import {
+  recordEventView,
   eventPlace,
   PERFORMER_TYPE_LABELS,
   TLiveEvent,
@@ -165,6 +166,10 @@ const LiveEventDetailScreen = ({
 }) => {
   useHardwareBack(onBack);
   const { data: event, isLoading, error, refetch } = useLiveEvent(eventId);
+  // Counted once per opening, for the organiser's page views.
+  useEffect(() => {
+    recordEventView(eventId);
+  }, [eventId]);
   const [activeTab, setActiveTab] = useState<TTab>("Overview");
   const [isReporting, setIsReporting] = useState(false);
   const [openPostId, setOpenPostId] = useState<string | null>(null);

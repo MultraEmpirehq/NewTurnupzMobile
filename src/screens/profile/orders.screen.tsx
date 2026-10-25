@@ -2,10 +2,10 @@ import React, { memo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { postData } from "@/api";
 import { constructErrorMessage } from "@/api/functions";
+import SafeModal from "@/shared/components/modals/safe-modal";
 import {
   ActivityIndicator,
   Linking,
-  Modal,
   Pressable,
   ScrollView,
   TextInput,
@@ -498,7 +498,7 @@ export const OrderSheet = memo(function OrderSheet({
   const shown = order ?? loaded.data ?? null;
   const visible = !!order || !!orderId;
   return (
-    <Modal
+    <SafeModal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
@@ -543,7 +543,7 @@ export const OrderSheet = memo(function OrderSheet({
         )}
       </SafeAreaView>
       <OverlayToast />
-    </Modal>
+    </SafeModal>
   );
 });
 

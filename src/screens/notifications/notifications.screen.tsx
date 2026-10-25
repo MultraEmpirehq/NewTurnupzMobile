@@ -19,8 +19,9 @@ import {
   useLiveUserTickets,
   useReceivedTransfers
 } from "@/screens/live/live-api";
-import { usePeopleNav } from "@/screens/people/people-modal";
+import { usePeopleNav } from "@/screens/people/people-nav";
 import { useBlogReadsStore } from "@/shared/stores/blog-reads.store";
+import { rememberArrival, srcOfHref } from "@/shared/stores/arrival.store";
 import {
   NOTIFICATION_FILTERS,
   TNotification,
@@ -276,7 +277,11 @@ const NotificationsScreen = ({
     } else if (item.data?.action === "open_chat" && typeof item.data.chatId === "string") {
       openChatWhenReady(item.data.chatId);
       onOpenMessages();
-    } else if (item.eventId) onOpenEvent(item.eventId);
+    } else if (item.eventId) {
+      // A reminder or "new from someone you follow": the sale counts for it.
+      rememberArrival(item.eventId, { src: srcOfHref(item.href) });
+      onOpenEvent(item.eventId);
+    }
     else if (item.category === "ORDER_UPDATES" || item.category === "TICKET_TRANSFERS") onOpenTickets();
   };
 

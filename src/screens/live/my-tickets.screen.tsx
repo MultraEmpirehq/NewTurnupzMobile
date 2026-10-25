@@ -1,15 +1,15 @@
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import SafeModal from "@/shared/components/modals/safe-modal";
 import {
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
   View
 } from "react-native";
-import QRCode from "react-native-qrcode-svg";
+import LiveTicketQr from "./live-ticket-qr";
 import { BRAND } from "@/shared/utils/brand-colors";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { LinearTransition } from "react-native-reanimated";
@@ -186,15 +186,13 @@ const Pass = ({
             </TextComponent>
           </View>
         ) : (
-          <View
-            className="rounded-2xl bg-white p-3"
-            style={{ opacity: usable ? 1 : 0.35 }}
-          >
-            <QRCode
-              value={ticket.qrCodeValue || ticket.code || ticket.id}
-              size={Math.min(220, width - 90)}
-            />
-          </View>
+          // Live: changes every 30 seconds, so a screenshot won't get in.
+          <LiveTicketQr
+            ticket={ticket}
+            size={Math.min(200, width - 110)}
+            usable={usable}
+            holderName={ticket.currentHolderName}
+          />
         )}
         <TextComponent className="mt-3 text-xs font-semibold tracking-widest text-zinc-500">
           {code}
@@ -273,7 +271,7 @@ const PassViewer = ({
   const count = group?.tickets.length ?? 0;
 
   return (
-    <Modal
+    <SafeModal
       visible={!!group}
       animationType="slide"
       presentationStyle="fullScreen"
@@ -401,7 +399,7 @@ const PassViewer = ({
         </TextComponent>
       </SafeAreaView>
       <OverlayToast />
-    </Modal>
+    </SafeModal>
   );
 };
 
@@ -613,10 +611,7 @@ const WalletCard = ({
             className="mt-3 items-center overflow-hidden"
             style={{ height: QR_PEEK }}
           >
-            <QRCode
-              value={ticket.qrCodeValue || ticket.code || ticket.id}
-              size={176}
-            />
+            <LiveTicketQr ticket={ticket} size={176} usable={!past} compact />
             <LinearGradient
               colors={["rgba(255,255,255,0)", "#ffffff"]}
               style={{

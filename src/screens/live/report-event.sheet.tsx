@@ -1,6 +1,7 @@
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useEffect, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, TextInput, View } from "react-native";
+import SafeModal from "@/shared/components/modals/safe-modal";
+import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from "react-native";
 import TextComponent from "@/shared/components/text/text.component";
 import { onError, onSuccess } from "@/shared/components/status/toast";
 import { constructErrorMessage } from "@/api/functions";
@@ -55,7 +56,7 @@ const ReportEventSheet = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <SafeModal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable className="flex-1 bg-black/40" onPress={() => !sending && onClose()} />
       <View className="max-h-[85%] rounded-t-3xl bg-white px-5 pb-8 pt-5">
         <TextComponent className="text-lg font-bold text-zinc-950">
@@ -127,7 +128,7 @@ const ReportEventSheet = ({
         </View>
       </View>
       <OverlayToast />
-    </Modal>
+    </SafeModal>
   );
 };
 

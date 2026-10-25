@@ -1,15 +1,20 @@
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useState } from "react";
-import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, TextInput, View } from "react-native";
+import SafeModal from "@/shared/components/modals/safe-modal";
+import { ActivityIndicator, FlatList, Pressable, ScrollView, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
-import { create } from "zustand";
 import TextComponent from "@/shared/components/text/text.component";
 import { onError } from "@/shared/components/status/toast";
 import { constructErrorMessage } from "@/api/functions";
 import { BRAND } from "@/shared/utils/brand-colors";
 import { ProfilePhoto } from "@/screens/profile/profile-photo";
 import ChatThreadScreen from "@/screens/live/chat-thread.screen";
+import { TPeoplePage, usePeopleNav } from "./people-nav";
+
+// Screens that only open a profile import this from ./people-nav, which keeps
+// them from pulling in this whole stack (and the chat screen inside it).
+export { usePeopleNav };
 import {
   TPersonCard,
   startPersonChat,
@@ -26,29 +31,7 @@ import {
  * follow each other can message each other from here.
  */
 
-type TPage =
-  | { kind: "person"; username: string }
-  | { kind: "connections"; username: string; which: "followers" | "following" }
-  | { kind: "search" };
-
-type TPeopleNav = {
-  stack: TPage[];
-  openPerson: (username: string) => void;
-  openConnections: (username: string, which: "followers" | "following") => void;
-  openSearch: () => void;
-  back: () => void;
-  close: () => void;
-};
-
-export const usePeopleNav = create<TPeopleNav>((set) => ({
-  stack: [],
-  openPerson: (username) => set((state) => ({ stack: [...state.stack, { kind: "person", username }] })),
-  openConnections: (username, which) =>
-    set((state) => ({ stack: [...state.stack, { kind: "connections", username, which }] })),
-  openSearch: () => set((state) => ({ stack: [...state.stack, { kind: "search" }] })),
-  back: () => set((state) => ({ stack: state.stack.slice(0, -1) })),
-  close: () => set({ stack: [] })
-}));
+type TPage = TPeoplePage;
 
 const Header = ({ title, onBack }: { title: string; onBack: () => void }) => (
   <View className="h-14 flex-row items-center gap-2 border-b bg-white px-3" style={{ borderColor: "#EEF0F4" }}>
@@ -290,7 +273,7 @@ const PeopleModal = () => {
   };
 
   return (
-    <Modal visible={!!page} animationType="slide" onRequestClose={nav.back}>
+    <SafeModal visible={!!page} animationType="slide" onRequestClose={nav.back}>
       <SafeAreaView className="flex-1 bg-white" edges={["top", "bottom"]}>
         {page?.kind === "person" && <PersonPage key={`p-${page.username}-${nav.stack.length}`} username={page.username} onMessage={(person) => void message(person)} />}
         {page?.kind === "connections" && <ConnectionsPage key={`c-${page.username}-${nav.stack.length}`} username={page.username} which={page.which} />}
@@ -298,7 +281,7 @@ const PeopleModal = () => {
         <ChatThreadScreen chatId={chat?.id ?? null} title={chat?.title ?? ""} onClose={() => setChat(null)} />
       </SafeAreaView>
       <OverlayToast />
-    </Modal>
+    </SafeModal>
   );
 };
 

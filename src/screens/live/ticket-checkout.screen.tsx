@@ -8,6 +8,7 @@ import {
   ScrollView,
   Switch,
   StyleSheet,
+  TextInput,
   useWindowDimensions,
   View
 } from "react-native";
@@ -23,8 +24,10 @@ import { describeTicketSaleState, ticketSaleState } from "@/shared/utils/ticket-
 import { ticketDaysLabel } from "@/shared/utils/event-days";
 import { orderOutcome } from "@/shared/utils/order-status";
 import { BRAND } from "@/shared/utils/brand-colors";
+import { readArrival } from "@/shared/stores/arrival.store";
 import {
   cardLabel,
+  checkPromoCode,
   fetchOrder,
   formatMoney,
   formatZero,
@@ -32,6 +35,7 @@ import {
   TLiveEvent,
   TLiveOrder,
   TLiveTicket,
+  TPromoCheck,
   TSavedCard,
   useCreateOrder,
   useCreditBalance,
@@ -114,8 +118,61 @@ const LiveTicketCheckoutScreen = ({
     (sum, line) => sum + (line.ticket.price?.amount ?? 0) * line.quantity,
     0
   );
-  const total = selected ? formatMoney(orderAmount, selected.price) : "";
   const isFree = orderAmount <= 0;
+
+  // The organiser's promo code: checked with the API, taken off each paid ticket
+  // (never more than 90%). The API works out the exact amount when you pay.
+  const [promo, setPromo] = useState<TPromoCheck | null>(null);
+  const [promoInput, setPromoInput] = useState("");
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [promoChecking, setPromoChecking] = useState(false);
+  const applyPromo = useCallback(
+    async (raw: string, quiet = false) => {
+      const code = raw.trim().toUpperCase();
+      if (!code) return;
+      setPromoChecking(true);
+      try {
+        const checked = await checkPromoCode(event.id, code);
+        if (checked) {
+          setPromo(checked);
+          setPromoInput(checked.code);
+          setPromoOpen(true);
+        }
+      } catch (promoError) {
+        if (!quiet) {
+          onError(
+            constructErrorMessage(
+              promoError as TApiErrorResponseType,
+              "That code doesn't work for this event."
+            )
+          );
+        }
+      } finally {
+        setPromoChecking(false);
+      }
+    },
+    [event.id]
+  );
+  // A promoter's code they arrived with fills itself in.
+  useEffect(() => {
+    const code = readArrival(event.id).code;
+    if (code && user && !isRegistration) void applyPromo(code, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event.id, !!user]);
+  const promoDiscount =
+    !promo || isRegistration
+      ? 0
+      : lines.reduce((sum, line) => {
+          const price = line.ticket.price?.amount ?? 0;
+          if (price <= 0) return sum;
+          const most = Math.floor(price * 0.9);
+          const off = promo.discountPercent
+            ? Math.min(Math.round((price * promo.discountPercent) / 100), most)
+            : Math.min(promo.discountAmount?.amount ?? 0, most);
+          return sum + off * line.quantity;
+        }, 0);
+  const afterPromo = Math.max(orderAmount - promoDiscount, 0);
+  const total = selected ? formatMoney(afterPromo, selected.price) : "";
 
   // Turnupz Credit in the ticket's currency, spent first when switched on.
   const { data: credit } = useCreditBalance(!isRegistration);
@@ -126,9 +183,9 @@ const LiveTicketCheckoutScreen = ({
       ?.amount ?? 0;
   const creditApplied =
     !isFree && !isRegistration && useCredit
-      ? Math.min(creditAvailable, orderAmount)
+      ? Math.min(creditAvailable, afterPromo)
       : 0;
-  const toPay = Math.max(orderAmount - creditApplied, 0);
+  const toPay = Math.max(afterPromo - creditApplied, 0);
   const coveredByCredit = creditApplied > 0 && toPay === 0;
 
   // Pay with: a saved card (the one that pays first is picked), or a new card.
@@ -221,6 +278,8 @@ const LiveTicketCheckoutScreen = ({
   const pay = async () => {
     if (!selected || !selectedOnSale || quantity < 1) return;
     const one = lines.length === 1;
+    // What brought them here (a boost, a reminder…), for the organiser's results.
+    const source = readArrival(event.id).src;
     setIsSubmitting(true);
     try {
       if (isRegistration) {
@@ -251,6 +310,8 @@ const LiveTicketCheckoutScreen = ({
               }))
             }),
         ...(creditApplied > 0 ? { useCredit: true } : {}),
+        ...(promo ? { promoCode: promo.code } : {}),
+        ...(source ? { source } : {}),
         ...(needsCard
           ? payingCard
             ? { cardId: payingCard.id }
@@ -613,6 +674,75 @@ const LiveTicketCheckoutScreen = ({
               </TextComponent>
             </View>
           ))}
+          {!isFree && !isRegistration && (
+            <View className="mt-3 border-t border-zinc-100 pt-3">
+              {promo ? (
+                <View className="flex-row items-center justify-between gap-3">
+                  <View className="flex-1">
+                    <TextComponent className="text-sm font-bold text-emerald-700">
+                      {promo.code}
+                    </TextComponent>
+                    <TextComponent className="text-xs text-zinc-500">{promo.label}</TextComponent>
+                  </View>
+                  {promoDiscount > 0 && (
+                    <TextComponent className="text-sm font-bold text-emerald-700">
+                      −{formatMoney(promoDiscount, selected.price)}
+                    </TextComponent>
+                  )}
+                  <Pressable
+                    onPress={() => {
+                      setPromo(null);
+                      setPromoInput("");
+                    }}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove code ${promo.code}`}
+                  >
+                    <TextComponent className="text-xs font-bold text-zinc-500">Remove</TextComponent>
+                  </Pressable>
+                </View>
+              ) : promoOpen ? (
+                <View className="flex-row items-center gap-2">
+                  <TextInput
+                    value={promoInput}
+                    onChangeText={(text) => setPromoInput(text.toUpperCase())}
+                    onSubmitEditing={() => void applyPromo(promoInput)}
+                    placeholder="Promo code"
+                    placeholderTextColor="#a1a1aa"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    autoFocus
+                    maxLength={20}
+                    returnKeyType="done"
+                    accessibilityLabel="Promo code"
+                    className="h-11 flex-1 rounded-lg border border-zinc-200 px-3 text-sm text-zinc-950"
+                  />
+                  <Pressable
+                    disabled={!promoInput.trim() || promoChecking}
+                    onPress={() => void applyPromo(promoInput)}
+                    accessibilityRole="button"
+                    className={
+                      !promoInput.trim() || promoChecking
+                        ? "h-11 items-center justify-center rounded-lg bg-zinc-300 px-4"
+                        : "h-11 items-center justify-center rounded-lg bg-primary px-4"
+                    }
+                  >
+                    {promoChecking ? (
+                      <ActivityIndicator color="#ffffff" />
+                    ) : (
+                      <TextComponent className="text-sm font-bold text-white">Apply</TextComponent>
+                    )}
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable onPress={() => setPromoOpen(true)} hitSlop={6} accessibilityRole="button">
+                  <TextComponent className="text-sm font-semibold" style={{ color: BRAND.blueDeep }}>
+                    Have a promo code?
+                  </TextComponent>
+                </Pressable>
+              )}
+            </View>
+          )}
           {!isFree && !isRegistration && (
             <View className="mt-3 flex-row items-center justify-between gap-3 border-t border-zinc-100 pt-3">
               <View className="flex-1">
