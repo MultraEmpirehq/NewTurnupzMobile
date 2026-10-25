@@ -1,5 +1,6 @@
 import React, { memo, useEffect } from "react";
-import { Modal, Pressable, ScrollView, Share, View } from "react-native";
+import SafeModal from "@/shared/components/modals/safe-modal";
+import { Pressable, ScrollView, Share, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { WEB_APP_URL } from "@env";
@@ -53,7 +54,7 @@ const BlogPostScreen = ({
     if (post) markRead(post.id);
   }, [post, markRead]);
 
-  if (!post) return <Modal visible={false} />;
+  if (!post) return <SafeModal visible={false} />;
   const [cover, ...more] = post.images ?? [];
   const by = event.organizerName || "The organiser";
   const share = () =>
@@ -62,7 +63,7 @@ const BlogPostScreen = ({
     }).catch(() => undefined);
 
   return (
-    <Modal visible animationType="slide" onRequestClose={onClose}>
+    <SafeModal visible animationType="slide" onRequestClose={onClose}>
       <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
         <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
           {cover ? (
@@ -136,7 +137,7 @@ const BlogPostScreen = ({
         </Pressable>
       </SafeAreaView>
       <OverlayToast />
-    </Modal>
+    </SafeModal>
   );
 };
 

@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import { useEffect } from "react";
 import { createMMKV } from "react-native-mmkv";
 import useUserStore from "@/shared/stores/user.store";
+import { rememberServerTime } from "@/shared/utils/live-code";
 import { useScreenActive } from "@/shared/hooks/use-screen-active";
 import { deleteData, getData, patchData, postData } from "@/api";
 import {
@@ -38,10 +39,34 @@ export type TBlogPost = {
   updatedAt?: string;
 };
 
+/** One day of a multi-day event, in order. */
+export type TLiveEventDay = {
+  id: string;
+  startsAt: string;
+  endsAt?: string | null;
+  /** Shown instead of the date when set, e.g. "Opening night". */
+  label?: string | null;
+  position: number;
+  /** Who performs that day, headliner first (on the event's detail). */
+  performers?: TLivePerformerSummary[];
+};
+
+/** How an event is selling, for the labels on its card. */
+export type TEventMomentum = {
+  sellingFast: boolean;
+  almostGone: boolean;
+  soldOut: boolean;
+};
+
 export type TLiveEvent = {
   id: string;
   name: string;
+  /** When it starts: the first day, for a multi-day event. */
   date: string;
+  /** A multi-day event's days; empty or missing for a one-day event. */
+  days?: TLiveEventDay[];
+  /** When a multi-day event ends; null for a one-day event. */
+  endDate?: string | null;
   timezone?: string;
   image?: string;
   medias?: string[];
@@ -64,6 +89,10 @@ export type TLiveEvent = {
   eventCountry?: string;
   activities?: { name: string; description?: string; date?: string }[];
   blogPosts?: TBlogPost[];
+  momentum?: TEventMomentum | null;
+  /** A paid boost: shown first and marked Sponsored. */
+  sponsored?: boolean;
+  boostId?: string;
   eventGuestsOfHonour?: {
     name?: string;
     firstName?: string;
@@ -84,6 +113,8 @@ export type TLiveTicket = {
   salesEndAt?: string | null;
   maxPerOrder?: number | null;
   isOnSale?: boolean;
+  /** For a multi-day event: the days it admits on. Empty means every day. */
+  dayIds?: string[];
 };
 
 export type TLiveOrder = {
@@ -110,6 +141,8 @@ export type TLiveUserTicket = {
     transferable?: boolean;
     isTransferable?: boolean;
   };
+  /** For the QR that changes every 30 seconds; only on your own tickets. */
+  liveCode?: { secret: string; windowSeconds: number; serverTime: string } | null;
   /** Its latest transfer that wasn't cancelled; PENDING means it's on its way to someone. */
   transfer?: {
     id: string;
@@ -238,6 +271,8 @@ export type TLivePerformerSummary = {
   image?: string | null;
   /** Approved by the Turnupz team: shown with the verified tick. */
   isVerified?: boolean;
+  /** Top of the bill; an event or a day can have several. */
+  isHeadliner?: boolean;
 };
 
 export type TLivePerformer = TLivePerformerSummary & {
@@ -475,6 +510,10 @@ export const useCreateOrder = () => {
       cardId?: string;
       /** Keep the card used on the payment page for next time. */
       saveCard?: boolean;
+      /** The organiser's promo code, checked again when the order is made. */
+      promoCode?: string;
+      /** What brought them here (a boost, a reminder…), for the organiser's results. */
+      source?: string;
     }) => {
       const { data } = await postData<
         typeof body,
@@ -489,6 +528,26 @@ export const useCreateOrder = () => {
       queryClient.invalidateQueries({ queryKey: ["saved-cards"] });
     }
   });
+};
+
+export type TPromoCheck = {
+  code: string;
+  label: string;
+  discountPercent: number | null;
+  discountAmount: { amount: number } | null;
+};
+
+/** Checkout's "Apply": the code and what it takes off, or the API's reason it can't be used. */
+export const checkPromoCode = async (eventId: string, code: string) => {
+  const { data } = await getData<TPromoCheck>(
+    `/promo-codes/check?eventId=${eventId}&code=${encodeURIComponent(code)}`
+  );
+  return data?.data ?? null;
+};
+
+/** Counts the event page being opened, for the organiser's views. Never throws. */
+export const recordEventView = (eventId: string) => {
+  void postData(`/event/${eventId}/view`, {}).catch(() => undefined);
 };
 
 /** A card kept for next time. Only its brand and last 4 digits are ever shown. */
@@ -636,6 +695,9 @@ export const useLiveUserTickets = (enabled = true) => {
   useEffect(() => {
     if (!userId || !query.data || !query.isSuccess || query.isFetching) return;
     if (query.dataUpdatedAt === 0) return;
+    // Fresh from Turnupz: learn how far this phone's clock is out, for live codes.
+    const serverTime = query.data.pages[0]?.tickets.find((ticket) => ticket.liveCode)?.liveCode?.serverTime;
+    if (serverTime) rememberServerTime(serverTime, query.dataUpdatedAt);
     try {
       savedTickets.set(`tickets:${userId}`, JSON.stringify(query.data));
     } catch {
@@ -996,6 +1058,8 @@ export type TMyOrder = {
   reference?: string | null;
   status: string;
   statusReason?: string | null;
+  /** For an order waiting for payment: when its held seats are let go. */
+  holdExpiresAt?: string | null;
   quantity: number;
   createdAt: string;
   ticket?: { name?: string; event?: TLiveEvent };

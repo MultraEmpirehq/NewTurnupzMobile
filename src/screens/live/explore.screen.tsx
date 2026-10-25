@@ -43,6 +43,7 @@ import {
   useExplorePlaceStore
 } from "@/shared/stores/explore-place.store";
 import ExplorePlaceSheet from "./explore-place.sheet";
+import { SponsoredRail } from "./sponsored";
 import EventOptionsSheet, { TEventOptionsTarget } from "./event-options.sheet";
 import LiveEventDetailScreen from "./event-detail.screen";
 import {
@@ -1077,6 +1078,7 @@ const LiveExploreScreen = ({
       image={event.image ?? event.medias?.[0]}
       category={event.category?.name}
       place={eventPlace(event)}
+      momentum={event.momentum}
       onPress={() => onOpenEvent(event.id)}
       onMore={() => openCardOptions(event)}
     />
@@ -1264,10 +1266,37 @@ const LiveExploreScreen = ({
     </View>
   );
 
+  // Boosted events: at the top of Explore while browsing, and of search results.
+  const sponsoredPlacement = !isFiltering ? "EXPLORE" : isEvents && q ? "SEARCH" : null;
+  // The place is settled (picked, or the phone's own country found), so a
+  // boost from somewhere else never flashes up first.
+  const placeReady = storedPlace !== undefined || !locationsQuery.isPending;
+  const sponsored = sponsoredPlacement && (sponsoredPlacement === "SEARCH" || placeReady) && (
+    <View className={sponsoredPlacement === "SEARCH" ? "pb-2 pt-4" : "pb-2"}>
+      <SponsoredRail
+        placement={sponsoredPlacement}
+        q={sponsoredPlacement === "SEARCH" ? q : undefined}
+        countryCode={sponsoredPlacement === "SEARCH" ? undefined : place?.countryCode}
+        city={sponsoredPlacement === "SEARCH" ? undefined : place?.city}
+        cardWidth={railCardWidth}
+        onOpenEvent={onOpenEvent}
+      />
+    </View>
+  );
   const header = (
     <View>
       {filtersBlock}
-      {isFiltering ? resultsBlock : browseBlock}
+      {isFiltering ? (
+        <>
+          {resultsBlock}
+          {sponsored}
+        </>
+      ) : (
+        <>
+          {sponsored}
+          {browseBlock}
+        </>
+      )}
     </View>
   );
 
@@ -1581,6 +1610,7 @@ const LiveExploreScreen = ({
             image={item.image ?? item.medias?.[0]}
             category={item.category?.name}
             place={eventPlace(item)}
+            momentum={item.momentum}
             onPress={() => onOpenEvent(item.id)}
             onMore={() => openCardOptions(item)}
           />

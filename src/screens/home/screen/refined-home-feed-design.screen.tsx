@@ -6,11 +6,12 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { ScreenActiveContext } from "@/shared/hooks/use-screen-active";
 import { useHomePlace } from "@/shared/hooks/use-home-place";
 import { StatusBar } from "expo-status-bar";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
 import ContainerComponent from "@/shared/components/container/container.component";
 import TextComponent from "@/shared/components/text/text.component";
 import { TEventDetailsType } from "@/shared/utils/types";
-import TurnupzWordmark from "@/shared/assets/images/turnupz.png blue.png";
+import TurnupzWordmark from "@/shared/assets/images/turnupz-wordmark-blue.png";
 import { useAccessibilityStore } from "@/shared/stores/accessibility.store";
 import LiveEventDetailScreen from "@/screens/live/event-detail.screen";
 import LiveTicketCheckoutScreen from "@/screens/live/ticket-checkout.screen";
@@ -34,7 +35,17 @@ import BrandLoader from "@/shared/components/brand-loader/brand-loader.component
 import EventTicketCard, {
   TICKET_LIST_BACKGROUND
 } from "@/screens/live/event-ticket-card";
-import { eventPlace, TLiveEvent, useLiveEvents } from "@/screens/live/live-api";
+import {
+  eventPlace,
+  TEventMomentum,
+  TLiveEvent,
+  useLiveEvents
+} from "@/screens/live/live-api";
+import { FeaturedBoost } from "@/screens/live/sponsored";
+import OrganiserShellScreen from "@/screens/organiser/organiser-shell.screen";
+import ChooseModeSheet from "@/screens/organiser/choose-mode.sheet";
+import { useOrganiserAccess } from "@/screens/organiser/organiser-api";
+import { useOrganiserStore } from "@/shared/stores/organiser.store";
 
 type TFeedMediaKind = "image" | "video";
 type TFeedEvent = Omit<TEventDetailsType, "date"> & {
@@ -49,6 +60,8 @@ type TFeedEvent = Omit<TEventDetailsType, "date"> & {
   category?: string;
   /** Saved by the signed-in person (live events). */
   isFavorite?: boolean;
+  /** How it's selling, for the card's label. */
+  momentum?: TEventMomentum | null;
 };
 
 type TBottomNavId =
@@ -141,6 +154,7 @@ const toLiveFeedEvent = (event: TLiveEvent): TFeedEvent => ({
   timezone: event.timezone,
   category: event.category?.name,
   isFavorite: event.isFavorite,
+  momentum: event.momentum,
   description: event.description,
   venue: {
     id: event.venue?.id ?? `${event.id}-venue`,
@@ -166,16 +180,19 @@ const PreviewBottomNav = ({
     (state) => state.screenReaderHints
   );
   const highContrast = useAccessibilityStore((state) => state.highContrast);
+  // Above Android's navigation buttons and the iPhone home bar, not under them.
+  const insets = useSafeAreaInsets();
   return (
     <View
+      style={{ height: (buttonLabels ? 76 : 68) + insets.bottom, paddingBottom: insets.bottom }}
       className={
         highContrast
           ? buttonLabels
-            ? "h-[76px] flex-row items-center justify-between border-t-2 border-white bg-black px-3"
-            : "h-[68px] flex-row items-center justify-around border-t-2 border-white bg-black px-2"
+            ? "flex-row items-center justify-between border-t-2 border-white bg-black px-3"
+            : "flex-row items-center justify-around border-t-2 border-white bg-black px-2"
           : buttonLabels
-            ? "h-[76px] flex-row items-center justify-between border-t border-zinc-200 bg-white px-3"
-            : "h-[68px] flex-row items-center justify-around border-t border-zinc-200 bg-white px-2"
+            ? "flex-row items-center justify-between border-t border-zinc-200 bg-white px-3"
+            : "flex-row items-center justify-around border-t border-zinc-200 bg-white px-2"
       }
     >
       {BOTTOM_NAV_ITEMS.map((item) => {
@@ -268,6 +285,7 @@ const FeedCard = ({
     category={event.category}
     place={event.venueName}
     badge={event.mediaKind === "video" ? "Video" : undefined}
+    momentum={event.momentum}
     onPress={() => onOpenDetails?.(event)}
     onMore={() => onOpenSettings(event)}
   />
@@ -311,6 +329,20 @@ const RefinedHomeFeedDesignScreen = () => {
   const hiddenEventIds = useHiddenEventsStore((state) => state.hiddenEventIds);
   const syncHiddenEvents = useHiddenEventsStore((state) => state.sync);
   const isSignedIn = !!useUserStore((state) => state.userToken);
+  const userId = useUserStore((state) => state.user?.id);
+  // Organisers and team members: which app opens, asked once and remembered.
+  const organiser = useOrganiserAccess();
+  const mode = useOrganiserStore((state) => state.mode);
+  const setMode = useOrganiserStore((state) => state.setMode);
+  const askedFor = useOrganiserStore((state) => state.askedFor);
+  const markAsked = useOrganiserStore((state) => state.markAsked);
+  const inOrganiserMode = mode === "organiser" && organiser.canOrganise;
+  const askMode =
+    isSignedIn && !!userId && organiser.ready && organiser.canOrganise && !askedFor.includes(userId);
+  const chooseMode = (next: "attendee" | "organiser") => {
+    if (userId) markAsked(userId);
+    setMode(next);
+  };
   const unreadNotifications = useUnreadNotifications(isSignedIn);
   // Your tickets, loaded once when the app opens (all of them), so event pages
   // and cards know what you're going to, and a fresh copy is kept for offline.
@@ -456,7 +488,12 @@ const RefinedHomeFeedDesignScreen = () => {
         className="flex-1 w-full self-center bg-white"
         style={{ maxWidth: 430 }}
       >
-        {tabSlot(
+        {inOrganiserMode && (
+          <ScreenActiveContext.Provider value={!overlay}>
+            <OrganiserShellScreen onOpenEvent={(eventId) => setLiveEventId(eventId)} onAttendee={() => setMode("attendee")} />
+          </ScreenActiveContext.Provider>
+        )}
+        {!inOrganiserMode && tabSlot(
           "home",
           <>
             <View className="h-14 items-center justify-center border-b border-zinc-100 bg-white px-4">
@@ -473,6 +510,15 @@ const RefinedHomeFeedDesignScreen = () => {
               keyExtractor={(event) => event.id}
               style={{ backgroundColor: FEED_BACKGROUND }}
               contentContainerStyle={{ paddingTop: 16 }}
+              // A boosted event, big and marked Sponsored, where the phone is.
+              ListHeaderComponent={
+                <FeaturedBoost
+                  countryCode={place?.countryCode}
+                  city={place?.city}
+                  enabled={homePlace.ready}
+                  onOpenEvent={setLiveEventId}
+                />
+              }
               renderItem={({ item }) => (
                 <FeedCard
                   event={item}
@@ -538,14 +584,14 @@ const RefinedHomeFeedDesignScreen = () => {
             />
           </>
         )}
-        {tabSlot(
+        {!inOrganiserMode && tabSlot(
           "search",
           <LiveExploreScreen
             onBook={setLiveBookingEvent}
             scrollToTopSignal={exploreTopSignal}
           />
         )}
-        {tabSlot(
+        {!inOrganiserMode && tabSlot(
           "messages",
           <ChatsScreen
             onOpenEvent={(eventId) => setLiveEventId(eventId)}
@@ -555,7 +601,7 @@ const RefinedHomeFeedDesignScreen = () => {
             }}
           />
         )}
-        {tabSlot(
+        {!inOrganiserMode && tabSlot(
           "favorites",
           <NotificationsScreen
             onOpenEvent={(eventId) => setLiveEventId(eventId)}
@@ -566,7 +612,7 @@ const RefinedHomeFeedDesignScreen = () => {
             }}
           />
         )}
-        {tabSlot(
+        {!inOrganiserMode && tabSlot(
           "profile",
           <ProfileScreen
             onOpenEvent={(eventId) => setLiveEventId(eventId)}
@@ -578,7 +624,7 @@ const RefinedHomeFeedDesignScreen = () => {
           />
         )}
         {/* My tickets is a page of its own: opened fresh each time. */}
-        {isTicketsTab && (
+        {!inOrganiserMode && isTicketsTab && (
           <ScreenActiveContext.Provider value={!overlay}>
             <LiveMyTicketsScreen
               openEventId={ticketsOpenEventId}
@@ -589,7 +635,7 @@ const RefinedHomeFeedDesignScreen = () => {
             />
           </ScreenActiveContext.Provider>
         )}
-        {!isTicketsTab && (
+        {!inOrganiserMode && !isTicketsTab && (
           <PreviewBottomNav
             activeTab={activeTab}
             onTabPress={onTabPress}
@@ -600,6 +646,11 @@ const RefinedHomeFeedDesignScreen = () => {
           event={optionsEvent}
           onClose={() => setOptionsEvent(null)}
           onOpenEvent={(eventId) => setLiveEventId(eventId)}
+        />
+        <ChooseModeSheet
+          visible={askMode && !overlay}
+          who={organiser.isVendor ? "You run events" : organiser.teams[0] ? `${organiser.teams[0].name} added you to their team` : "You can scan tickets at the door"}
+          onChoose={chooseMode}
         />
         {/* Someone's profile, their followers, finding people: opened from anywhere. */}
         <PeopleModal />

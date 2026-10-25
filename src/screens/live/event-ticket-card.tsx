@@ -1,5 +1,5 @@
 import React, { memo } from "react";
-import { useTicketsHeldFor } from "./live-api";
+import { TEventMomentum, useTicketsHeldFor } from "./live-api";
 import { Pressable, View } from "react-native";
 import { Circle, Path, Svg } from "react-native-svg";
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
@@ -28,7 +28,21 @@ type TEventTicketCardProps = {
   onMore?: () => void;
   /** A fixed width for side-scrolling rails; full width in lists otherwise. */
   width?: number;
+  /** How it's selling: Selling fast, Almost gone or Sold out. */
+  momentum?: TEventMomentum | null;
+  /** A paid boost: outlined and marked Sponsored. */
+  sponsored?: boolean;
 };
+
+/** The one selling label worth showing, strongest first. */
+const momentumLabel = (momentum?: TEventMomentum | null) =>
+  momentum?.soldOut
+    ? { text: "🏆 Sold out", background: "#fcd34d", color: "#0b1d2a" }
+    : momentum?.almostGone
+      ? { text: "Almost gone", background: "#fbbf24", color: "#0b1d2a" }
+      : momentum?.sellingFast
+        ? { text: "🔥 Selling fast", background: "#f97316", color: "#ffffff" }
+        : null;
 
 /**
  * An event as a ticket stub, matching the web's card: the poster with its
@@ -46,14 +60,17 @@ const EventTicketCard: React.FC<TEventTicketCardProps> = ({
   eventId,
   onPress,
   onMore,
-  width
+  width,
+  momentum,
+  sponsored
 }) => {
   const going = useTicketsHeldFor(eventId) > 0;
+  const selling = momentumLabel(momentum);
   const dateBlock = formatEventDateBlock(date, timezone);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Open details for ${name}`}
+      accessibilityLabel={`Open details for ${name}${sponsored ? ", sponsored" : ""}`}
       onPress={onPress}
       className={width ? "mb-5 rounded-3xl bg-white" : "mx-4 mb-5 rounded-3xl bg-white"}
       style={{
@@ -65,7 +82,14 @@ const EventTicketCard: React.FC<TEventTicketCardProps> = ({
         elevation: 3
       }}
     >
-      <View className="overflow-hidden rounded-3xl border border-black/5">
+      <View
+        className={
+          sponsored
+            ? "overflow-hidden rounded-3xl border-2"
+            : "overflow-hidden rounded-3xl border border-black/5"
+        }
+        style={sponsored ? { borderColor: "rgba(5,119,250,0.6)" } : undefined}
+      >
         <View className="relative aspect-[4/3] w-full bg-[#eef6ff]">
           {!!image && (
             <CustomImage
@@ -75,19 +99,35 @@ const EventTicketCard: React.FC<TEventTicketCardProps> = ({
               contentFit="cover"
             />
           )}
-          {!!category && (
-            <View className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1">
-              <TextComponent className="text-xs font-semibold text-zinc-900">
-                {category}
-              </TextComponent>
+          {(sponsored || !!category) && (
+            <View className="absolute left-3 top-3 flex-row gap-1.5">
+              {sponsored && (
+                <View className="rounded-full bg-black/55 px-3 py-1">
+                  <TextComponent className="text-xs font-bold text-white">Sponsored</TextComponent>
+                </View>
+              )}
+              {!!category && !sponsored && (
+                <View className="rounded-full bg-white/90 px-3 py-1">
+                  <TextComponent numberOfLines={1} className="text-xs font-semibold text-zinc-900">
+                    {category}
+                  </TextComponent>
+                </View>
+              )}
             </View>
           )}
-          {(going || !!badge) && (
+          {(going || !!badge || !!selling) && (
             <View className="absolute right-3 top-3 flex-row gap-1.5">
               {going && (
                 // You already hold tickets for this one.
                 <View className="flex-row items-center gap-1 rounded-full px-3 py-1" style={{ backgroundColor: "#0577FA" }}>
                   <TextComponent className="text-xs font-bold text-white">✓ Going</TextComponent>
+                </View>
+              )}
+              {!!selling && !going && (
+                <View className="rounded-full px-3 py-1" style={{ backgroundColor: selling.background }}>
+                  <TextComponent className="text-xs font-extrabold" style={{ color: selling.color }}>
+                    {selling.text}
+                  </TextComponent>
                 </View>
               )}
               {!!badge && (
@@ -130,10 +170,11 @@ const EventTicketCard: React.FC<TEventTicketCardProps> = ({
 
         <View className="flex-row items-center gap-4 py-4 pl-5 pr-3">
           <View className="w-12 items-center rounded-2xl bg-[#eef6ff] py-2">
-            <TextComponent className="text-[11px] font-semibold text-zinc-900">
+            {/* One line each, shrinking to fit: never "DE" / "1". */}
+            <TextComponent numberOfLines={1} adjustsFontSizeToFit className="text-[11px] font-semibold text-zinc-900">
               {dateBlock?.month ?? "TBA"}
             </TextComponent>
-            <TextComponent className="text-xl font-bold leading-6 text-zinc-900">
+            <TextComponent numberOfLines={1} adjustsFontSizeToFit className="text-xl font-bold leading-6 text-zinc-900">
               {dateBlock?.day ?? "--"}
             </TextComponent>
           </View>

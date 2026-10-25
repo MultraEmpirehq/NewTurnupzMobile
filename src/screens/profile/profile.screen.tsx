@@ -1,3 +1,5 @@
+import { useOrganiserAccess } from "@/screens/organiser/organiser-api";
+import { useOrganiserStore } from "@/shared/stores/organiser.store";
 import React, { memo, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -50,7 +52,7 @@ import ProfileSettingsScreen from "./profile-settings.screen";
 import EditProfileScreen from "./edit-profile.screen";
 import WalletScreen from "./wallet.screen";
 import { ProfilePhoto } from "./profile-photo";
-import { usePeopleNav } from "@/screens/people/people-modal";
+import { usePeopleNav } from "@/screens/people/people-nav";
 import { usePerson } from "@/screens/people/people-api";
 import { maskAmount, useBalancePrivacyStore } from "@/shared/stores/balance-privacy.store";
 import {
@@ -181,6 +183,8 @@ const ProfileScreen = ({
   const [optionsEvent, setOptionsEvent] = useState<TEventOptionsTarget | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  const organiser = useOrganiserAccess();
+  const setOrganiserMode = useOrganiserStore((state) => state.setMode);
   const tickets = useLiveUserTickets();
   const saved = useLiveEvents({ isFavorite: "true", limit: "50" }, isSignedIn);
   const follows = useFollows(isSignedIn);
@@ -571,6 +575,31 @@ const ProfileScreen = ({
           </View>
         </View>
 
+
+        {/* Organisers and team members: the way into organiser mode. */}
+        {organiser.canOrganise && (
+          <View className="mx-5 mt-4 rounded-2xl p-4" style={{ backgroundColor: BRAND.ink }}>
+            <TextComponent className="text-[11px] font-bold tracking-widest text-white/60">
+              {organiser.isVendor ? "YOU RUN EVENTS" : "YOU'RE ON A TEAM"}
+            </TextComponent>
+            <TextComponent numberOfLines={1} className="mt-0.5 text-base font-extrabold text-white">
+              {organiser.isVendor ? name : organiser.teams[0]?.name ?? "Door access"}
+            </TextComponent>
+            <TextComponent className="text-xs text-white/70">
+              {organiser.scanEvents.length
+                ? `${organiser.scanEvents.length} live or upcoming ${organiser.scanEvents.length === 1 ? "event" : "events"}`
+                : "Sales, your events and the door"}
+            </TextComponent>
+            <Pressable
+              onPress={() => setOrganiserMode("organiser")}
+              accessibilityRole="button"
+              className="mt-3 h-11 items-center justify-center rounded-xl"
+              style={{ backgroundColor: BRAND.blue }}
+            >
+              <TextComponent className="text-sm font-extrabold text-white">⇄ Switch to organiser</TextComponent>
+            </Pressable>
+          </View>
+        )}
 
         <View className="mx-5 mt-4 flex-row gap-2.5">
           <Pressable

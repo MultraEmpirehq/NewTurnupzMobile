@@ -1,9 +1,9 @@
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useEffect, useState } from "react";
+import SafeModal from "@/shared/components/modals/safe-modal";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   TextInput,
@@ -95,7 +95,7 @@ const TransferTicketSheet = ({
   };
 
   return (
-    <Modal
+    <SafeModal
       visible={!!ticket}
       transparent
       animationType="slide"
@@ -187,7 +187,7 @@ const TransferTicketSheet = ({
         </View>
       </KeyboardAvoidingView>
       <OverlayToast />
-    </Modal>
+    </SafeModal>
   );
 };
 
