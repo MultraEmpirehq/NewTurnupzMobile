@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import ContainerComponent from "@/shared/components/container/container.component";
 import "@styles/global.css";
 import "@/shared/utils/css-interop";
+import "@/shared/i18n";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { View } from "react-native";
 import { themes } from "@/shared/utils/colors";

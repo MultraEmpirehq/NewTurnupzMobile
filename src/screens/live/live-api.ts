@@ -749,6 +749,8 @@ export type TLiveChat = {
   vendor?: { id?: string; name?: string; firstName?: string; lastName?: string };
   /** Chats between two people: the other person. */
   person?: { id: string; username: string | null; image: string | null } | null;
+  /** A message request: incoming waits for you to accept, outgoing for them. */
+  request?: "incoming" | "outgoing" | null;
 };
 
 export type TSharedEvent = {
@@ -778,6 +780,21 @@ export type TLiveChatMessage = {
 };
 
 /** The chats the signed-in person is in, most recent first. */
+/** Messages from people you don't follow back, waiting for you to accept. */
+export const useMessageRequests = (enabled = true) =>
+  useQuery({
+    queryKey: ["live-chats", "requests"],
+    queryFn: async () => {
+      const { data } = await getData<TLiveChat[]>("/chats?requests=true&limit=50");
+      return data?.data ?? [];
+    },
+    enabled
+  });
+
+/** Accept (it moves into your chats) or decline (it's removed; they aren't told). */
+export const answerMessageRequest = (chatId: string, accept: boolean) =>
+  postData(`/chats/${chatId}/request/${accept ? "accept" : "decline"}`, {});
+
 export const useLiveChats = (enabled = true) => {
   // Checked for new messages every 20 seconds, but only while it's on screen.
   const onScreen = useScreenActive();

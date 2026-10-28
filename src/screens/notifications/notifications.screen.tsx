@@ -1,7 +1,7 @@
 import React, { memo, useMemo, useState } from "react";
 import { useOpenChatStore } from "@/shared/stores/open-chat.store";
 import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, View } from "react-native";
-import Svg, { Circle, Path } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import TextComponent from "@/shared/components/text/text.component";
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
@@ -219,6 +219,7 @@ const NotificationsScreen = ({
   const [filter, setFilter] = useState<TNotificationFilter>("all");
   const [showSettings, setShowSettings] = useState(false);
   const openPerson = usePeopleNav((state) => state.openPerson);
+  const openFollowRequests = usePeopleNav((state) => state.openFollowRequests);
   const openPostWhenReady = useBlogReadsStore((state) => state.openPostWhenReady);
   const list = useNotifications(filter, isSignedIn);
   const unread = useUnreadNotifications(isSignedIn);
@@ -268,7 +269,9 @@ const NotificationsScreen = ({
 
   const open = (item: TNotification) => {
     if (!item.isRead) void markRead([item.id]);
-    if (item.data?.action === "open_person" && typeof item.data.username === "string") {
+    if (item.data?.action === "open_follow_requests") {
+      openFollowRequests();
+    } else if (item.data?.action === "open_person" && typeof item.data.username === "string") {
       openPerson(item.data.username);
     } else if (item.data?.action === "open_blog" && item.eventId && typeof item.data.postId === "string") {
       // The event page opens this post as soon as it has loaded.
@@ -302,22 +305,16 @@ const NotificationsScreen = ({
               <TextComponent className="text-[13px] font-bold" style={{ color: BRAND.blueDeep }}>Mark all read</TextComponent>
             </Pressable>
           )}
+          {/* Same button as Profile's settings, so settings always look alike. */}
           <Pressable
             onPress={() => setShowSettings(true)}
             accessibilityRole="button"
             accessibilityLabel="Notification settings"
-            className="size-9 items-center justify-center rounded-xl border bg-white"
-            style={{ borderColor: "#EEF0F4" }}
+            hitSlop={10}
+            className="size-10 items-center justify-center"
           >
-            <Svg width={18} height={18} viewBox="0 0 24 24">
-              <Circle cx={12} cy={12} r={3} fill="none" stroke={BRAND.ink} strokeWidth={1.8} />
-              <Path
-                d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"
-                fill="none"
-                stroke={BRAND.ink}
-                strokeWidth={1.8}
-                strokeLinejoin="round"
-              />
+            <Svg width={26} height={26} viewBox="0 0 24 24">
+              <Path d="M4.5 7h15M4.5 12h15M4.5 17h15" fill="none" stroke={BRAND.ink} strokeWidth={2.4} strokeLinecap="round" />
             </Svg>
           </Pressable>
         </View>

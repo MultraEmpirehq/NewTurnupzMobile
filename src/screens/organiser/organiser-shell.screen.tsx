@@ -171,15 +171,7 @@ const OrganiserShellScreen = ({
             {workspaces.length > 1 ? " ▾" : ""}
           </TextComponent>
         </Pressable>
-        <Pressable
-          onPress={onAttendee}
-          accessibilityRole="button"
-          accessibilityLabel="Switch to attendee"
-          className="rounded-full px-3 py-1.5"
-          style={{ backgroundColor: "rgba(255,255,255,0.14)" }}
-        >
-          <TextComponent className="text-xs font-bold text-white">⇄ Attendee</TextComponent>
-        </Pressable>
+        {/* Switching back to attendee lives on the Me tab only. */}
       </View>
 
       <View className="flex-1">
