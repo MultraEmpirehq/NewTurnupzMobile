@@ -587,24 +587,63 @@ const MESSAGE_POLICIES: TMessagePolicy[] = ["EVERYONE", "MUTUALS", "NOBODY"];
 const POLICY_KEY = { EVERYONE: "everyone", MUTUALS: "mutuals", NOBODY: "nobody" } as const;
 
 const PrivacyPage = ({ onBack, onOpenBlocked }: { onBack: () => void; onOpenBlocked: () => void }) => {
-  useHardwareBack(onBack);
   const { t } = useTranslation();
   const privacy = usePrivacy();
   const update = useUpdatePrivacy();
   const requests = useFollowRequests(!!privacy.data?.isPrivate);
   const openFollowRequests = usePeopleNav((state) => state.openFollowRequests);
-  const value = privacy.data;
+  const saved = privacy.data;
 
-  const change = async (next: Parameters<typeof update>[0]) => {
+  // Changes wait here until Save, which sends them in one request.
+  type TChange = Parameters<typeof update>[0];
+  const [draft, setDraft] = useState<TChange>({});
+  const [saving, setSaving] = useState(false);
+  const value = saved ? { ...saved, ...draft } : undefined;
+  const changes: TChange = {};
+  if (saved && draft.isPrivate !== undefined && draft.isPrivate !== saved.isPrivate) {
+    changes.isPrivate = draft.isPrivate;
+  }
+  if (saved && draft.messagePolicy && draft.messagePolicy !== saved.messagePolicy) {
+    changes.messagePolicy = draft.messagePolicy;
+  }
+  const dirty = Object.keys(changes).length > 0;
+
+  const save = async () => {
+    if (!dirty) return;
+    setSaving(true);
     try {
-      await update(next);
+      await update(changes);
+      setDraft({});
+      onSuccess(
+        [
+          t("privacy.saved"),
+          changes.isPrivate === undefined
+            ? null
+            : t(changes.isPrivate ? "privacy.nowPrivate" : "privacy.nowPublic"),
+          changes.messagePolicy ? t(`privacy.now${changes.messagePolicy}`) : null
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
     } catch (error) {
       onError(errorText(error, t("privacy.saveFailed")));
+    } finally {
+      setSaving(false);
     }
   };
 
+  // Leaving with changes not saved: ask, rather than lose them quietly.
+  const leave = () => {
+    if (!dirty) return onBack();
+    Alert.alert(t("privacy.unsavedTitle"), t("privacy.unsavedBody"), [
+      { text: t("privacy.keepEditing"), style: "cancel" },
+      { text: t("privacy.discard"), style: "destructive", onPress: onBack }
+    ]);
+  };
+  useHardwareBack(leave);
+
   return (
-    <Page title={t("settings.privacySettings")} onBack={onBack}>
+    <Page title={t("settings.privacySettings")} onBack={leave}>
       {!value ? (
         privacy.isLoading ? <Loading /> : (
           <TextComponent className="p-8 text-center text-sm text-zinc-500">{t("notificationSettings.loadFailed")}</TextComponent>
@@ -616,7 +655,7 @@ const PrivacyPage = ({ onBack, onOpenBlocked }: { onBack: () => void; onOpenBloc
               label={t("privacy.private")}
               hint={t("privacy.privateHint")}
               value={value.isPrivate}
-              onChange={(next) => void change({ isPrivate: next })}
+              onChange={(next) => setDraft((current) => ({ ...current, isPrivate: next }))}
               last={!value.isPrivate}
             />
             {value.isPrivate && (
@@ -636,7 +675,7 @@ const PrivacyPage = ({ onBack, onOpenBlocked }: { onBack: () => void; onOpenBloc
               return (
                 <Pressable
                   key={policy}
-                  onPress={() => !on && void change({ messagePolicy: policy })}
+                  onPress={() => setDraft((current) => ({ ...current, messagePolicy: policy }))}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: on }}
                   className={
@@ -664,6 +703,20 @@ const PrivacyPage = ({ onBack, onOpenBlocked }: { onBack: () => void; onOpenBloc
               );
             })}
           </Section>
+
+          {dirty && (
+            <View className="gap-2 px-4 pt-4">
+              <PrimaryButton label={t("privacy.saveChanges")} onPress={() => void save()} busy={saving} />
+              <Pressable
+                onPress={() => setDraft({})}
+                disabled={saving}
+                accessibilityRole="button"
+                className="h-11 items-center justify-center"
+              >
+                <TextComponent className="text-sm font-semibold text-zinc-600">{t("privacy.discard")}</TextComponent>
+              </Pressable>
+            </View>
+          )}
 
           <Section title={t("privacy.restricted")}>
             <Row
@@ -700,7 +753,7 @@ const BlockedPage = ({ onBack }: { onBack: () => void }) => {
           try {
             await blockPerson(id, false);
           } catch (error) {
-            onError(errorText(error, t("privacy.saveFailed")));
+            onError(errorText(error, t("privacy.unblockFailed")));
           } finally {
             setBusy(null);
           }

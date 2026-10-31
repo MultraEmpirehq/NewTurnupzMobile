@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import * as Location from "expo-location";
+import {
+  locationWasSkipped,
+  usePermissionsIntroStore
+} from "@/shared/stores/permissions-intro.store";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { createMMKV } from "react-native-mmkv";
@@ -51,7 +55,8 @@ const withTimeout = <T>(work: Promise<T>, ms: number) =>
 /** Asks the first time; true when the app may use the phone's location. */
 const locationAllowed = async () => {
   let permission = await Location.getForegroundPermissionsAsync();
-  if (permission.status === "undetermined" && permission.canAskAgain) {
+  // Not asked again here after "Not now" on the first-open step.
+  if (permission.status === "undetermined" && permission.canAskAgain && !locationWasSkipped()) {
     permission = await Location.requestForegroundPermissionsAsync();
   }
   return permission.status === "granted";
@@ -82,8 +87,11 @@ export const useHomePlace = () => {
   const { place, checkedAt, setPlace } = useHomePlaceStore();
   const fresh = !!place && Date.now() - checkedAt < FRESH_FOR;
   const [ready, setReady] = useState(fresh);
+  // The first-open step asks for location; Home waits for it, then looks again.
+  const permissionsSeen = usePermissionsIntroStore((state) => state.seen);
 
   useEffect(() => {
+    if (!permissionsSeen) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -106,7 +114,7 @@ export const useHomePlace = () => {
     return () => {
       cancelled = true;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [permissionsSeen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { ready, place: useHomePlaceStore((state) => state.place) };
 };

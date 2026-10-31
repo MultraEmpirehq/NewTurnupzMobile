@@ -164,6 +164,8 @@ export const eventPlace = (event?: TLiveEvent | null) => {
   return [venue, area].filter(Boolean).join(", ") || "Venue to be announced";
 };
 
+const DOLLAR_CURRENCIES = new Set(["CAD", "USD", "AUD", "NZD", "SGD", "HKD"]);
+
 export const formatPrice = (price?: TPrice | null, quantity = 1) => {
   if (!price || !price.amount) return "Free";
   if (quantity === 1 && price.formatted?.withCurrency) {
@@ -171,7 +173,11 @@ export const formatPrice = (price?: TPrice | null, quantity = 1) => {
   }
   const code = price.currency?.code || "NGN";
   try {
-    return new Intl.NumberFormat(price.currency?.locale || "en-NG", {
+    // Dollars share "$", so they're written CA$50 or US$50, as the API does.
+    const locale = DOLLAR_CURRENCIES.has(code.toUpperCase())
+      ? "en-GB"
+      : price.currency?.locale || "en-NG";
+    return new Intl.NumberFormat(locale, {
       style: "currency",
       currency: code,
       maximumFractionDigits: 2
@@ -517,7 +523,7 @@ export const useCreateOrder = () => {
     }) => {
       const { data } = await postData<
         typeof body,
-        { orderId: string; status: string; redirectUrl?: string }
+        { orderId: string; status: string; redirectUrl?: string; holdExpiresAt?: string | null }
       >("/order", body);
       return data?.data;
     },

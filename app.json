@@ -20,7 +20,7 @@
         "foregroundImage": "./src/shared/assets/images/adaptive-icon.png",
         "backgroundImage": "./src/shared/assets/images/adaptive-background.png",
         "monochromeImage": "./src/shared/assets/images/monochrome-icon.png",
-        "backgroundColor": "#0577FA"
+        "backgroundColor": "#8968C3"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,

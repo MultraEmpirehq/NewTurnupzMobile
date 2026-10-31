@@ -11,6 +11,14 @@ const fr: TTranslations = {
     unread: "{{label}}, {{count}} non lues",
     opens: "Ouvre la section {{label}}"
   },
+  permissionsIntro: {
+    title: "Découvrez ce qui se passe près de chez vous",
+    location: "Turnupz utilise votre position pour afficher d'abord les événements de votre ville, et leur distance.",
+    locationPrivacy: "Uniquement pendant que vous utilisez l'app. Vous pouvez changer cela à tout moment dans les réglages de votre téléphone.",
+    camera: "Vous scannez des billets à l'entrée ? Nous demanderons l'accès à l'appareil photo quand vous ouvrirez Scanner.",
+    allow: "Autoriser la position",
+    notNow: "Plus tard"
+  },
   common: {
     cancel: "Annuler",
     send: "Envoyer",
@@ -67,7 +75,19 @@ const fr: TTranslations = {
     unblock: "Débloquer",
     unblockConfirm: "Débloquer {{name}} ?",
     unblockBody: "Cette personne pourra de nouveau vous trouver, vous suivre et vous écrire.",
-    saveFailed: "Impossible d'enregistrer ce réglage."
+    saveFailed: "Impossible d'enregistrer vos réglages de confidentialité.",
+    unblockFailed: "Impossible de débloquer cette personne. Réessayez.",
+    saveChanges: "Enregistrer",
+    discard: "Annuler les modifications",
+    keepEditing: "Continuer",
+    unsavedTitle: "Annuler vos modifications ?",
+    unsavedBody: "Vos modifications de confidentialité ne sont pas encore enregistrées.",
+    saved: "Enregistré.",
+    nowPrivate: "Votre profil est privé.",
+    nowPublic: "Votre profil est public.",
+    nowEVERYONE: "Tout le monde peut vous écrire.",
+    nowMUTUALS: "Les personnes qui se suivent mutuellement peuvent vous écrire.",
+    nowNOBODY: "Personne ne peut ouvrir une conversation avec vous."
   },
   language: {
     title: "Langue",

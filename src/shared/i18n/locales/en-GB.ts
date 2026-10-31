@@ -9,6 +9,14 @@ const enGB = {
     unread: "{{label}}, {{count}} unread",
     opens: "Opens the {{label}} section"
   },
+  permissionsIntro: {
+    title: "See what's on near you",
+    location: "Turnupz uses your location to show events in your city first, and how far away they are.",
+    locationPrivacy: "Only while you're using the app. You can change this any time in your phone's settings.",
+    camera: "Scanning tickets at the door? We'll ask for your camera when you open Scan.",
+    allow: "Allow location",
+    notNow: "Not now"
+  },
   common: {
     cancel: "Cancel",
     send: "Send",
@@ -65,7 +73,19 @@ const enGB = {
     unblock: "Unblock",
     unblockConfirm: "Unblock {{name}}?",
     unblockBody: "They'll be able to find you, follow you and message you again.",
-    saveFailed: "Couldn't save that setting."
+    saveFailed: "Couldn't save your privacy settings.",
+    unblockFailed: "Couldn't unblock them. Please try again.",
+    saveChanges: "Save changes",
+    discard: "Discard changes",
+    keepEditing: "Keep editing",
+    unsavedTitle: "Discard your changes?",
+    unsavedBody: "Your privacy changes haven't been saved yet.",
+    saved: "Saved.",
+    nowPrivate: "Your profile is private.",
+    nowPublic: "Your profile is public.",
+    nowEVERYONE: "Anyone can message you.",
+    nowMUTUALS: "People who follow each other can message you.",
+    nowNOBODY: "No one can start a chat with you."
   },
   language: {
     title: "Language",

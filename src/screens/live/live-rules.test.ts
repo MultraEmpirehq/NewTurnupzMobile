@@ -36,7 +36,13 @@ describe("event times", () => {
   it("defaults to Lagos and names a zone that isn't the phone's", () => {
     expect(formatEventClock(instant, undefined)).toBe("8:00 PM");
     const note = eventZoneNote("Asia/Tokyo");
-    expect(note === null || note === "Times in Asia/Tokyo").toBe(true);
+    expect(note === null || note === "Times in Tokyo time").toBe(true);
+  });
+
+  it("gives the phone's own time when its clock differs from the venue's", () => {
+    const note = eventZoneNote("Asia/Tokyo", "2026-11-01T11:00:00.000Z");
+    // 8:00 PM in Tokyo; on a phone elsewhere, its own time is added.
+    expect(note === null || /^Tokyo time · .+ your time$/.test(note)).toBe(true);
   });
 });
 
