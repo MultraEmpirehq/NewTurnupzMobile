@@ -6,7 +6,7 @@ import { createMMKV } from "react-native-mmkv";
 /**
  * A ticket's live QR code, made on the phone (offline too) from the ticket's
  * secret and the time. It changes every 30 seconds, so a screenshot stops
- * working almost at once. Must match the API's format exactly:
+ * working within about 90 seconds. Must match the API's format exactly:
  *
  *   TZ1.<ticket code>.<30-second window>.<12 hex characters of HMAC-SHA256>
  */

@@ -164,6 +164,8 @@ export const eventPlace = (event?: TLiveEvent | null) => {
   return [venue, area].filter(Boolean).join(", ") || "Venue to be announced";
 };
 
+const DOLLAR_CURRENCIES = new Set(["CAD", "USD", "AUD", "NZD", "SGD", "HKD"]);
+
 export const formatPrice = (price?: TPrice | null, quantity = 1) => {
   if (!price || !price.amount) return "Free";
   if (quantity === 1 && price.formatted?.withCurrency) {
@@ -171,7 +173,11 @@ export const formatPrice = (price?: TPrice | null, quantity = 1) => {
   }
   const code = price.currency?.code || "NGN";
   try {
-    return new Intl.NumberFormat(price.currency?.locale || "en-NG", {
+    // Dollars share "$", so they're written CA$50 or US$50, as the API does.
+    const locale = DOLLAR_CURRENCIES.has(code.toUpperCase())
+      ? "en-GB"
+      : price.currency?.locale || "en-NG";
+    return new Intl.NumberFormat(locale, {
       style: "currency",
       currency: code,
       maximumFractionDigits: 2
@@ -517,7 +523,7 @@ export const useCreateOrder = () => {
     }) => {
       const { data } = await postData<
         typeof body,
-        { orderId: string; status: string; redirectUrl?: string }
+        { orderId: string; status: string; redirectUrl?: string; holdExpiresAt?: string | null }
       >("/order", body);
       return data?.data;
     },
@@ -749,6 +755,8 @@ export type TLiveChat = {
   vendor?: { id?: string; name?: string; firstName?: string; lastName?: string };
   /** Chats between two people: the other person. */
   person?: { id: string; username: string | null; image: string | null } | null;
+  /** A message request: incoming waits for you to accept, outgoing for them. */
+  request?: "incoming" | "outgoing" | null;
 };
 
 export type TSharedEvent = {
@@ -778,6 +786,21 @@ export type TLiveChatMessage = {
 };
 
 /** The chats the signed-in person is in, most recent first. */
+/** Messages from people you don't follow back, waiting for you to accept. */
+export const useMessageRequests = (enabled = true) =>
+  useQuery({
+    queryKey: ["live-chats", "requests"],
+    queryFn: async () => {
+      const { data } = await getData<TLiveChat[]>("/chats?requests=true&limit=50");
+      return data?.data ?? [];
+    },
+    enabled
+  });
+
+/** Accept (it moves into your chats) or decline (it's removed; they aren't told). */
+export const answerMessageRequest = (chatId: string, accept: boolean) =>
+  postData(`/chats/${chatId}/request/${accept ? "accept" : "decline"}`, {});
+
 export const useLiveChats = (enabled = true) => {
   // Checked for new messages every 20 seconds, but only while it's on screen.
   const onScreen = useScreenActive();

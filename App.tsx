@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import ContainerComponent from "@/shared/components/container/container.component";
 import "@styles/global.css";
 import "@/shared/utils/css-interop";
+import "@/shared/i18n";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { View } from "react-native";
 import { themes } from "@/shared/utils/colors";
@@ -15,6 +16,8 @@ import { useFonts } from "expo-font";
 import { BRAND_FONTS } from "@/shared/utils/fonts";
 import BrandIntro from "@/shared/components/brand-intro/brand-intro.component";
 import { useIntroStore } from "@/shared/stores/intro.store";
+import PermissionsIntro from "@/shared/components/permissions-intro/permissions-intro.component";
+import { usePermissionsIntroStore } from "@/shared/stores/permissions-intro.store";
 
 import { queryClient } from "@/shared/query-client";
 
@@ -25,6 +28,8 @@ export default function App() {
   const [fontsLoaded, fontError] = useFonts(BRAND_FONTS);
   const introDone = useIntroStore((state) => state.introDone);
   const finishIntro = useIntroStore((state) => state.setIntroDone);
+  // On a new install, permissions come first, straight after the intro.
+  const permissionsSeen = usePermissionsIntroStore((state) => state.seen);
   if (!fontsLoaded && !fontError) {
     return <View style={{ flex: 1, backgroundColor: "#f7fbff" }} />;
   }
@@ -53,6 +58,7 @@ export default function App() {
             )}
             {/* Plays over the app, which loads underneath in the meantime. */}
             {!introDone && <BrandIntro onFinish={finishIntro} />}
+            {introDone && !permissionsSeen && <PermissionsIntro />}
           </SafeAreaProvider>
         </View>
       </QueryClientProvider>

@@ -111,11 +111,29 @@ export const formatEventTime = (
 ) => `${formatEventDay(value, timezone)}, ${formatEventClock(value, timezone)}`;
 
 /**
- * "Times in Africa/Lagos" when the event's zone isn't the phone's, so someone
- * abroad isn't misled about when doors open; null when they're the same.
+ * For a phone whose clock differs from the venue's: "Lagos time · 8:00 PM your
+ * time" (with the day when that differs too), so someone abroad knows when it
+ * starts for them. Null when the phone shows the same time as the venue.
  */
-export const eventZoneNote = (timezone?: string | null) => {
+export const eventZoneNote = (
+  timezone?: string | null,
+  at?: Date | string
+) => {
   const zone = zoneOf(timezone);
-  if (zone === viewerZone()) return null;
-  return `Times in ${zone.replace(/_/g, " ")}`;
+  const mine = viewerZone();
+  if (!mine || zone === mine) return null;
+  const city = zone.split("/").pop()?.replace(/_/g, " ") ?? zone;
+  const when = at ? new Date(at) : null;
+  if (!when || Number.isNaN(when.getTime())) return `Times in ${city} time`;
+  const there = wallClock(when, zone);
+  const here = wallClock(when, mine);
+  // Same clock under another name (Lagos and Douala): nothing to add.
+  if (there.day === here.day && there.hour === here.hour && there.minute === here.minute) {
+    return null;
+  }
+  const yours =
+    there.day === here.day
+      ? formatEventClock(when, mine)
+      : `${WEEKDAYS[here.weekday]} ${here.day} ${MONTHS[here.month]}, ${formatEventClock(when, mine)}`;
+  return `${city} time · ${yours} your time`;
 };

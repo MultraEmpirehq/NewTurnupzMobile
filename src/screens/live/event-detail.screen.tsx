@@ -203,7 +203,7 @@ const LiveEventDetailScreen = ({
     () => [event?.image, ...(event?.medias ?? [])].filter(Boolean) as string[],
     [event]
   );
-  const zoneNote = event ? eventZoneNote(event.timezone) : null;
+  const zoneNote = event ? eventZoneNote(event.timezone, event.date) : null;
   // A multi-day event is on until its last day is over.
   const isPast = event ? eventEndsAt(event) < new Date() : false;
   const multiDay = isMultiDay(event);
@@ -217,7 +217,7 @@ const LiveEventDetailScreen = ({
       : isRegistration
         ? held
           ? "You're registered"
-          : "Register"
+          : "Register free"
         : held
           ? "Get more tickets"
           : "Book Ticket";

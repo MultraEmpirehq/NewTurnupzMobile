@@ -22,6 +22,7 @@ import {
   useSavedCards,
   formatZero
 } from "@/screens/live/live-api";
+import { useEmptyCreditText } from "@/shared/hooks/use-empty-credit-text";
 
 const STATE_LABEL: Record<TCreditGrant["state"], string> = {
   PENDING: "On the way",
@@ -55,6 +56,7 @@ const WalletScreen = ({ onBack }: { onBack: () => void }) => {
   const toggleHideBalance = useBalancePrivacyStore((state) => state.toggleHideBalance);
 
   const rows = balance.data ?? [];
+  const emptyCredit = useEmptyCreditText();
   const recent = (history.data ?? []).slice(0, 10);
 
   const refresh = () => {
@@ -149,7 +151,7 @@ const WalletScreen = ({ onBack }: { onBack: () => void }) => {
             ))
           ) : (
             <TextComponent className="mt-1 text-2xl font-extrabold text-white">
-              {hideBalance ? "•••••" : formatZero()}
+              {hideBalance ? "•••••" : emptyCredit}
             </TextComponent>
           )}
           <TextComponent className="mt-3 text-xs leading-5 text-white/70">

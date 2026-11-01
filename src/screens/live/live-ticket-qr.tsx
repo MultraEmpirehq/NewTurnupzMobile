@@ -73,7 +73,7 @@ const clockOf = (at: number) => {
 
 /**
  * A ticket's QR, live: it changes every 30 seconds, made on the phone from
- * the ticket's secret, so a screenshot stops working. Three things move to
+ * the ticket's secret, so a screenshot stops working within about 90 seconds. Three things move to
  * show it's live (a ring counting down, a shimmering band, the seconds), and
  * the screen stays awake while it's open. Tickets saved before live codes
  * show their plain code until they refresh.

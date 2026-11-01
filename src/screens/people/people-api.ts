@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getData, postData } from "@/api";
+import { deleteData, getData, patchData, postData } from "@/api";
 import { toggleFollow } from "@/screens/profile/profile-api";
 
 /** Someone on Turnupz as others see them. */
@@ -10,6 +10,8 @@ export type TPersonCard = {
   image: string | null;
   /** You follow them. */
   isFollowing: boolean;
+  /** You've asked to follow them (they're private) and they haven't answered. */
+  requested?: boolean;
   /** They follow you. */
   followsYou: boolean;
 };
@@ -20,8 +22,16 @@ export type TPersonProfile = TPersonCard & {
   country: string | null;
   followers: number;
   following: number;
-  /** You follow each other. */
+  /** Only approved followers see their followers and following. */
+  isPrivate?: boolean;
+  /** Private and you're not an approved follower: their lists are hidden. */
+  locked?: boolean;
+  /** You've blocked them. */
+  blockedByMe?: boolean;
+  /** Their message setting lets you write to them. */
   canMessage: boolean;
+  /** Your first message would wait in their message requests. */
+  messageIsRequest?: boolean;
   isMe: boolean;
 };
 
@@ -54,16 +64,86 @@ export const useConnections = (username: string | null | undefined, which: "foll
     getNextPageParam: (last) => last.pagination?.nextPage ?? undefined
   });
 
-/** Follow or unfollow someone; refreshes every profile and list it touches. */
-export const useFollowPerson = () => {
+/** Everything that shows who follows or blocks whom, refreshed together. */
+const useRefreshPeople = () => {
   const queryClient = useQueryClient();
+  return () => {
+    for (const key of ["person", "person-connections", "people-search", "follows", "follow-requests", "blocks", "privacy", "live-chats"]) {
+      void queryClient.invalidateQueries({ queryKey: [key] });
+    }
+  };
+};
+
+/** Follow or unfollow someone (or ask to, if they're private, or take the request back). */
+export const useFollowPerson = () => {
+  const refresh = useRefreshPeople();
   return async (personId: string) => {
     const isFollowing = await toggleFollow("PERSON", personId);
-    void queryClient.invalidateQueries({ queryKey: ["person"] });
-    void queryClient.invalidateQueries({ queryKey: ["person-connections"] });
-    void queryClient.invalidateQueries({ queryKey: ["people-search"] });
-    void queryClient.invalidateQueries({ queryKey: ["follows"] });
+    refresh();
     return isFollowing;
+  };
+};
+
+/* ------------------------------------------------------------------ privacy */
+
+export type TMessagePolicy = "EVERYONE" | "MUTUALS" | "NOBODY";
+export type TPrivacy = { isPrivate: boolean; messagePolicy: TMessagePolicy; blockedCount: number };
+
+export const usePrivacy = () =>
+  useQuery({
+    queryKey: ["privacy"],
+    queryFn: async () => (await getData<TPrivacy>("/privacy")).data?.data ?? null
+  });
+
+/** Changes privacy settings, showing the change straight away. */
+export const useUpdatePrivacy = () => {
+  const queryClient = useQueryClient();
+  return async (change: Partial<Pick<TPrivacy, "isPrivate" | "messagePolicy">>) => {
+    const before = queryClient.getQueryData<TPrivacy>(["privacy"]);
+    if (before) queryClient.setQueryData(["privacy"], { ...before, ...change });
+    try {
+      const saved = (await patchData<typeof change, TPrivacy>("/privacy", change)).data?.data;
+      if (saved) queryClient.setQueryData(["privacy"], saved);
+      void queryClient.invalidateQueries({ queryKey: ["follow-requests"] });
+    } catch (error) {
+      queryClient.setQueryData(["privacy"], before);
+      throw error;
+    }
+  };
+};
+
+export type TBlockedPerson = { id: string; name: string; username: string | null; image: string | null; blockedAt: string };
+
+export const useBlocks = () =>
+  useQuery({
+    queryKey: ["blocks"],
+    queryFn: async () => (await getData<TBlockedPerson[]>("/privacy/blocks")).data?.data ?? []
+  });
+
+/** Block or unblock someone; refreshes everything that shows them. */
+export const useBlockPerson = () => {
+  const refresh = useRefreshPeople();
+  return async (userId: string, block: boolean) => {
+    if (block) await postData(`/privacy/blocks/${userId}`, {});
+    else await deleteData(`/privacy/blocks/${userId}`);
+    refresh();
+  };
+};
+
+export type TFollowRequest = { id: string; name: string; username: string | null; image: string | null; requestedAt: string };
+
+export const useFollowRequests = (enabled = true) =>
+  useQuery({
+    queryKey: ["follow-requests"],
+    enabled,
+    queryFn: async () => (await getData<TFollowRequest[]>("/follows/requests")).data?.data ?? []
+  });
+
+export const useAnswerFollowRequest = () => {
+  const refresh = useRefreshPeople();
+  return async (userId: string, accept: boolean) => {
+    await postData(`/follows/requests/${userId}/${accept ? "accept" : "decline"}`, {});
+    refresh();
   };
 };
 

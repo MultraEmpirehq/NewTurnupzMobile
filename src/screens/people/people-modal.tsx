@@ -1,7 +1,7 @@
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useState } from "react";
 import SafeModal from "@/shared/components/modals/safe-modal";
-import { ActivityIndicator, FlatList, Pressable, ScrollView, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 import TextComponent from "@/shared/components/text/text.component";
@@ -17,23 +17,28 @@ import { TPeoplePage, usePeopleNav } from "./people-nav";
 export { usePeopleNav };
 import {
   TPersonCard,
+  TPersonProfile,
   startPersonChat,
+  useAnswerFollowRequest,
+  useBlockPerson,
   useConnections,
   useFollowPerson,
+  useFollowRequests,
   usePeopleSearch,
   usePerson
 } from "./people-api";
 
 /**
  * People: someone's profile, who follows them and who they follow, and
- * finding people by name. One full-screen stack that any screen can open
- * (search, a chat, a notification); back steps through it. Two people who
- * follow each other can message each other from here.
+ * finding people by name, and the follow requests waiting for you. One
+ * full-screen stack that any screen can open (search, a chat, a
+ * notification); back steps through it. Messaging follows the other person's
+ * setting; blocking is in the ⋯ menu on a profile.
  */
 
 type TPage = TPeoplePage;
 
-const Header = ({ title, onBack }: { title: string; onBack: () => void }) => (
+const Header = ({ title, onBack, onMore }: { title: string; onBack: () => void; onMore?: () => void }) => (
   <View className="h-14 flex-row items-center gap-2 border-b bg-white px-3" style={{ borderColor: "#EEF0F4" }}>
     <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Go back" hitSlop={10} className="size-9 items-center justify-center">
       <Svg width={22} height={22} viewBox="0 0 24 24">
@@ -41,15 +46,31 @@ const Header = ({ title, onBack }: { title: string; onBack: () => void }) => (
       </Svg>
     </Pressable>
     <TextComponent numberOfLines={1} className="flex-1 text-lg font-bold text-zinc-950">{title}</TextComponent>
+    {!!onMore && (
+      <Pressable onPress={onMore} accessibilityRole="button" accessibilityLabel="More options" hitSlop={10} className="size-9 items-center justify-center">
+        <Svg width={22} height={22} viewBox="0 0 24 24">
+          <Circle cx={5} cy={12} r={1.8} fill={BRAND.ink} />
+          <Circle cx={12} cy={12} r={1.8} fill={BRAND.ink} />
+          <Circle cx={19} cy={12} r={1.8} fill={BRAND.ink} />
+        </Svg>
+      </Pressable>
+    )}
   </View>
 );
 
-/** Follow / Following, kept in step everywhere. */
+const LockIcon = () => (
+  <Svg width={22} height={22} viewBox="0 0 24 24">
+    <Path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3" fill="none" stroke={BRAND.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+/** Follow / Following / Requested, kept in step everywhere. */
 const FollowPill = ({ person, size = "md" }: { person: TPersonCard; size?: "sm" | "md" }) => {
   const follow = useFollowPerson();
   const [busy, setBusy] = useState(false);
-  const on = person.isFollowing;
-  const label = on ? "Following" : person.followsYou ? "Follow back" : "Follow";
+  // Tapping again unfollows, or takes a request back.
+  const on = person.isFollowing || !!person.requested;
+  const label = person.isFollowing ? "Following" : person.requested ? "Requested" : person.followsYou ? "Follow back" : "Follow";
   return (
     <Pressable
       onPress={async () => {
@@ -92,13 +113,42 @@ const PersonRow = ({ person, onPress }: { person: TPersonCard; onPress: () => vo
   </Pressable>
 );
 
+/** Block or unblock, confirmed first; blocking says what it does. */
+const useBlockMenu = (p: TPersonProfile | null | undefined) => {
+  const blockPerson = useBlockPerson();
+  const run = async (block: boolean) => {
+    if (!p) return;
+    try {
+      await blockPerson(p.id, block);
+    } catch (error) {
+      onError(constructErrorMessage(error as TApiErrorResponseType, "That didn't work. Please try again."));
+    }
+  };
+  if (!p || p.isMe) return undefined;
+  return () =>
+    p.blockedByMe
+      ? Alert.alert(`Unblock ${p.name}?`, "They'll be able to find you, follow you and message you again.", [
+          { text: "Cancel", style: "cancel" },
+          { text: "Unblock", onPress: () => void run(false) }
+        ])
+      : Alert.alert(
+          `Block ${p.name}?`,
+          "They won't be able to find you, follow you, message you or send you tickets, and you won't see them. They won't be told.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Block", style: "destructive", onPress: () => void run(true) }
+          ]
+        );
+};
+
 const PersonPage = ({ username, onMessage }: { username: string; onMessage: (person: TPersonCard) => void }) => {
   const nav = usePeopleNav();
   const person = usePerson(username);
   const p = person.data;
+  const blockMenu = useBlockMenu(p);
   return (
     <View className="flex-1" style={{ backgroundColor: "#F7F8FB" }}>
-      <Header title={p?.username ? `@${p.username}` : "Profile"} onBack={nav.back} />
+      <Header title={p?.username ? `@${p.username}` : "Profile"} onBack={nav.back} onMore={blockMenu} />
       {person.isLoading ? (
         <ActivityIndicator className="mt-16" color={BRAND.blue} />
       ) : !p ? (
@@ -119,13 +169,30 @@ const PersonPage = ({ username, onMessage }: { username: string; onMessage: (per
             </View>
           </View>
 
+          {p.blockedByMe ? (
+            <View className="mt-5 rounded-2xl bg-white p-4">
+              <TextComponent className="text-[15px] font-bold text-zinc-950">You've blocked {p.name.split(" ")[0]}</TextComponent>
+              <TextComponent className="mt-1 text-[13px] leading-[18px] text-zinc-500">
+                You can't see each other's profiles, follow each other or send messages.
+              </TextComponent>
+              <Pressable
+                onPress={blockMenu}
+                accessibilityRole="button"
+                className="mt-3 h-10 items-center justify-center rounded-xl border"
+                style={{ borderColor: "#DDE2EA" }}
+              >
+                <TextComponent className="text-sm font-bold text-zinc-950">Unblock</TextComponent>
+              </Pressable>
+            </View>
+          ) : (
+          <>
           <View className="mt-3 flex-row gap-4">
-            <Pressable onPress={() => p.username && nav.openConnections(p.username, "followers")} accessibilityRole="button">
+            <Pressable onPress={() => !p.locked && p.username && nav.openConnections(p.username, "followers")} disabled={p.locked} accessibilityRole="button">
               <TextComponent className="text-[13.5px] text-zinc-500">
                 <TextComponent className="text-[13.5px] font-extrabold text-zinc-950">{p.followers}</TextComponent> {p.followers === 1 ? "follower" : "followers"}
               </TextComponent>
             </Pressable>
-            <Pressable onPress={() => p.username && nav.openConnections(p.username, "following")} accessibilityRole="button">
+            <Pressable onPress={() => !p.locked && p.username && nav.openConnections(p.username, "following")} disabled={p.locked} accessibilityRole="button">
               <TextComponent className="text-[13.5px] text-zinc-500">
                 <TextComponent className="text-[13.5px] font-extrabold text-zinc-950">{p.following}</TextComponent> following
               </TextComponent>
@@ -147,6 +214,11 @@ const PersonPage = ({ username, onMessage }: { username: string; onMessage: (per
                   </Pressable>
                 )}
               </View>
+              {p.canMessage && p.messageIsRequest && (
+                <TextComponent className="mt-2.5 text-[12.5px] text-zinc-500">
+                  {`${p.name.split(" ")[0]} doesn't follow you, so your first message goes to their message requests.`}
+                </TextComponent>
+              )}
               {!p.canMessage && (
                 <TextComponent className="mt-2.5 text-[12.5px] text-zinc-500">
                   {p.followsYou
@@ -157,6 +229,22 @@ const PersonPage = ({ username, onMessage }: { username: string; onMessage: (per
                 </TextComponent>
               )}
             </>
+          )}
+
+          {p.locked && (
+            <View className="mt-6 items-center rounded-2xl bg-white px-6 py-7">
+              <View className="size-12 items-center justify-center rounded-full border-2" style={{ borderColor: BRAND.ink }}>
+                <LockIcon />
+              </View>
+              <TextComponent className="mt-3 text-[15px] font-bold text-zinc-950">This account is private</TextComponent>
+              <TextComponent className="mt-1 text-center text-[13px] leading-[18px] text-zinc-500">
+                {p.requested
+                  ? `Your request is waiting for ${p.name.split(" ")[0]} to accept.`
+                  : "Follow them to see who they follow and who follows them."}
+              </TextComponent>
+            </View>
+          )}
+          </>
           )}
         </ScrollView>
       )}
@@ -257,6 +345,64 @@ const SearchPage = () => {
   );
 };
 
+/** People asking to follow you (you're private): accept or decline each. */
+const RequestsPage = () => {
+  const nav = usePeopleNav();
+  const requests = useFollowRequests();
+  const answer = useAnswerFollowRequest();
+  const [busy, setBusy] = useState<string | null>(null);
+  const respond = async (userId: string, accept: boolean) => {
+    setBusy(userId);
+    try {
+      await answer(userId, accept);
+    } catch (error) {
+      onError(constructErrorMessage(error as TApiErrorResponseType, "That didn't work. Please try again."));
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <View className="flex-1" style={{ backgroundColor: "#F7F8FB" }}>
+      <Header title="Follow requests" onBack={nav.back} />
+      {requests.isLoading ? (
+        <ActivityIndicator className="mt-16" color={BRAND.blue} />
+      ) : (
+        <FlatList
+          data={requests.data ?? []}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingVertical: 8 }}
+          renderItem={({ item }) => (
+            <View className="flex-row items-center gap-3 px-4 py-2.5">
+              <Pressable onPress={() => item.username && nav.openPerson(item.username)} accessibilityRole="button" className="flex-1 flex-row items-center gap-3">
+                <ProfilePhoto uri={item.image} name={item.name} size={48} ringColor={BRAND.white} />
+                <View className="flex-1">
+                  <TextComponent numberOfLines={1} className="text-[14.5px] font-bold text-zinc-950">{item.name}</TextComponent>
+                  {!!item.username && <TextComponent numberOfLines={1} className="text-[12.5px] text-zinc-500">@{item.username}</TextComponent>}
+                </View>
+              </Pressable>
+              {busy === item.id ? (
+                <ActivityIndicator color={BRAND.blue} />
+              ) : (
+                <>
+                  <Pressable onPress={() => void respond(item.id, true)} accessibilityRole="button" className="h-8 items-center justify-center rounded-full px-3.5" style={{ backgroundColor: BRAND.blueDeep }}>
+                    <TextComponent className="text-[12.5px] font-bold text-white">Accept</TextComponent>
+                  </Pressable>
+                  <Pressable onPress={() => void respond(item.id, false)} accessibilityRole="button" className="h-8 items-center justify-center rounded-full border bg-white px-3.5" style={{ borderColor: "#DDE2EA" }}>
+                    <TextComponent className="text-[12.5px] font-bold text-zinc-950">Decline</TextComponent>
+                  </Pressable>
+                </>
+              )}
+            </View>
+          )}
+          ListEmptyComponent={
+            <TextComponent className="mx-8 mt-16 text-center text-sm text-zinc-500">No one is waiting. New requests show here.</TextComponent>
+          }
+        />
+      )}
+    </View>
+  );
+};
+
 /** Mounted once: shows whatever page is on top of the people stack. */
 const PeopleModal = () => {
   const nav = usePeopleNav();
@@ -278,6 +424,7 @@ const PeopleModal = () => {
         {page?.kind === "person" && <PersonPage key={`p-${page.username}-${nav.stack.length}`} username={page.username} onMessage={(person) => void message(person)} />}
         {page?.kind === "connections" && <ConnectionsPage key={`c-${page.username}-${nav.stack.length}`} username={page.username} which={page.which} />}
         {page?.kind === "search" && <SearchPage />}
+        {page?.kind === "requests" && <RequestsPage />}
         <ChatThreadScreen chatId={chat?.id ?? null} title={chat?.title ?? ""} onClose={() => setChat(null)} />
       </SafeAreaView>
       <OverlayToast />
