@@ -217,7 +217,7 @@ const LiveEventDetailScreen = ({
       : isRegistration
         ? held
           ? "You're registered"
-          : "Register"
+          : "Register free"
         : held
           ? "Get more tickets"
           : "Book Ticket";

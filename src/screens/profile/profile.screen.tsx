@@ -62,6 +62,7 @@ import {
   useMe,
   useReferralMe
 } from "./profile-api";
+import { useEmptyCreditText } from "@/shared/hooks/use-empty-credit-text";
 
 /**
  * Your profile: photo, name and bio over the blue banner, Edit and Share, your
@@ -436,6 +437,7 @@ const ProfileScreen = ({
   const name = user?.name || [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Your profile";
   const more = tickets.hasNextPage ? "+" : "";
   const creditRow = credit.data?.find((row) => row.available.amount > 0) ?? credit.data?.[0];
+  const emptyCredit = useEmptyCreditText();
   const inviteCode = referral.data?.code ?? user?.username ?? null;
 
   const shareProfile = () => {
@@ -629,7 +631,7 @@ const ProfileScreen = ({
                 ? maskAmount(creditRow?.available.formatted?.withCurrency)
                 : creditRow && creditRow.available.amount > 0
                   ? creditRow.available.formatted?.withCurrency
-                  : creditRow?.available.formatted?.withCurrency ?? formatZero()}
+                  : creditRow?.available.formatted?.withCurrency ?? emptyCredit}
             </TextComponent>
             <TextComponent className="mt-0.5 text-xs font-semibold" style={{ color: BRAND.blue }}>
               Open wallet ›

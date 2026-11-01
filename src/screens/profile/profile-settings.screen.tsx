@@ -62,6 +62,7 @@ import {
   useNotificationPreferences,
   useSessions,
 } from "./profile-api";
+import { useEmptyCreditText } from "@/shared/hooks/use-empty-credit-text";
 
 /**
  * Settings, and the pages behind each row. Every switch and form here talks
@@ -1012,13 +1013,14 @@ const ProfileSettingsScreen = ({
   const credit = useCreditBalance();
   const hideBalance = useBalancePrivacyStore((state) => state.hideBalance);
   const creditRow = credit.data?.find((row) => row.available.amount > 0) ?? credit.data?.[0];
+  const emptyCredit = useEmptyCreditText();
   const creditText = hideBalance
     ? maskAmount(creditRow?.available.formatted?.withCurrency)
     : creditRow && creditRow.available.amount > 0
       ? creditRow.available.formatted?.withCurrency
       : credit.isLoading
         ? "…"
-        : creditRow?.available.formatted?.withCurrency ?? formatZero();
+        : creditRow?.available.formatted?.withCurrency ?? emptyCredit;
   const sessions = useSessions();
   const [loggingOut, setLoggingOut] = useState(false);
   const back = () => setPage("menu");
