@@ -23,7 +23,7 @@ export type TWebOnlyTask = {
 };
 
 export const webUrl = (path: string) =>
-  `${(WEB_APP_URL ?? "https://turnupz.com").replace(/\/$/, "")}${path}`;
+  `${(WEB_APP_URL ?? "https://turnupz.app").replace(/\/$/, "")}${path}`;
 
 /**
  * "This is easier on a bigger screen": for setup work the app leaves to the

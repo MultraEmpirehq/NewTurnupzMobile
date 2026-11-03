@@ -21,7 +21,7 @@ export type TOrganizerConversationDraft = {
 // The web's event page; "/events/:id" doesn't exist there. It carries the
 // sharer's username, so a purchase through it earns them share-link credit.
 export const getEventPublicUrl = (eventId: string) => {
-  const base = `${(WEB_APP_URL ?? "https://turnupz.com").replace(/\/$/, "")}/explore/event/${encodeURIComponent(eventId)}`;
+  const base = `${(WEB_APP_URL ?? "https://turnupz.app").replace(/\/$/, "")}/explore/event/${encodeURIComponent(eventId)}`;
   const username = useUserStore.getState().user?.username;
   return username ? `${base}?ref=${encodeURIComponent(username)}` : base;
 };
