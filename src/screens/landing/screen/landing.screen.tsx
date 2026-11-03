@@ -29,6 +29,31 @@ import { constructErrorMessage } from "@/api/functions";
 import { Controller } from "react-hook-form";
 import { TAuthBodyType } from "../../../shared/utils/types";
 import useAuth from "../../../shared/hooks/use-auth.hook";
+import { useOrganiserStore } from "@/shared/stores/organiser.store";
+
+type TIntent = "attendee" | "organiser";
+
+// Same account either way; the side only changes the words and, for
+// organisers, where the app goes once they're in (see the home screen).
+const COPY: Record<TIntent, { eyebrow: string; title: string; subtitle: string }> = {
+  attendee: {
+    eyebrow: "Log in or sign up",
+    title: "Let's get you in",
+    subtitle:
+      "Enter your email. We'll log you in, or send a link to set up your account if you're new."
+  },
+  organiser: {
+    eyebrow: "For organisers",
+    title: "Host on Turnupz",
+    subtitle:
+      "Enter your email. We'll log you in, or send a link to set up your account. Then tell us about your business and start selling tickets."
+  }
+};
+
+const SIDES: { value: TIntent; label: string }[] = [
+  { value: "attendee", label: "Attendee" },
+  { value: "organiser", label: "Organiser" }
+];
 
 const checkIfEmailExistsSchema = joi.object({
   email: joi.string().email().required().messages({
@@ -63,6 +88,9 @@ const LandingScreen = () => {
   const navigation =
     useNavigation<NavigationProp<UnauthenticatedStackParamList>>();
   const [canLogin, setCanLogin] = useState(false);
+  const [intent, setIntent] = useState<TIntent>("attendee");
+  const copy = COPY[intent];
+  const setWantsToHost = useOrganiserStore((state) => state.setWantsToHost);
   const { performAuthOperations } = useApp();
   const setUserDetails = useUserStore((state) => state.setUser);
   const { performAuthVerificationCheck } = useAuth();
@@ -86,6 +114,8 @@ const LandingScreen = () => {
     async (formBody: TAuthBodyType) => {
       // One spelling per address, as on the web, so capitals can't split an account.
       const body = { ...formBody, email: formBody.email.trim().toLowerCase() };
+      // Kept (it's saved) through any sign-up steps, until home acts on it.
+      setWantsToHost(intent === "organiser");
       try {
         if (!canLogin) {
           const { data } = await getData<TUserCheckResponseType>(
@@ -96,7 +126,8 @@ const LandingScreen = () => {
               "/auth/register",
               {
                 email: body.email,
-                // The link finishes sign-up on the web, as the web's own does.
+                // Required by the api, but the app's sign-up uses a code
+                // instead (sent on the next screen), so no link is emailed.
                 url: `${WEB_APP_URL}/auth/register/{{token}}?email=${body.email}`
               }
             );
@@ -141,25 +172,34 @@ const LandingScreen = () => {
         onError(errorMessage);
       }
     },
-    [canLogin, performAuthOperations, performAuthVerificationCheck]
+    [canLogin, intent, setWantsToHost, performAuthOperations, performAuthVerificationCheck]
   );
   // Google lands in the same place as a password login.
   const onGoogleToken = useCallback(
     async (accessToken: string) => {
+      setWantsToHost(intent === "organiser");
       performAuthOperations(accessToken, true);
       await performAuthVerificationCheck();
     },
-    [performAuthOperations, performAuthVerificationCheck]
+    [intent, setWantsToHost, performAuthOperations, performAuthVerificationCheck]
   );
   return (
     <AuthTicketLayout
-      eyebrow={canLogin ? "Log in" : "Log in or sign up"}
-      title={canLogin ? "Welcome back" : "Let's get you in"}
+      eyebrow={
+        canLogin
+          ? intent === "organiser"
+            ? "Organiser log in"
+            : "Log in"
+          : copy.eyebrow
+      }
+      title={canLogin ? "Welcome back" : copy.title}
       subtitle={
         canLogin
           ? "Enter your password to carry on where you left off."
-          : "Enter your email. We'll log you in, or send a link to set up your account if you're new."
+          : copy.subtitle
       }
+      stubKicker={intent === "organiser" ? "ALL ACCESS" : undefined}
+      stubTitle={intent === "organiser" ? "Your stage on Turnupz" : undefined}
       footer={
         <TextComponent className="text-center text-xs text-white/55">
           By continuing you agree to the Turnupz Terms of Service and Privacy
@@ -168,6 +208,33 @@ const LandingScreen = () => {
       }
     >
       <View className="gap-5">
+        {/* Which side they're here for. */}
+        <View
+          className="flex-row rounded-full bg-[#f1f4f9] p-1"
+          accessibilityRole="tablist"
+        >
+          {SIDES.map((side) => {
+            const active = intent === side.value;
+            return (
+              <Pressable
+                key={side.value}
+                onPress={() => setIntent(side.value)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                className={`h-10 flex-1 items-center justify-center rounded-full ${
+                  active ? "bg-white" : ""
+                }`}
+                style={active ? { elevation: 2, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } } : undefined}
+              >
+                <TextComponent
+                  className={`text-sm font-bold ${active ? "text-black" : "text-black/50"}`}
+                >
+                  {side.label}
+                </TextComponent>
+              </Pressable>
+            );
+          })}
+        </View>
         {canLogin ? (
           // The email is settled by now, so it shows as a chip that can be changed.
           <View className="flex-row items-center gap-3 rounded-2xl bg-[#f7f9fc] px-4 py-3">
