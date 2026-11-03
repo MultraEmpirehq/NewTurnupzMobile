@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useId } from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import Animated, {
   Easing,
   cancelAnimation,
@@ -91,6 +91,10 @@ const BrandLoader: React.FC<TBrandLoaderProps> = ({
   playing = !progress
 }) => {
   const reducedMotion = useReducedMotion();
+  // Android doesn't redraw the pen and ink as they animate (animated SVG
+  // props), which left the wordmark invisible there. It gets the finished
+  // wordmark instead, still pulsing, glowing and fading with the pull.
+  const drawnStill = Platform.OS === "android" || reducedMotion;
   const t = useSharedValue(reducedMotion ? 0.5 : 0);
   const width = (height * LOGO_WIDTH) / LOGO_HEIGHT;
   const text = (label ?? "Turning up...").replace(/(\.{3}|…)$/, "");
@@ -136,7 +140,9 @@ const BrandLoader: React.FC<TBrandLoaderProps> = ({
     // Pulled by hand it stays solid; the loop fades in and out.
     const opacity =
       progress && !playing
-        ? 1
+        ? drawnStill
+          ? Math.min(1, value / (INKED_AT * 0.6))
+          : 1
         : value < 0.03
           ? value / 0.03
           : value > 0.92
@@ -236,6 +242,11 @@ const BrandLoader: React.FC<TBrandLoaderProps> = ({
               />
             </ClipPath>
           </Defs>
+          {drawnStill ? (
+            // The finished wordmark, no pen or reveal.
+            LOGO_PATHS.map((d, index) => <Path key={`still-${index}`} d={d} fill={`url(#${uid}-ink)`} />)
+          ) : (
+          <>
           {/* The pen: each outline traced once. */}
           {LOGO_PATHS.map((d, index) => (
             <AnimatedPath
@@ -263,6 +274,8 @@ const BrandLoader: React.FC<TBrandLoaderProps> = ({
             fill={`url(#${uid}-ink)`}
             clipPath={`url(#${uid}-clip)`}
           />
+          </>
+          )}
         </Svg>
       </Animated.View>
 

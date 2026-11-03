@@ -55,7 +55,7 @@ export const useEventPromotion = (eventId?: string, enabled = true) =>
 
 /** The event's page on the web, tagged with the organiser so their sales show as theirs. */
 export const eventShareUrl = (eventId: string, ref?: string | null, code?: string) => {
-  const base = `${(WEB_APP_URL ?? "https://turnupz.com").replace(/\/$/, "")}/explore/event/${encodeURIComponent(eventId)}`;
+  const base = `${(WEB_APP_URL ?? "https://turnupz.app").replace(/\/$/, "")}/explore/event/${encodeURIComponent(eventId)}`;
   const params = [ref ? `ref=${encodeURIComponent(ref)}` : null, code ? `code=${encodeURIComponent(code)}` : null]
     .filter(Boolean)
     .join("&");

@@ -134,7 +134,7 @@ xcodebuild -workspace Turnup.xcworkspace -scheme Turnup \
   -configuration Release -sdk iphonesimulator \
   -destination "id=<UDID>" -derivedDataPath build/dd build
 xcrun simctl install <UDID> build/dd/Build/Products/Release-iphonesimulator/Turnup.app
-xcrun simctl launch <UDID> com.turnup.mobile
+xcrun simctl launch <UDID> com.turnupz.app
 ```
 
 A Release build embeds the JS, so no Metro is needed. A JS-only change means rerunning `xcodebuild` and `install` (1–2 min). `plugins/with-pod-deployment-target.js` raises old pods to iOS 15.1 on every prebuild; don't hand-edit the Podfile for that.

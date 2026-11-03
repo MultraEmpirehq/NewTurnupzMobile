@@ -9,13 +9,21 @@ import { constructErrorMessage } from "@/api/functions";
 import useUserStore from "@/shared/stores/user.store";
 import { BRAND } from "@/shared/utils/brand-colors";
 import ChatThreadScreen from "@/screens/live/chat-thread.screen";
-import { TLiveChat, useAcceptTransfer, useLiveChats, useReceivedTransfers } from "@/screens/live/live-api";
+import {
+  TLiveChat,
+  answerMessageRequest,
+  useAcceptTransfer,
+  useLiveChats,
+  useMessageRequests,
+  useReceivedTransfers
+} from "@/screens/live/live-api";
 import { usePeopleNav } from "@/screens/people/people-nav";
 
 /**
  * Messages: every chat you're in. You join an event's group chat as soon as
  * you have a ticket; chats with organisers sit alongside. A ticket a friend
- * sent you waits at the top with Accept.
+ * sent you waits at the top with Accept, and so do message requests from
+ * people you don't follow back.
  */
 
 const FILTERS = [
@@ -56,6 +64,21 @@ const ChatsScreen = ({
   const isSignedIn = !!useUserStore((state) => state.userToken);
   const myId = useUserStore((state) => state.user?.id);
   const chats = useLiveChats(isSignedIn);
+  const requests = useMessageRequests(isSignedIn);
+  const [showRequests, setShowRequests] = useState(false);
+  const [answering, setAnswering] = useState<string | null>(null);
+  const answerRequest = async (chat: TLiveChat, accept: boolean) => {
+    setAnswering(chat.id);
+    try {
+      await answerMessageRequest(chat.id, accept);
+      await Promise.all([requests.refetch(), chats.refetch()]);
+    } catch (error) {
+      onError(constructErrorMessage(error as TApiErrorResponseType, "That didn't work. Please try again."));
+    } finally {
+      setAnswering(null);
+    }
+  };
+  const requestList = requests.data ?? [];
   const received = useReceivedTransfers();
   const accept = useAcceptTransfer();
   const [filter, setFilter] = useState<TFilter>("all");
@@ -148,6 +171,7 @@ const ChatsScreen = ({
             refreshing={chats.isRefetching}
             onRefresh={() => {
               void chats.refetch();
+              void requests.refetch();
               void received.refetch();
             }}
             tintColor={BRAND.blue}
@@ -192,6 +216,71 @@ const ChatsScreen = ({
             <Pressable onPress={() => void acceptWaiting()} disabled={accept.isPending} accessibilityRole="button" className="rounded-full px-3.5 py-2" style={{ backgroundColor: BRAND.blue }}>
               {accept.isPending ? <ActivityIndicator size="small" color={BRAND.white} /> : <TextComponent className="text-[12.5px] font-extrabold text-white">Accept</TextComponent>}
             </Pressable>
+          </View>
+        )}
+
+        {requestList.length > 0 && (
+          <Pressable
+            onPress={() => setShowRequests((on) => !on)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showRequests }}
+            className="mx-5 mb-2 mt-1 flex-row items-center gap-3 rounded-[18px] border bg-white px-3.5 py-3"
+            style={{ borderColor: "#EEF0F4" }}
+          >
+            <View className="size-10 items-center justify-center rounded-xl" style={{ backgroundColor: BRAND.blueTint }}>
+              <Svg width={20} height={20} viewBox="0 0 24 24">
+                <Path d="M4 5h16v11H8l-4 4z" fill="none" stroke={BRAND.blueDeep} strokeWidth={2} strokeLinejoin="round" />
+              </Svg>
+            </View>
+            <View className="flex-1">
+              <TextComponent className="text-[14px] font-extrabold text-zinc-950">Message requests</TextComponent>
+              <TextComponent numberOfLines={1} className="text-xs text-zinc-500">
+                {requestList.length === 1 ? `${requestList[0].eventName} wants to message you` : `${requestList.length} people want to message you`}
+              </TextComponent>
+            </View>
+            <TextComponent className="text-[12.5px] font-bold" style={{ color: BRAND.blueDeep }}>{showRequests ? "Hide" : "View"}</TextComponent>
+          </Pressable>
+        )}
+
+        {showRequests && requestList.length > 0 && (
+          <View className="mx-5 mb-3 overflow-hidden rounded-[18px] bg-white">
+            {requestList.map((chat, index) => (
+              <View
+                key={chat.id}
+                className={index === requestList.length - 1 ? "px-3.5 py-3" : "border-b border-black/5 px-3.5 py-3"}
+              >
+                <Pressable onPress={() => setOpen(chat)} accessibilityRole="button" className="flex-row items-center gap-3">
+                  {chat.person?.image ? (
+                    <CustomImage className="size-11 rounded-full" imageClassName="size-full rounded-full" source={{ uri: chat.person.image }} contentFit="cover" />
+                  ) : (
+                    <View className="size-11 items-center justify-center rounded-full" style={{ backgroundColor: BRAND.ink }}>
+                      <TextComponent className="font-extrabold" style={{ color: BRAND.blue }}>{initials(chat.eventName)}</TextComponent>
+                    </View>
+                  )}
+                  <View className="flex-1">
+                    <TextComponent numberOfLines={1} className="text-[14px] font-bold text-zinc-950">{chat.eventName}</TextComponent>
+                    <TextComponent numberOfLines={2} className="text-[12.5px] text-zinc-500">{chat.preview || "Wants to message you"}</TextComponent>
+                  </View>
+                </Pressable>
+                <View className="mt-2.5 flex-row gap-2">
+                  {answering === chat.id ? (
+                    <ActivityIndicator color={BRAND.blue} />
+                  ) : (
+                    <>
+                      <Pressable onPress={() => void answerRequest(chat, true)} accessibilityRole="button" className="h-9 flex-1 items-center justify-center rounded-xl" style={{ backgroundColor: BRAND.blueDeep }}>
+                        <TextComponent className="text-[13px] font-bold text-white">Accept</TextComponent>
+                      </Pressable>
+                      <Pressable onPress={() => void answerRequest(chat, false)} accessibilityRole="button" className="h-9 flex-1 items-center justify-center rounded-xl border" style={{ borderColor: "#DDE2EA" }}>
+                        <TextComponent className="text-[13px] font-bold text-zinc-950">Decline</TextComponent>
+                      </Pressable>
+                    </>
+                  )}
+                </View>
+              </View>
+            ))}
+            <TextComponent className="px-3.5 pb-3 text-[11.5px] text-zinc-400">
+              Replying accepts it. Declining removes it, and they aren't told.
+            </TextComponent>
           </View>
         )}
 
@@ -240,6 +329,8 @@ const ChatsScreen = ({
                         <Tag label={chat.status === "ARCHIVED" ? "CLOSED" : "EVENT"} dark={chat.status === "ARCHIVED"} />
                       ) : !isPerson && !iAmOrganiser ? (
                         <Tag label="ORGANISER" dark />
+                      ) : chat.request === "outgoing" ? (
+                        <Tag label="REQUEST SENT" dark />
                       ) : null}
                     </View>
                     <TextComponent numberOfLines={1} className="mt-0.5 text-[13px] text-zinc-500">
@@ -278,6 +369,8 @@ const ChatsScreen = ({
         onClose={() => {
           setOpen(null);
           void chats.refetch();
+          // Replying to a request accepts it.
+          void requests.refetch();
         }}
       />
     </View>

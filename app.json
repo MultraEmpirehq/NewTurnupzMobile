@@ -13,19 +13,19 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.turnup.mobile"
+      "bundleIdentifier": "com.turnupz.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./src/shared/assets/images/adaptive-icon.png",
         "backgroundImage": "./src/shared/assets/images/adaptive-background.png",
         "monochromeImage": "./src/shared/assets/images/monochrome-icon.png",
-        "backgroundColor": "#0577FA"
+        "backgroundColor": "#8968C3"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.turnup.mobile",
-      "versionCode": 1
+      "package": "com.turnupz.app",
+      "versionCode": 2
     },
     "web": {
       "favicon": "./src/shared/assets/images/favicon.png",

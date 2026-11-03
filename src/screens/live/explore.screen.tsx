@@ -10,6 +10,7 @@ import {
   View
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useQueryClient } from "@tanstack/react-query";
 import { Circle, Path, Svg } from "react-native-svg";
 import { useDebounce } from "use-debounce";
 import {
@@ -541,6 +542,7 @@ const LiveExploreScreen = ({
   scrollToTopSignal?: number;
 }) => {
   // Whichever result list is showing; they share it as only one is mounted.
+  const queryClient = useQueryClient();
   const listRef = useRef<TBrandRefreshListHandle>(null);
   const [stack, setStack] = useState<TExploreDetail[]>([]);
   const push = (detail: TExploreDetail) =>
@@ -1335,6 +1337,8 @@ const LiveExploreScreen = ({
   };
 
   const refresh = () => {
+    // Sponsored too: a boost may have started since.
+    void queryClient.invalidateQueries({ queryKey: ["sponsored"] });
     void events.refetch();
     void today.refetch();
     void thisWeek.refetch();

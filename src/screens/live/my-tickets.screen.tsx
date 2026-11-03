@@ -186,7 +186,7 @@ const Pass = ({
             </TextComponent>
           </View>
         ) : (
-          // Live: changes every 30 seconds, so a screenshot won't get in.
+          // Live: changes every 30 seconds, so a screenshot soon stops working.
           <LiveTicketQr
             ticket={ticket}
             size={Math.min(200, width - 110)}

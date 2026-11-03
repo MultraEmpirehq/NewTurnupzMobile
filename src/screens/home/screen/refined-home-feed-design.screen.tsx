@@ -2,6 +2,7 @@ import NavIcon from "@/shared/components/nav-icons/nav-icons";
 import { useLiveUserTickets } from "@/screens/live/live-api";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Pressable, StyleSheet, View } from "react-native";
 import { ScreenActiveContext } from "@/shared/hooks/use-screen-active";
 import { useHomePlace } from "@/shared/hooks/use-home-place";
@@ -13,6 +14,7 @@ import TextComponent from "@/shared/components/text/text.component";
 import { TEventDetailsType } from "@/shared/utils/types";
 import TurnupzWordmark from "@/shared/assets/images/turnupz-wordmark-blue.png";
 import { useAccessibilityStore } from "@/shared/stores/accessibility.store";
+import { useTranslation } from "react-i18next";
 import LiveEventDetailScreen from "@/screens/live/event-detail.screen";
 import LiveTicketCheckoutScreen from "@/screens/live/ticket-checkout.screen";
 import LiveMyTicketsScreen from "@/screens/live/my-tickets.screen";
@@ -69,7 +71,8 @@ type TBottomNavId =
 
 type TBottomNavItem = {
   id: TBottomNavId;
-  label: string;
+  /** Its name, as a key under nav.* in the translations. */
+  label: "home" | "explore" | "messages" | "notifications" | "profile";
   renderIcon: (color: string, active: boolean) => React.ReactNode;
 };
 
@@ -84,14 +87,14 @@ const NAV_ICON_SIZE = 26;
 const BOTTOM_NAV_ITEMS: TBottomNavItem[] = [
   {
     id: "home",
-    label: "Home",
+    label: "home",
     renderIcon: (color, active) => (
       <NavIcon name="home" size={NAV_ICON_SIZE} color={color} active={active} />
     )
   },
   {
     id: "search",
-    label: "Explore",
+    label: "explore",
     renderIcon: (color, active) => (
       <NavIcon
         name="explore"
@@ -103,7 +106,7 @@ const BOTTOM_NAV_ITEMS: TBottomNavItem[] = [
   },
   {
     id: "messages",
-    label: "Messages",
+    label: "messages",
     renderIcon: (color, active) => (
       <NavIcon
         name="messages"
@@ -115,7 +118,7 @@ const BOTTOM_NAV_ITEMS: TBottomNavItem[] = [
   },
   {
     id: "favorites",
-    label: "Notifications",
+    label: "notifications",
     renderIcon: (color, active) => (
       <NavIcon
         name="notifications"
@@ -127,7 +130,7 @@ const BOTTOM_NAV_ITEMS: TBottomNavItem[] = [
   },
   {
     id: "profile",
-    label: "Profile",
+    label: "profile",
     renderIcon: (color, active) => (
       <NavIcon
         name="profile"
@@ -175,6 +178,7 @@ const PreviewBottomNav = ({
   /** Shows a blue dot on the notifications tab. */
   unreadNotifications?: number;
 }) => {
+  const { t } = useTranslation();
   const buttonLabels = useAccessibilityStore((state) => state.buttonLabels);
   const screenReaderHints = useAccessibilityStore(
     (state) => state.screenReaderHints
@@ -197,6 +201,7 @@ const PreviewBottomNav = ({
     >
       {BOTTOM_NAV_ITEMS.map((item) => {
         const isActive = activeTab === item.id;
+        const label = t(`nav.${item.label}`);
         const color = isActive
           ? highContrast
             ? "#38bdf8"
@@ -211,11 +216,11 @@ const PreviewBottomNav = ({
             accessibilityRole="button"
             accessibilityLabel={
               item.id === "favorites" && unreadNotifications > 0
-                ? `${item.label}, ${unreadNotifications} unread`
-                : item.label
+                ? t("nav.unread", { label, count: unreadNotifications })
+                : label
             }
             accessibilityHint={
-              screenReaderHints ? `Opens the ${item.label} section` : undefined
+              screenReaderHints ? t("nav.opens", { label }) : undefined
             }
             accessibilityState={{ selected: isActive }}
             onPress={() => onTabPress(item.id)}
@@ -253,7 +258,7 @@ const PreviewBottomNav = ({
                       : "mt-1 text-[10px] text-zinc-500"
                 }
               >
-                {item.label}
+                {label}
               </TextComponent>
             )}
           </Pressable>
@@ -292,6 +297,7 @@ const FeedCard = ({
 );
 
 const RefinedHomeFeedDesignScreen = () => {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TBottomNavId>("home");
   // Tabs opened so far; they stay mounted (hidden) after you leave them.
   const [visitedTabs, setVisitedTabs] = useState<TBottomNavId[]>(["home"]);
@@ -537,7 +543,11 @@ const RefinedHomeFeedDesignScreen = () => {
                 />
               )}
               refreshing={liveEvents.isRefetching}
-              onRefresh={() => void liveEvents.refetch()}
+              onRefresh={() => {
+                void liveEvents.refetch();
+                // The Featured card too: a boost may have started since.
+                void queryClient.invalidateQueries({ queryKey: ["sponsored"] });
+              }}
               // The next ten load well before the end is reached, so scrolling
               // never has to stop and wait.
               onEndReached={() =>

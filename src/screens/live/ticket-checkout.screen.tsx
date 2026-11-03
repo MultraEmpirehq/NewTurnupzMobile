@@ -25,6 +25,7 @@ import { ticketDaysLabel } from "@/shared/utils/event-days";
 import { orderOutcome } from "@/shared/utils/order-status";
 import { BRAND } from "@/shared/utils/brand-colors";
 import { readArrival } from "@/shared/stores/arrival.store";
+import HoldTimer from "./hold-timer";
 import {
   cardLabel,
   checkPromoCode,
@@ -39,6 +40,7 @@ import {
   TSavedCard,
   useCreateOrder,
   useCreditBalance,
+  useFeatures,
   useLiveTickets,
   useSavedCards
 } from "./live-api";
@@ -49,7 +51,13 @@ const DEFAULT_MAX = 10;
 type TStep =
   | { kind: "select" }
   /** On Flutterwave's page (redirectUrl), or a saved card the bank is still confirming. */
-  | { kind: "awaiting-payment"; orderId: string; redirectUrl?: string }
+  | {
+      kind: "awaiting-payment";
+      orderId: string;
+      redirectUrl?: string;
+      /** When the held seats are let go, for the countdown. */
+      holdExpiresAt?: string | null;
+    }
   | { kind: "outcome"; order: TLiveOrder }
   | { kind: "registered"; status: "confirmed" | "pending" };
 
@@ -181,8 +189,10 @@ const LiveTicketCheckoutScreen = ({
   const creditAvailable =
     credit?.find((row) => row.currency.toUpperCase() === currency)?.available
       ?.amount ?? 0;
+  // Paying with credit can be paused for everyone (Admin switch).
+  const { creditSpending } = useFeatures();
   const creditApplied =
-    !isFree && !isRegistration && useCredit
+    !isFree && !isRegistration && creditSpending && useCredit
       ? Math.min(creditAvailable, afterPromo)
       : 0;
   const toPay = Math.max(afterPromo - creditApplied, 0);
@@ -216,12 +226,25 @@ const LiveTicketCheckoutScreen = ({
     }
   }, [startedWithOne, tickets]);
 
+  /** Moves the countdown to the hold's latest end, if they're still on that order. */
+  const keepHold = useCallback((orderId: string, holdExpiresAt: string) => {
+    setStep((current) =>
+      current.kind === "awaiting-payment" &&
+      current.orderId === orderId &&
+      current.holdExpiresAt !== holdExpiresAt
+        ? { ...current, holdExpiresAt }
+        : current
+    );
+  }, []);
+
   const checkOrder = useCallback(async (orderId: string) => {
     setIsChecking(true);
     try {
       const order = await fetchOrder(orderId);
       if (order && order.status?.toUpperCase() !== "PENDING") {
         setStep({ kind: "outcome", order });
+      } else if (order?.holdExpiresAt) {
+        keepHold(orderId, order.holdExpiresAt);
       }
       return order;
     } catch (checkError) {
@@ -234,7 +257,7 @@ const LiveTicketCheckoutScreen = ({
     } finally {
       setIsChecking(false);
     }
-  }, []);
+  }, [keepHold]);
 
   // Coming back from the payment page is the moment to look again.
   const awaitingOrderId = step.kind === "awaiting-payment" ? step.orderId : null;
@@ -321,14 +344,19 @@ const LiveTicketCheckoutScreen = ({
       if (!created?.orderId) throw new Error("No order was created");
       // A saved card the bank hasn't confirmed yet: wait here for it.
       if (!created.redirectUrl && created.status?.toUpperCase() === "PENDING") {
-        setStep({ kind: "awaiting-payment", orderId: created.orderId });
+        setStep({
+          kind: "awaiting-payment",
+          orderId: created.orderId,
+          holdExpiresAt: created.holdExpiresAt
+        });
         return;
       }
       if (created.redirectUrl) {
         setStep({
           kind: "awaiting-payment",
           orderId: created.orderId,
-          redirectUrl: created.redirectUrl
+          redirectUrl: created.redirectUrl,
+          holdExpiresAt: created.holdExpiresAt
         });
         await Linking.openURL(created.redirectUrl);
         return;
@@ -352,9 +380,12 @@ const LiveTicketCheckoutScreen = ({
 
   const reopenPayment = async (orderId: string) => {
     try {
-      const { data } = await postData<undefined, { redirectUrl?: string; status?: string }>(
-        `/order/${orderId}/payment`
-      );
+      const { data } = await postData<
+        undefined,
+        { redirectUrl?: string; status?: string; holdExpiresAt?: string | null }
+      >(`/order/${orderId}/payment`);
+      // Reopening holds the seats afresh if the hold had run out.
+      if (data?.data?.holdExpiresAt) keepHold(orderId, data.data.holdExpiresAt);
       if (data?.data?.redirectUrl) {
         await Linking.openURL(data.data.redirectUrl);
       } else {
@@ -392,9 +423,10 @@ const LiveTicketCheckoutScreen = ({
             Your bank is confirming the payment
           </TextComponent>
           <TextComponent className="text-center text-sm text-zinc-600">
-            This usually takes a few seconds. Your seats are held, and your tickets will be
-            in My Tickets as soon as it's done.
+            This usually takes a few seconds. Your tickets will be in My Tickets as soon as
+            it's done.
           </TextComponent>
+          <HoldTimer until={step.holdExpiresAt} />
         </View>
         <Pressable
           onPress={() => void checkOrder(step.orderId)}
@@ -418,12 +450,12 @@ const LiveTicketCheckoutScreen = ({
         <View className="mt-10 items-center gap-3 px-4">
           <ActivityIndicator color="#00B2FF" />
           <TextComponent className="text-center text-lg font-bold text-zinc-950">
-            Finish paying on Flutterwave
+            Finish paying in your browser
           </TextComponent>
           <TextComponent className="text-center text-sm text-zinc-600">
-            Your seats are held for a few minutes. Come back here when you're done and
-            we'll confirm your tickets.
+            Come back here when you're done and we'll confirm your tickets.
           </TextComponent>
+          <HoldTimer until={step.holdExpiresAt} />
         </View>
         <Pressable
           onPress={() => void checkOrder(step.orderId)}
@@ -743,7 +775,7 @@ const LiveTicketCheckoutScreen = ({
               )}
             </View>
           )}
-          {!isFree && !isRegistration && (
+          {!isFree && !isRegistration && creditSpending && (
             <View className="mt-3 flex-row items-center justify-between gap-3 border-t border-zinc-100 pt-3">
               <View className="flex-1">
                 <TextComponent className="text-sm font-semibold text-zinc-950">
