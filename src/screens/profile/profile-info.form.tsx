@@ -215,8 +215,9 @@ const ProfileInfoForm = ({
       {isDirty && <PrimaryButton label="Save changes" onPress={() => void save()} busy={saving} />}
       <DateModalComponent
         visible={dateOpen}
+        value={form.dateOfBirth ? `${form.dateOfBirth}T12:00:00` : null}
         onClose={() => setDateOpen(false)}
-        onDateSelected={(date) => set("dateOfBirth")(date.toISOString().slice(0, 10))}
+        onDateSelected={(date) => set("dateOfBirth")(format(date, "yyyy-MM-dd"))}
       />
     </View>
   );

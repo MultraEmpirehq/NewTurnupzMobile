@@ -18,6 +18,7 @@ import useUserStore from "../../../shared/stores/user.store";
 import useApp from "../../../shared/hooks/use-app.hook";
 import useAuth from "@/shared/hooks/use-auth.hook";
 import CheckPasswordValidityComponent from "@/shared/components/form/password-validity/check-password-validity.component";
+import { onError } from "@/shared/components/status/toast";
 
 type TCreatePasswordBodyType = {
   password: string;
@@ -77,13 +78,15 @@ const CreatePasswordScreen = () => {
         performAuthOperations(data?.data?.accessToken, true);
         await performAuthVerificationCheck();
       } catch (error) {
-        const errorMessage = constructErrorMessage(
-          error as TApiErrorResponseType,
-          "Failed to create password"
+        onError(
+          constructErrorMessage(
+            error as TApiErrorResponseType,
+            "We couldn't save your password. Try again."
+          )
         );
       }
     },
-    [performAuthVerificationCheck]
+    [email, token, performAuthOperations, performAuthVerificationCheck]
   );
   return (
     <AuthTicketLayout
