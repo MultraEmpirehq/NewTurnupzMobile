@@ -7,6 +7,7 @@ import { EVerificationType } from "@/shared/utils/types";
 import VerificationScreen from "@/screens/verification/screen/verification.screen";
 import ForgotPasswordScreen from "@/screens/forgot-password/screen/forgot-password.screen";
 import OnboardingScreen from "@/screens/onboarding/screen/onboarding.screen";
+import ResetPasswordScreen from "@/screens/reset-password/screen/reset-password.screen";
 
 export type UnauthenticatedStackParamList = {
   landing: undefined;
@@ -41,6 +42,7 @@ const UnauthenticatedNavigator = () => {
       <Stack.Screen name="create-password" component={CreatePasswordScreen} />
       <Stack.Screen name="verification" component={VerificationScreen} />
       <Stack.Screen name="forgot-password" component={ForgotPasswordScreen} />
+      <Stack.Screen name="reset-password" component={ResetPasswordScreen} />
       <Stack.Screen name="onboarding" component={OnboardingScreen} />
     </Stack.Navigator>
   );

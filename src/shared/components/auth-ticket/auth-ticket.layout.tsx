@@ -79,6 +79,9 @@ type TAuthTicketLayoutProps = {
   onBack?: () => void;
   /** Sits under the ticket, e.g. the terms line. */
   footer?: React.ReactNode;
+  /** The ticket's stub; organisers get their own ("All access"). */
+  stubKicker?: string;
+  stubTitle?: string;
 };
 
 const AuthTicketLayout: React.FC<TAuthTicketLayoutProps> = ({
@@ -87,7 +90,9 @@ const AuthTicketLayout: React.FC<TAuthTicketLayoutProps> = ({
   subtitle,
   children,
   onBack,
-  footer
+  footer,
+  stubKicker = "ADMIT ONE",
+  stubTitle = "Your pass to Turnupz"
 }) => (
   <ContainerComponent isSafeAreaView className="flex-1" style={styles.page}>
     <NightSky />
@@ -134,10 +139,10 @@ const AuthTicketLayout: React.FC<TAuthTicketLayoutProps> = ({
                 <View className="flex-row items-start justify-between">
                   <View>
                     <TextComponent style={styles.admit}>
-                      ADMIT ONE
+                      {stubKicker}
                     </TextComponent>
                     <TextComponent className="mt-1 text-xl font-bold text-white">
-                      Your pass to Turnupz
+                      {stubTitle}
                     </TextComponent>
                   </View>
                   <View style={styles.serial}>

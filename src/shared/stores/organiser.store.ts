@@ -13,6 +13,9 @@ type TOrganiserStore = {
   workspaceVendorId: string | null;
   /** Asked "attendee or organiser?" already, for this account. */
   askedFor: string[];
+  /** Signed in by the Organiser side of the sign-in screen; home takes it from there. */
+  wantsToHost: boolean;
+  setWantsToHost: (wantsToHost: boolean) => void;
   setMode: (mode: "attendee" | "organiser") => void;
   setWorkspace: (vendorId: string | null) => void;
   markAsked: (userId: string) => void;
@@ -27,14 +30,16 @@ export const useOrganiserStore = create<TOrganiserStore>()(
       mode: "attendee",
       workspaceVendorId: null,
       askedFor: [],
+      wantsToHost: false,
       setMode: (mode) => set({ mode }),
+      setWantsToHost: (wantsToHost) => set({ wantsToHost }),
       setWorkspace: (workspaceVendorId) => set({ workspaceVendorId }),
       markAsked: (userId) =>
         set((state) =>
           state.askedFor.includes(userId) ? state : { askedFor: [...state.askedFor, userId] }
         ),
       // Signing out: the next person starts as an attendee.
-      reset: () => set({ mode: "attendee", workspaceVendorId: null })
+      reset: () => set({ mode: "attendee", workspaceVendorId: null, wantsToHost: false })
     }),
     {
       name: "organiser",
