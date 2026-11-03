@@ -26,14 +26,19 @@ import {
   PERFORMER_TYPE_LABELS,
   TLiveEvent,
   TLiveEventDay,
-  useLiveEvent
-,
+  startOrganizerChat,
+  useLiveEvent,
   useTicketsHeldFor
 } from "./live-api";
 import { PerformerAvatar } from "./explore-details";
 import ReportEventSheet from "./report-event.sheet";
 import LeavingTurnupzSheet from "./leaving-turnupz.sheet";
 import BlogPostScreen, { postedAgo } from "./blog-post.screen";
+import ChatThreadScreen from "./chat-thread.screen";
+import { MediaTile, MediaViewer, mediaItemsOf } from "./event-media";
+import FollowButton from "@/screens/profile/follow-button";
+import useUserStore from "@/shared/stores/user.store";
+import { constructErrorMessage } from "@/api/functions";
 import { useBlogReadsStore } from "@/shared/stores/blog-reads.store";
 import {
   eventDateRange,
@@ -142,6 +147,43 @@ const EventSchedule = ({
   </View>
 );
 
+/** The sponsor board: each logo fills its tile, or the name shows. */
+const SponsorBoard = ({ sponsors }: { sponsors?: TLiveEvent["sponsors"] }) => {
+  const items = (sponsors ?? []).filter((sponsor) => sponsor.name?.trim());
+  if (!items.length) return null;
+  return (
+    <View className="mt-6">
+      <TextComponent className="text-base font-bold text-primary">Sponsors</TextComponent>
+      <View className="mt-3 flex-row flex-wrap overflow-hidden rounded-xl border border-zinc-100 bg-white">
+        {items.map((sponsor, index) => {
+          const logo = sponsor.showName ? null : sponsor.imageDetails?.url;
+          return (
+            <View
+              key={sponsor.id ?? `${sponsor.name}-${index}`}
+              className="h-20 items-center justify-center overflow-hidden border-b border-r border-zinc-100 px-2"
+              style={{ width: "50%" }}
+            >
+              {logo ? (
+                <CustomImage
+                  className="absolute inset-0"
+                  imageClassName="size-full"
+                  source={{ uri: logo }}
+                  contentFit="cover"
+                  style={{ width: "100%", height: "100%" }}
+                />
+              ) : (
+                <TextComponent numberOfLines={2} className="text-center text-sm font-bold text-zinc-700">
+                  {sponsor.name}
+                </TextComponent>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
 const TABS = ["Overview", "Media", "Activities", "Blogs"] as const;
 type TTab = (typeof TABS)[number];
 
@@ -199,8 +241,31 @@ const LiveEventDetailScreen = ({
   const isCompactPhone = width < 380;
   const horizontalPadding = isCompactPhone ? 12 : 16;
 
+  const [viewing, setViewing] = useState<number | null>(null);
+  const [organiserChat, setOrganiserChat] = useState<{ id: string; title: string } | null>(null);
+  const [openingChat, setOpeningChat] = useState(false);
+  const isSignedIn = !!useUserStore((state) => state.userToken);
+  const messageOrganiser = async () => {
+    if (!event) return;
+    if (!isSignedIn) {
+      onError("Sign in to message the organiser.");
+      return;
+    }
+    setOpeningChat(true);
+    try {
+      const chat = await startOrganizerChat(event.id);
+      setOrganiserChat({ id: chat.id, title: chat.title });
+    } catch (error) {
+      onError(constructErrorMessage(error as TApiErrorResponseType, "We couldn't reach the organiser right now."));
+    } finally {
+      setOpeningChat(false);
+    }
+  };
   const media = useMemo(
-    () => [event?.image, ...(event?.medias ?? [])].filter(Boolean) as string[],
+    () => [
+      ...(event?.image ? [{ url: event.image }] : []),
+      ...mediaItemsOf(event?.mediaDetails, event?.medias)
+    ],
     [event]
   );
   const zoneNote = event ? eventZoneNote(event.timezone, event.date) : null;
@@ -324,9 +389,34 @@ const LiveEventDetailScreen = ({
               )}
             </View>
             {!!event.organizerName && (
-              <TextComponent className="text-xs text-zinc-500">
-                By {event.organizerName}
-              </TextComponent>
+              <View className="flex-row flex-wrap items-center gap-2">
+                <TextComponent className="text-xs text-zinc-500">
+                  By <TextComponent className="text-xs font-bold text-zinc-900">{event.organizerName}</TextComponent>
+                </TextComponent>
+                {!event.isOwner && (
+                  <>
+                    <FollowButton
+                      type="PLANNER"
+                      id={event.organizerId}
+                      name={event.organizerName}
+                      size="sm"
+                    />
+                    <Pressable
+                      onPress={() => void messageOrganiser()}
+                      disabled={openingChat}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Message ${event.organizerName}`}
+                      className="h-7 flex-row items-center rounded-full border border-zinc-200 px-3"
+                    >
+                      {openingChat ? (
+                        <ActivityIndicator size="small" />
+                      ) : (
+                        <TextComponent className="text-xs font-semibold text-zinc-800">Message</TextComponent>
+                      )}
+                    </Pressable>
+                  </>
+                )}
+              </View>
             )}
           </View>
 
@@ -471,22 +561,21 @@ const LiveEventDetailScreen = ({
                   </ScrollView>
                 </>
               )}
+              <SponsorBoard sponsors={event.sponsors} />
             </View>
           )}
 
           {activeTab === "Media" && (
             <View className="mt-4 gap-3">
               {media.length === 0 ? (
-                <TextComponent className="text-sm text-zinc-500">No photos yet.</TextComponent>
+                <TextComponent className="text-sm text-zinc-500">No photos or videos yet.</TextComponent>
               ) : (
-                media.map((uri) => (
-                  <CustomImage
-                    key={uri}
-                    className="w-full rounded-xl"
-                    imageClassName="size-full rounded-xl"
-                    source={{ uri }}
-                    contentFit="cover"
-                    style={{ height: isCompactPhone ? 180 : 210 }}
+                media.map((item, index) => (
+                  <MediaTile
+                    key={`${item.url}-${index}`}
+                    item={item}
+                    height={isCompactPhone ? 180 : 210}
+                    onPress={() => setViewing(index)}
                   />
                 ))
               )}
@@ -587,6 +676,13 @@ const LiveEventDetailScreen = ({
         />
       )}
       <LeavingTurnupzSheet url={leavingTo} eventName={event?.name} onClose={() => setLeavingTo(null)} />
+      <MediaViewer items={media} index={viewing} onClose={() => setViewing(null)} />
+      <ChatThreadScreen
+        chatId={organiserChat?.id ?? null}
+        title={organiserChat?.title ?? ""}
+        subtitle="Event organiser"
+        onClose={() => setOrganiserChat(null)}
+      />
       {!!event && (
         <ReportEventSheet
           visible={isReporting}

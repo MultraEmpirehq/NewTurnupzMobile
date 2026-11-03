@@ -70,6 +70,16 @@ export type TLiveEvent = {
   timezone?: string;
   image?: string;
   medias?: string[];
+  /** The gallery with what each file is (photo or video). */
+  mediaDetails?: { url?: string; type?: string | null }[];
+  /** The sponsor board, in the organiser's order. */
+  sponsors?: {
+    id?: string;
+    name: string;
+    imageDetails?: { url?: string } | null;
+    /** Show the name even though there's a logo. */
+    showName?: boolean;
+  }[];
   description?: string;
   organizerName?: string;
   /** The organiser's user id: what a planner is followed by. */
@@ -389,6 +399,24 @@ export const useLivePerformer = (performerId?: string) =>
 /** Saves the event, or un-saves it if it was saved (the api toggles). */
 export const toggleSavedEvent = (eventId: string) =>
   postData(`/events/favorite/${eventId}`);
+
+/** Platform switches admins can change (the API's GET /features). */
+export type TFeatures = { promotion: boolean; creditSpending: boolean; referralRewards: boolean };
+
+/** Until the switches load (or if they can't): the server's defaults. */
+const DEFAULT_FEATURES: TFeatures = { promotion: true, creditSpending: false, referralRewards: false };
+
+export const useFeatures = (): TFeatures => {
+  const { data } = useQuery({
+    queryKey: ["features"],
+    queryFn: async () => {
+      const { data } = await getData<TFeatures>("/features");
+      return data?.data ?? null;
+    },
+    staleTime: 60 * 1000
+  });
+  return { ...DEFAULT_FEATURES, ...(data ?? {}) };
+};
 
 export const useLiveCategories = () =>
   useQuery({

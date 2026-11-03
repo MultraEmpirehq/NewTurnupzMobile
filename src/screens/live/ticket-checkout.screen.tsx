@@ -40,6 +40,7 @@ import {
   TSavedCard,
   useCreateOrder,
   useCreditBalance,
+  useFeatures,
   useLiveTickets,
   useSavedCards
 } from "./live-api";
@@ -188,8 +189,10 @@ const LiveTicketCheckoutScreen = ({
   const creditAvailable =
     credit?.find((row) => row.currency.toUpperCase() === currency)?.available
       ?.amount ?? 0;
+  // Paying with credit can be paused for everyone (Admin switch).
+  const { creditSpending } = useFeatures();
   const creditApplied =
-    !isFree && !isRegistration && useCredit
+    !isFree && !isRegistration && creditSpending && useCredit
       ? Math.min(creditAvailable, afterPromo)
       : 0;
   const toPay = Math.max(afterPromo - creditApplied, 0);
@@ -772,7 +775,7 @@ const LiveTicketCheckoutScreen = ({
               )}
             </View>
           )}
-          {!isFree && !isRegistration && (
+          {!isFree && !isRegistration && creditSpending && (
             <View className="mt-3 flex-row items-center justify-between gap-3 border-t border-zinc-100 pt-3">
               <View className="flex-1">
                 <TextComponent className="text-sm font-semibold text-zinc-950">
