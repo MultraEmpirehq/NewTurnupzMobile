@@ -30,6 +30,7 @@ import {
   TSharedEvent,
   sendChatMessage,
   sendChatPhoto,
+  toggleChatReaction,
   useLiveChatMessages,
   useLiveChats,
   useLiveUserTickets
@@ -73,6 +74,9 @@ export const SharedEventCard = ({ event, onPress }: { event: TSharedEvent; onPre
     </View>
   </Pressable>
 );
+
+/** The reactions on offer, as on the website. */
+const REACTIONS = ["🔥", "🙌", "❤️"];
 
 const Avatar = ({ name, size = 30, dark }: { name?: string | null; size?: number; dark?: boolean }) => (
   <View
@@ -231,6 +235,91 @@ const ChatThreadScreen = ({
             : "Organiser"
           : undefined);
 
+  // Reactions: long-press a message to pick one; tap a chip to add or take yours off.
+  const [picking, setPicking] = useState<string | null>(null);
+  const react = async (messageId: string, reaction: string) => {
+    if (!chatId) return;
+    setPicking(null);
+    const key = ["live-chat-messages", chatId];
+    const before = queryClient.getQueryData<TLiveChatMessage[]>(key);
+    // Shown straight away; put back if the server says no.
+    queryClient.setQueryData<TLiveChatMessage[]>(key, (current) =>
+      current?.map((message) => {
+        if (message.id !== messageId) return message;
+        const reactions = [...(message.reactions ?? [])];
+        const at = reactions.findIndex((item) => item.reaction === reaction);
+        if (at === -1) reactions.push({ reaction, count: 1, mine: true });
+        else {
+          const item = reactions[at];
+          const count = item.count + (item.mine ? -1 : 1);
+          if (count <= 0) reactions.splice(at, 1);
+          else reactions[at] = { ...item, count, mine: !item.mine };
+        }
+        return { ...message, reactions };
+      })
+    );
+    try {
+      await toggleChatReaction(chatId, messageId, reaction);
+    } catch (error) {
+      if (before) queryClient.setQueryData(key, before);
+      onError(constructErrorMessage(error as TApiErrorResponseType, "Couldn't add your reaction."));
+    }
+  };
+
+  const reactionsFor = (message: TLiveChatMessage, mine: boolean) => {
+    const shown = (message.reactions ?? []).filter((item) => item.count > 0);
+    return (
+      <>
+        {picking === message.id && (
+          <View
+            className="mt-1 flex-row gap-1 rounded-full border bg-white px-1.5 py-1"
+            style={{ borderColor: "#EEF0F4", alignSelf: mine ? "flex-end" : "flex-start" }}
+          >
+            {REACTIONS.map((emoji) => (
+              <Pressable
+                key={emoji}
+                onPress={() => void react(message.id, emoji)}
+                accessibilityRole="button"
+                accessibilityLabel={`React ${emoji}`}
+                hitSlop={4}
+                className="size-9 items-center justify-center rounded-full"
+              >
+                <TextComponent className="text-xl">{emoji}</TextComponent>
+              </Pressable>
+            ))}
+          </View>
+        )}
+        {shown.length > 0 && (
+          <View className="mt-1 flex-row flex-wrap gap-1" style={{ alignSelf: mine ? "flex-end" : "flex-start" }}>
+            {shown.map((item) => (
+              <Pressable
+                key={item.reaction}
+                onPress={() => void react(message.id, item.reaction)}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.reaction} ${item.count}${item.mine ? ", including you" : ""}`}
+                className="flex-row items-center rounded-full border px-2 py-0.5"
+                style={{
+                  borderColor: item.mine ? BRAND.blue : "#EEF0F4",
+                  backgroundColor: item.mine ? BRAND.blueTint : BRAND.white
+                }}
+              >
+                <TextComponent className="text-xs">
+                  {item.reaction} {item.count}
+                </TextComponent>
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </>
+    );
+  };
+
+  const longPressFor = (messageId: string) => ({
+    onLongPress: () => setPicking((current) => (current === messageId ? null : messageId)),
+    delayLongPress: 300,
+    accessibilityHint: "Long-press to react"
+  });
+
   const renderMessage = (message: TLiveChatMessage) => {
     const mine = message.senderId === myId;
     const fromOrganiser = message.senderRole === "vendor" || message.kind === "event-update";
@@ -242,7 +331,7 @@ const ChatThreadScreen = ({
     if (isGroup && fromOrganiser && !mine) {
       return (
         <View className="px-3 py-1">
-          <View className="rounded-[18px] p-3.5" style={{ backgroundColor: BRAND.ink }}>
+          <Pressable {...longPressFor(message.id)} className="rounded-[18px] p-3.5" style={{ backgroundColor: BRAND.ink }}>
             <View className="mb-1 flex-row items-center gap-1.5">
               <TextComponent className="text-xs font-extrabold text-white">{message.senderName}</TextComponent>
               <View className="rounded-md px-1.5 py-0.5" style={{ backgroundColor: BRAND.blue }}>
@@ -254,7 +343,8 @@ const ChatThreadScreen = ({
             )}
             {!!caption && <TextComponent className="text-[13px] leading-5 text-white">{caption}</TextComponent>}
             <TextComponent className="mt-1 text-right text-[10.5px] text-white/60">{clock(message.createdAt)}</TextComponent>
-          </View>
+          </Pressable>
+          {reactionsFor(message, false)}
         </View>
       );
     }
@@ -262,7 +352,7 @@ const ChatThreadScreen = ({
     return (
       <View className={mine ? "flex-row-reverse items-end gap-2 px-3 py-1" : "flex-row items-end gap-2 px-3 py-1"}>
         {!mine && isGroup && <Avatar name={message.senderName} />}
-        <View style={{ maxWidth: "80%" }} className={mine ? "items-end" : "items-start"}>
+        <Pressable {...longPressFor(message.id)} style={{ maxWidth: "80%" }} className={mine ? "items-end" : "items-start"}>
           {!!shared && (
             <View className="mb-1">
               <SharedEventCard event={shared} onPress={onOpenEvent ? () => onOpenEvent(shared.id) : undefined} />
@@ -294,7 +384,8 @@ const ChatThreadScreen = ({
               </TextComponent>
             </View>
           )}
-        </View>
+          {reactionsFor(message, mine)}
+        </Pressable>
       </View>
     );
   };

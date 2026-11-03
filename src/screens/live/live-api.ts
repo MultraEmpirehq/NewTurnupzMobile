@@ -810,6 +810,8 @@ export type TLiveChatMessage = {
   body?: string | null;
   href?: string | null;
   metadata?: { sharedEvent?: TSharedEvent } | null;
+  /** Each emoji, how many reacted, and whether you did. */
+  reactions?: { reaction: string; count: number; mine?: boolean }[];
   createdAt: string;
 };
 
@@ -901,6 +903,13 @@ export const startOrganizerChat = async (eventId: string) => {
   >("/chats/direct", { eventId });
   return data!.data!;
 };
+
+/** Adds your reaction to a message, or takes it off if it's there. */
+export const toggleChatReaction = (chatId: string, messageId: string, reaction: string) =>
+  postData<{ reaction: string }, unknown>(
+    `/event-chat/${chatId}/messages/${messageId}/reactions`,
+    { reaction }
+  );
 
 /** Sends a message; with an event attached it shows as that event's card. */
 export const sendChatMessage = (
