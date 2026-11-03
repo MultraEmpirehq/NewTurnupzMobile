@@ -20,7 +20,8 @@ import {
   useCreditBalance,
   useCreditHistory,
   useSavedCards,
-  formatZero
+  formatZero,
+  useFeatures
 } from "@/screens/live/live-api";
 import { useEmptyCreditText } from "@/shared/hooks/use-empty-credit-text";
 
@@ -49,6 +50,7 @@ const SectionLabel = ({ children }: { children: string }) => (
 const WalletScreen = ({ onBack }: { onBack: () => void }) => {
   const queryClient = useQueryClient();
   const balance = useCreditBalance();
+  const { creditSpending } = useFeatures();
   const history = useCreditHistory();
   const cards = useSavedCards();
   const [busyCard, setBusyCard] = useState<string | null>(null);
@@ -155,7 +157,9 @@ const WalletScreen = ({ onBack }: { onBack: () => void }) => {
             </TextComponent>
           )}
           <TextComponent className="mt-3 text-xs leading-5 text-white/70">
-            From refunds and friends you invite. It comes off your next ticket at checkout.
+            {creditSpending
+              ? "From refunds and friends you invite. It comes off your next ticket at checkout."
+              : "Paying with Turnupz Credit is paused for now. Your balance is safe and stays here."}
           </TextComponent>
         </View>
 
