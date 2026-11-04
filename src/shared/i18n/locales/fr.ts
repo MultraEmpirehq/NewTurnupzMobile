@@ -176,6 +176,7 @@ const fr: TTranslations = {
     common: "Questions fréquentes",
     none: "Aucune question pour l'instant.",
     stillStuck: "Toujours bloqué ? Écrivez-nous",
+    followUs: "Suivez Turnupz",
     subject: "Objet",
     subjectPlaceholder: "ex. Remboursement d'un événement annulé",
     message: "Message",

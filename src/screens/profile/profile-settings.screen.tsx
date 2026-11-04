@@ -1,4 +1,5 @@
 import { formatZero, openSupportChat, useCreditBalance } from "@/screens/live/live-api";
+import { SOCIAL_LINKS } from "@/shared/utils/social-links";
 import OrdersPage from "./orders.screen";
 import { maskAmount, useBalancePrivacyStore } from "@/shared/stores/balance-privacy.store";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
@@ -989,6 +990,21 @@ const HelpPage = ({ onBack }: { onBack: () => void }) => {
           <TextComponent className="px-1 text-xs text-zinc-500">{t("help.replyNote")}</TextComponent>
           <PrimaryButton label={t("common.send")} onPress={() => void send()} busy={sending} disabled={!message.trim()} />
         </View>
+      </Section>
+      <Section title={t("help.followUs")}>
+        {SOCIAL_LINKS.map((link, index) => (
+          <Pressable
+            key={link.label}
+            onPress={() => void Linking.openURL(link.url).catch(() => onError(t("settings.couldntOpen")))}
+            accessibilityRole="link"
+            accessibilityLabel={`Turnupz on ${link.label}`}
+            className={`flex-row items-center gap-3 px-4 py-3.5 ${index === SOCIAL_LINKS.length - 1 ? "" : "border-b border-black/5"}`}
+          >
+            <TextComponent className="flex-1 text-base font-semibold text-zinc-950">{link.label}</TextComponent>
+            <TextComponent className="text-sm text-zinc-500">{link.handle}</TextComponent>
+            <TextComponent className="text-base text-zinc-400">↗</TextComponent>
+          </Pressable>
+        ))}
       </Section>
     </Page>
   );
