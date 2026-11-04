@@ -8,7 +8,6 @@ import { format } from "date-fns";
 import { latestAdultBirthDate, toCalendarDay } from "@/shared/utils/age";
 import { BRAND } from "@/shared/utils/brand-colors";
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 /** How far back the year list goes. */
 const YEARS_SHOWN = 100;
 const YEAR_COLUMNS = 4;
@@ -18,12 +17,13 @@ const TYPICAL_AGE = 25;
 
 const pad = (value: number) => String(value).padStart(2, "0");
 
-type TStep = "year" | "month" | "day";
+type TStep = "year" | "day";
 
 /**
- * A birthday picker that starts with the year, since that's the far one:
- * year, then month, then day. Tapping the month and year above the calendar
- * goes back to the years. Days that would make someone under 18 can't be picked.
+ * A birthday picker: the month's calendar, with its month and year as a button
+ * that opens a grid of years, so a birthday decades back is two taps away
+ * rather than hundreds of swipes. Days that would make someone under 18 can't
+ * be picked.
  */
 const DateModalComponent: React.FC<{
   onDateSelected: (date: Date) => void;
@@ -40,31 +40,28 @@ const DateModalComponent: React.FC<{
   );
   const chosen = value ? new Date(value) : null;
 
-  const [step, setStep] = useState<TStep>("year");
+  const [step, setStep] = useState<TStep>("day");
   const [year, setYear] = useState(maxYear - (TYPICAL_AGE - 18));
-  const [month, setMonth] = useState(0);
+  const [month, setMonth] = useState(latest.getMonth());
 
-  // Each time it opens: on the chosen date's month, or at the years.
+  // Each time it opens: on the chosen date's month, or this month some years back.
   useEffect(() => {
     if (!visible) return;
+    setStep("day");
     if (chosen && !Number.isNaN(chosen.getTime())) {
       setYear(chosen.getFullYear());
       setMonth(chosen.getMonth());
-      setStep("day");
     } else {
       setYear(maxYear - (TYPICAL_AGE - 18));
-      setStep("year");
+      setMonth(latest.getMonth());
     }
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const monthAllowed = (index: number) =>
-    year < maxYear || index <= latest.getMonth();
 
   const pickYear = (picked: number) => {
     setYear(picked);
     // The latest year only goes up to this month.
     if (picked === maxYear && month > latest.getMonth()) setMonth(latest.getMonth());
-    setStep("month");
+    setStep("day");
   };
 
   const yearIndex = Math.max(0, years.indexOf(year));
@@ -80,10 +77,10 @@ const DateModalComponent: React.FC<{
         <View className="w-[90%] rounded-2xl bg-white p-4">
           <View className="mb-3 flex-row items-center justify-between">
             <TextComponent className="text-base font-bold text-zinc-950">
-              {step === "year" ? "What year were you born?" : step === "month" ? `Which month in ${year}?` : "Which day?"}
+              {step === "year" ? "Pick the year" : "Your date of birth"}
             </TextComponent>
-            {step !== "year" && (
-              <Pressable onPress={() => setStep(step === "day" ? "month" : "year")} hitSlop={8} accessibilityRole="button">
+            {step === "year" && (
+              <Pressable onPress={() => setStep("day")} hitSlop={8} accessibilityRole="button">
                 <TextComponent className="text-sm font-semibold" style={{ color: BRAND.blueDeep }}>
                   Back
                 </TextComponent>
@@ -125,37 +122,6 @@ const DateModalComponent: React.FC<{
             />
           )}
 
-          {step === "month" && (
-            <View className="flex-row flex-wrap">
-              {MONTHS.map((label, index) => {
-                const allowed = monthAllowed(index);
-                const selected = index === month;
-                return (
-                  <View key={label} className="w-1/3 p-1">
-                    <Pressable
-                      disabled={!allowed}
-                      onPress={() => {
-                        setMonth(index);
-                        setStep("day");
-                      }}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected, disabled: !allowed }}
-                      className="h-12 items-center justify-center rounded-full"
-                      style={{
-                        backgroundColor: selected ? BRAND.blueDeep : "#f4f6fa",
-                        opacity: allowed ? 1 : 0.35
-                      }}
-                    >
-                      <TextComponent className={`text-base font-semibold ${selected ? "text-white" : "text-zinc-900"}`}>
-                        {label}
-                      </TextComponent>
-                    </Pressable>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-
           {step === "day" && (
             <Calendar
               key={`${year}-${month}`}
@@ -166,9 +132,16 @@ const DateModalComponent: React.FC<{
                   ? { [toCalendarDay(chosen)]: { selected: true, selectedColor: BRAND.blueDeep } }
                   : undefined
               }
-              // The month and year: tap them to jump to another year.
+              // The month and year: tap to pick another year.
               renderHeader={() => (
-                <Pressable onPress={() => setStep("year")} accessibilityRole="button" hitSlop={8}>
+                <Pressable
+                  onPress={() => setStep("year")}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${format(new Date(year, month, 1), "MMMM yyyy")}, change year`}
+                  hitSlop={8}
+                  className="rounded-full px-3 py-1.5"
+                  style={{ backgroundColor: BRAND.blueTint }}
+                >
                   <TextComponent className="text-base font-bold" style={{ color: BRAND.blueDeep }}>
                     {format(new Date(year, month, 1), "MMMM yyyy")} ▾
                   </TextComponent>

@@ -174,6 +174,7 @@ const enGB = {
     common: "Common questions",
     none: "No questions yet.",
     stillStuck: "Still stuck? Message us",
+    followUs: "Follow Turnupz",
     subject: "Subject",
     subjectPlaceholder: "e.g. Refund for a cancelled event",
     message: "Message",
