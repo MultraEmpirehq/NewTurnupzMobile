@@ -1,3 +1,4 @@
+import BadgeCheckIcon from "@/shared/assets/icons/badge-check.icon";
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useMemo, useState } from "react";
 import SafeModal from "@/shared/components/modals/safe-modal";
@@ -375,7 +376,10 @@ const ChatThreadScreen = ({
             >
               {mine && <LinearGradient colors={BRAND_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0 }} />}
               {!mine && isGroup && (
-                <TextComponent className="mb-0.5 text-[11.5px] font-extrabold" style={{ color: BRAND.blueDeep }}>{message.senderName}</TextComponent>
+                <View className="mb-0.5 flex-row items-center gap-1">
+                  <TextComponent className="text-[11.5px] font-extrabold" style={{ color: BRAND.blueDeep }}>{message.senderName}</TextComponent>
+                  {message.senderRole === "admin" && <BadgeCheckIcon size={12} color={BRAND.blue} color2={BRAND.blueDeep} />}
+                </View>
               )}
               <TextComponent className="text-[13.5px] leading-5" style={{ color: mine ? BRAND.white : "#18181b" }}>{caption}</TextComponent>
               <TextComponent className="mt-0.5 text-right text-[10.5px]" style={{ color: mine ? "rgba(255,255,255,0.75)" : "#A1A1AA" }}>
@@ -486,6 +490,14 @@ const ChatThreadScreen = ({
           {/* Messages, newest at the bottom */}
           {messages.isLoading ? (
             <ActivityIndicator className="mt-16" color={BRAND.blue} />
+          ) : rows.length === 0 ? (
+            // Not inside the list: it's flipped to keep the newest at the bottom, and
+            // anything in it would need flipping back differently on each platform.
+            <View className="flex-1 items-center justify-end px-10 py-10">
+              <TextComponent className="text-center text-sm text-zinc-500">
+                {isPerson ? "Say hello." : isDirect ? "Ask the organiser anything about the event." : "Say hi to everyone going."}
+              </TextComponent>
+            </View>
           ) : (
             <FlatList
               data={rows}
@@ -502,13 +514,6 @@ const ChatThreadScreen = ({
                 ) : (
                   renderMessage(item.message)
                 )
-              }
-              ListEmptyComponent={
-                <View className="items-center px-10 py-10" style={{ transform: [{ scaleY: -1 }] }}>
-                  <TextComponent className="text-center text-sm text-zinc-500">
-                    {isPerson ? "Say hello." : isDirect ? "Ask the organiser anything about the event." : "Say hi to everyone going."}
-                  </TextComponent>
-                </View>
               }
             />
           )}

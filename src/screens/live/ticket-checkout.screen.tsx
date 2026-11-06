@@ -39,7 +39,10 @@ import {
   TPromoCheck,
   TSavedCard,
   useCreateOrder,
+  checkoutTax,
+  recordTicketPageView,
   useCreditBalance,
+  useEventTaxRates,
   useFeatures,
   useLiveTickets,
   useSavedCards
@@ -163,6 +166,9 @@ const LiveTicketCheckoutScreen = ({
   );
   // A promoter's code they arrived with fills itself in.
   useEffect(() => {
+    recordTicketPageView(event.id);
+  }, [event.id]);
+  useEffect(() => {
     const code = readArrival(event.id).code;
     if (code && user && !isRegistration) void applyPromo(code, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -180,7 +186,13 @@ const LiveTicketCheckoutScreen = ({
           return sum + off * line.quantity;
         }, 0);
   const afterPromo = Math.max(orderAmount - promoDiscount, 0);
-  const total = selected ? formatMoney(afterPromo, selected.price) : "";
+  // Tax on the tickets, if any applies here. The api works it out again when paying.
+  const { data: taxRates } = useEventTaxRates(
+    !isFree && !isRegistration ? event.id : undefined,
+    selected?.price?.currency?.code,
+  );
+  const taxed = checkoutTax(afterPromo, taxRates);
+  const total = selected ? formatMoney(taxed.gross, selected.price) : "";
 
   // Turnupz Credit in the ticket's currency, spent first when switched on.
   const { data: credit } = useCreditBalance(!isRegistration);
@@ -193,9 +205,9 @@ const LiveTicketCheckoutScreen = ({
   const { creditSpending } = useFeatures();
   const creditApplied =
     !isFree && !isRegistration && creditSpending && useCredit
-      ? Math.min(creditAvailable, afterPromo)
+      ? Math.min(creditAvailable, taxed.gross)
       : 0;
-  const toPay = Math.max(afterPromo - creditApplied, 0);
+  const toPay = Math.max(taxed.gross - creditApplied, 0);
   const coveredByCredit = creditApplied > 0 && toPay === 0;
 
   // Pay with: a saved card (the one that pays first is picked), or a new card.
@@ -287,7 +299,8 @@ const LiveTicketCheckoutScreen = ({
    * an order can't mix currencies, so either of those starts the order afresh.
    */
   const setCount = (ticket: TLiveTicket, count: number) => {
-    const next = Math.max(0, Math.min(count, maxFor(ticket)));
+    // Registration is one place per person.
+    const next = Math.max(0, Math.min(count, isRegistration ? 1 : maxFor(ticket)));
     setQuantities((current) => {
       const otherCurrency =
         !!currency && ticket.price?.currency?.code?.toUpperCase() !== currency;
@@ -641,7 +654,18 @@ const LiveTicketCheckoutScreen = ({
                       {formatPrice(ticket.price)}
                     </TextComponent>
                   </View>
-                  {isSelected && !unavailable ? (
+                  {isSelected && !unavailable && isRegistration ? (
+                    <Pressable
+                      onPress={() => setCount(ticket, 0)}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${ticket.name}`}
+                    >
+                      <TextComponent className="text-xs font-bold" style={{ color: BRAND.blueDeep }}>
+                        Selected ✓
+                      </TextComponent>
+                    </Pressable>
+                  ) : isSelected && !unavailable ? (
                     <View className="flex-row items-center gap-3">
                       <Pressable
                         onPress={() => setCount(ticket, count - 1)}
@@ -676,7 +700,7 @@ const LiveTicketCheckoutScreen = ({
                 </View>
               }
               note={
-                isSelected && !unavailable && count >= max && max > 0 ? (
+                !isRegistration && isSelected && !unavailable && count >= max && max > 0 ? (
                   <View className="mx-4 mb-3 rounded-lg px-3 py-2" style={{ backgroundColor: BRAND.blueTint }}>
                     <TextComponent className="text-xs leading-4 text-zinc-700">
                       {max === ticket.available
@@ -797,6 +821,16 @@ const LiveTicketCheckoutScreen = ({
               />
             </View>
           )}
+          {taxed.lines.map((line) => (
+            <View key={line.code} className="mt-2 flex-row justify-between">
+              <TextComponent className="text-xs text-zinc-500">
+                {taxed.included ? `Includes ${line.label}` : line.label}
+              </TextComponent>
+              <TextComponent className="text-sm font-bold text-zinc-950">
+                {formatMoney(line.amount, selected.price)}
+              </TextComponent>
+            </View>
+          ))}
           {creditApplied > 0 && (
             <View className="mt-2 flex-row justify-between">
               <TextComponent className="text-xs text-zinc-500">Turnupz Credit</TextComponent>

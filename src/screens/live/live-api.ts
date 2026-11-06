@@ -81,6 +81,7 @@ export type TLiveEvent = {
     showName?: boolean;
   }[];
   description?: string;
+  additionalInformation?: string[];
   organizerName?: string;
   /** The organiser's user id: what a planner is followed by. */
   organizerId?: string;
@@ -139,6 +140,7 @@ export type TLiveOrder = {
 
 export type TLiveUserTicket = {
   id: string;
+  registrationStatus?: string | null;
   /** The order it came from; only on tickets you bought yourself. */
   orderId?: string;
   code?: string;
@@ -584,6 +586,11 @@ export const recordEventView = (eventId: string) => {
   void postData(`/event/${eventId}/view`, {}).catch(() => undefined);
 };
 
+/** Counts the ticket page being opened, for the sales funnel. Never throws. */
+export const recordTicketPageView = (eventId: string) => {
+  void postData(`/event/${eventId}/view`, { page: "tickets" }).catch(() => undefined);
+};
+
 /** A card kept for next time. Only its brand and last 4 digits are ever shown. */
 export type TSavedCard = {
   id: string;
@@ -938,6 +945,16 @@ export const isFreeTicket = (ticket: TLiveUserTicket) =>
   ticket.ticket?.event?.saleMethod === "register" ||
   !(ticket.ticket?.price?.amount && ticket.ticket.price.amount > 0);
 
+/** A free ticket or registration not yet used can be given up before the event. */
+export const canCancelPlace = (ticket: TLiveUserTicket) =>
+  isFreeTicket(ticket) &&
+  (ticket.status ?? "UN_USED") === "UN_USED" &&
+  ticket.registrationStatus !== "REJECTED" &&
+  ticket.transfer?.status !== "PENDING";
+
+export const cancelFreePlace = (ticketId: string) =>
+  postData(`/ticket/${ticketId}/cancel-place`, {});
+
 export const canTransfer = (ticket: TLiveUserTicket) =>
   !isFreeTicket(ticket) &&
   (ticket.ticket?.isTransferable ?? ticket.ticket?.transferable ?? false) &&
@@ -1125,6 +1142,9 @@ export type TMyOrder = {
   ticket?: { name?: string; event?: TLiveEvent };
   items?: { ticketId: string; name: string; quantity: number; unitPrice: TPrice }[];
   total?: TPrice;
+  /** Tax, as sold, and whether it's part of the prices rather than on top. */
+  tax?: { label: string; amount: TPrice }[];
+  taxIncluded?: boolean;
   payment?: { card: TPrice | null; cardLabel: string | null; credit: TPrice | null };
   refunds?: {
     status: string;
@@ -1195,4 +1215,55 @@ export const useTicketsHeldFor = (eventId?: string | null) => {
         : 0
   });
   return userId ? (data ?? 0) : 0;
+};
+
+/* ------------------------------------------------------------------- tax */
+
+export type TEventTaxRates = {
+  taxInclusive: boolean;
+  rates: { code: string; label: string; ppm: number }[];
+};
+
+/** The taxes on an event's tickets; none unless a decision is approved. */
+export const useEventTaxRates = (eventId?: string, currency?: string) =>
+  useQuery({
+    queryKey: ["event-tax-rates", eventId, currency],
+    enabled: !!eventId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await getData<TEventTaxRates>(
+        `/event/${eventId}/tax-rates${currency ? `?currency=${currency}` : ""}`,
+      );
+      return data?.data ?? null;
+    },
+  });
+
+/**
+ * Tax shown at checkout, the same sum the api does when the order is made.
+ * Amounts in main units (naira, dollars).
+ */
+export const checkoutTax = (priced: number, tax?: TEventTaxRates | null) => {
+  const lines: { code: string; label: string; amount: number }[] = [];
+  if (!tax?.rates.length || priced <= 0) return { gross: priced, lines, included: false };
+  const minor = Math.round(priced * 100);
+  const halfUp = (value: number) => Math.floor(value + 0.5);
+  if (!tax.taxInclusive) {
+    let added = 0;
+    for (const rate of tax.rates) {
+      const amount = halfUp((minor * rate.ppm) / 1_000_000);
+      added += amount;
+      lines.push({ code: rate.code, label: rate.label, amount: amount / 100 });
+    }
+    return { gross: (minor + added) / 100, lines, included: false };
+  }
+  const totalPpm = tax.rates.reduce((sum, rate) => sum + rate.ppm, 0);
+  const net = halfUp((minor * 1_000_000) / (1_000_000 + totalPpm));
+  for (const rate of tax.rates) {
+    lines.push({
+      code: rate.code,
+      label: rate.label,
+      amount: halfUp((net * rate.ppm) / 1_000_000) / 100,
+    });
+  }
+  return { gross: priced, lines, included: true };
 };

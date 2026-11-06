@@ -23,6 +23,9 @@ const enGB = {
     savedOnPhone: "Saved on this phone."
   },
   settings: {
+    hosting: "Hosting",
+    hostEvents: "Host events",
+    hostEventsHint: "Run your own events on Turnupz",
     title: "Settings",
     account: "Account",
     changePassword: "Change password",

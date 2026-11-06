@@ -1,8 +1,12 @@
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
+import { useQueryClient } from "@tanstack/react-query";
+import { constructErrorMessage } from "@/api/functions";
+import { onError, onSuccess } from "@/shared/components/status/toast";
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import SafeModal from "@/shared/components/modals/safe-modal";
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -40,7 +44,9 @@ import {
   TRefundedOrder,
   formatPrice,
   useReceivedTransfers,
-  canTransfer
+  canTransfer,
+  canCancelPlace,
+  cancelFreePlace
 } from "./live-api";
 
 /**
@@ -58,6 +64,8 @@ const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
   EXPIRED: { label: "Expired", bg: "#f1f2f5", fg: "#52525b" },
   CANCELLED: { label: "Cancelled", bg: "#ffe4e6", fg: "#be123c" }
 };
+const AWAITING_APPROVAL = { label: "Awaiting approval", bg: "#fff4e5", fg: "#b45309" };
+const DECLINED = { label: "Declined", bg: "#ffe4e6", fg: "#be123c" };
 const NOT_USED = { label: "Not used", bg: "#f1f2f5", fg: "#52525b" };
 
 type TEventTickets = { event: TLiveEvent; tickets: TLiveUserTicket[] };
@@ -72,6 +80,8 @@ const isPast = (event: TLiveEvent) =>
  * once each day.
  */
 const statusOf = (ticket: TLiveUserTicket, event?: TLiveEvent) => {
+  if (ticket.registrationStatus === "PENDING") return AWAITING_APPROVAL;
+  if (ticket.registrationStatus === "REJECTED") return DECLINED;
   if (event && isMultiDay(event) && !isPast(event)) return STATUS.UN_USED;
   const status = STATUS[ticket.status ?? "UN_USED"] ?? STATUS.UN_USED;
   return event && isPast(event) && status === STATUS.UN_USED
@@ -185,6 +195,18 @@ const Pass = ({
                 : "This ticket wasn't used."}
             </TextComponent>
           </View>
+        ) : ticket.registrationStatus === "PENDING" || ticket.registrationStatus === "REJECTED" ? (
+          // No code to scan until the organiser says yes.
+          <View className="w-full items-center rounded-2xl bg-zinc-50 px-4 py-8">
+            <TextComponent className="text-center font-bold text-zinc-950">
+              {ticket.registrationStatus === "PENDING" ? "Waiting for the organiser" : "Not approved"}
+            </TextComponent>
+            <TextComponent className="mt-1 text-center text-sm text-zinc-500">
+              {ticket.registrationStatus === "PENDING"
+                ? "You'll get your code here once they approve your registration."
+                : "The organiser didn't approve this registration."}
+            </TextComponent>
+          </View>
         ) : (
           // Live: changes every 30 seconds, so a screenshot soon stops working.
           <LiveTicketQr
@@ -267,6 +289,30 @@ const PassViewer = ({
 }) => {
   const { width } = useWindowDimensions();
   const [page, setPage] = useState(0);
+  const queryClient = useQueryClient();
+  const askToCancelPlace = (ticket: TLiveUserTicket, eventName?: string) =>
+    Alert.alert(
+      "Cancel your place?",
+      `Your place${eventName ? ` at ${eventName}` : ""} goes back for someone else. You can get another if any are left.`,
+      [
+        { text: "Keep it", style: "cancel" },
+        {
+          text: "Cancel my place",
+          style: "destructive",
+          onPress: () => {
+            void cancelFreePlace(ticket.id)
+              .then(() => {
+                onSuccess("Your place was cancelled.");
+                void queryClient.invalidateQueries({ queryKey: ["live-user-tickets"] });
+                onClose();
+              })
+              .catch((error: TApiErrorResponseType) =>
+                onError(constructErrorMessage(error, "We couldn't cancel your place."))
+              );
+          }
+        }
+      ]
+    );
   const passWidth = Math.min(360, width - 48);
   const count = group?.tickets.length ?? 0;
 
@@ -345,6 +391,18 @@ const PassViewer = ({
                     colour={colour}
                   />
                 </Pressable>
+                {canCancelPlace(ticket) && !isPast(group.event) && (
+                  <Pressable
+                    onPress={() => askToCancelPlace(ticket, group.event.name)}
+                    accessibilityRole="button"
+                    hitSlop={6}
+                    className="items-center py-1"
+                  >
+                    <TextComponent className="text-sm font-semibold text-white/80">
+                      Cancel my place
+                    </TextComponent>
+                  </Pressable>
+                )}
                 <View className="flex-row gap-2">
                   {canTransfer(ticket) && !isPast(group.event) && (
                     <Pressable
@@ -611,7 +669,13 @@ const WalletCard = ({
             className="mt-3 items-center overflow-hidden"
             style={{ height: QR_PEEK }}
           >
-            <LiveTicketQr ticket={ticket} size={176} usable={!past} compact />
+            {ticket.registrationStatus === "PENDING" || ticket.registrationStatus === "REJECTED" ? (
+              <TextComponent className="py-10 text-center text-sm font-semibold text-zinc-500">
+                {ticket.registrationStatus === "PENDING" ? "Waiting for the organiser" : "Not approved"}
+              </TextComponent>
+            ) : (
+              <LiveTicketQr ticket={ticket} size={176} usable={!past} compact />
+            )}
             <LinearGradient
               colors={["rgba(255,255,255,0)", "#ffffff"]}
               style={{

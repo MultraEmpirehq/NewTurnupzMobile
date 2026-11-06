@@ -25,6 +25,9 @@ const fr: TTranslations = {
     savedOnPhone: "Enregistré sur ce téléphone."
   },
   settings: {
+    hosting: "Organiser",
+    hostEvents: "Organiser des événements",
+    hostEventsHint: "Organisez vos événements sur Turnupz",
     title: "Paramètres",
     account: "Compte",
     changePassword: "Changer le mot de passe",

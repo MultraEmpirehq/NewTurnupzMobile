@@ -1,5 +1,7 @@
 import { formatZero, openSupportChat, useCreditBalance } from "@/screens/live/live-api";
 import { SOCIAL_LINKS } from "@/shared/utils/social-links";
+import useUserStore from "@/shared/stores/user.store";
+import VendorApplicationScreen from "@/screens/organiser/vendor-application.screen";
 import OrdersPage from "./orders.screen";
 import { maskAmount, useBalancePrivacyStore } from "@/shared/stores/balance-privacy.store";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
@@ -1026,6 +1028,8 @@ const ProfileSettingsScreen = ({
   const queryClient = useQueryClient();
   const { logoutUser } = useUser();
   const [page, setPage] = useState<TPage>("menu");
+  const [applying, setApplying] = useState(false);
+  const user = useUserStore((state) => state.user);
   const credit = useCreditBalance();
   const hideBalance = useBalancePrivacyStore((state) => state.hideBalance);
   const creditRow = credit.data?.find((row) => row.available.amount > 0) ?? credit.data?.[0];
@@ -1092,6 +1096,11 @@ const ProfileSettingsScreen = ({
             last
           />
         </Section>
+        {user?.role === "USER" && (
+          <Section title={t("settings.hosting")}>
+            <Row label={t("settings.hostEvents")} hint={t("settings.hostEventsHint")} onPress={() => setApplying(true)} last />
+          </Section>
+        )}
         <Section title={t("settings.preferences")}>
           <Row label={t("settings.notifications")} onPress={() => setPage("notifications")} />
           <Row label={t("settings.privacySettings")} onPress={() => setPage("privacy")} />
@@ -1133,6 +1142,7 @@ const ProfileSettingsScreen = ({
           <TextComponent className="pt-6 text-center text-xs text-zinc-400">{t("settings.version", { version })}</TextComponent>
         )}
       </ScrollView>
+      <VendorApplicationScreen visible={applying} onClose={() => setApplying(false)} />
     </View>
   );
 };

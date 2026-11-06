@@ -180,10 +180,13 @@ const Header = ({ title, onBack }: { title: string; onBack?: () => void }) => (
 const EventOptionsSheet = ({
   event,
   onClose,
-  onOpenEvent
+  onOpenEvent,
+  shareOnly = false
 }: {
   event: TEventOptionsTarget | null;
   onClose: () => void;
+  /** Opened from a Share button: straight to sharing, and back closes it. */
+  shareOnly?: boolean;
   /** Opens an event shared in a chat; without it event cards there are inert. */
   onOpenEvent?: (eventId: string) => void;
 }) => {
@@ -192,7 +195,8 @@ const EventOptionsSheet = ({
   const hiddenEventIds = useHiddenEventsStore((state) => state.hiddenEventIds);
   const toggleHidden = useHiddenEventsStore((state) => state.toggleHidden);
 
-  const [view, setView] = useState<TView>("actions");
+  const firstView: TView = shareOnly ? "share" : "actions";
+  const [view, setView] = useState<TView>(firstView);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState<"organizer" | "save" | null>(null);
@@ -215,7 +219,7 @@ const EventOptionsSheet = ({
 
   useEffect(() => {
     if (!event) return;
-    setView("actions");
+    setView(firstView);
     setSaved(!!event.isFavorite);
     setCopied(false);
     setNote("");
@@ -420,12 +424,15 @@ const EventOptionsSheet = ({
     }
 
     if (view === "pick") {
-      const list = chats.data ?? [];
+      // An event's group chat only takes that event: no advertising to its guests.
+      const list = (chats.data ?? []).filter(
+        (chat) => chat.type !== "EVENT_GROUP" || chat.eventId === event.id
+      );
       return (
         <View>
           <Header
             title="Share with a Turnupz user"
-            onBack={() => setView("actions")}
+            onBack={() => setView(firstView)}
           />
           <TextInput
             value={note}
@@ -495,7 +502,7 @@ const EventOptionsSheet = ({
     if (view === "share") {
       return (
         <View>
-          <Header title="Share event" onBack={() => setView("actions")} />
+          <Header title="Share event" onBack={shareOnly ? onClose : () => setView("actions")} />
           <Pressable
             onPress={() => (isSignedIn ? setView("pick") : needSignIn())}
             className="h-14 flex-row items-center rounded-xl bg-blue-50 px-4"

@@ -179,6 +179,7 @@ const ProfileScreen = ({
   const hideBalance = useBalancePrivacyStore((state) => state.hideBalance);
   const toggleHideBalance = useBalancePrivacyStore((state) => state.toggleHideBalance);
   const referral = useReferralMe();
+  const emptyCredit = useEmptyCreditText();
   const [list, setList] = useState<TList | null>(null);
   const [detail, setDetail] = useState<TDetail | null>(null);
   const [optionsEvent, setOptionsEvent] = useState<TEventOptionsTarget | null>(null);
@@ -437,12 +438,11 @@ const ProfileScreen = ({
   const name = user?.name || [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Your profile";
   const more = tickets.hasNextPage ? "+" : "";
   const creditRow = credit.data?.find((row) => row.available.amount > 0) ?? credit.data?.[0];
-  const emptyCredit = useEmptyCreditText();
   const inviteCode = referral.data?.code ?? user?.username ?? null;
 
   const shareProfile = () => {
     const handle = user?.username ? `@${user.username}` : name;
-    const link = inviteCode ? ` ${inviteLink(inviteCode)}` : "";
+    const link = inviteCode && !organiser.isVendor ? ` ${inviteLink(inviteCode)}` : "";
     Share.share({
       message: `I'm ${handle} on Turnupz, where I find what's on. Join me:${link}`
     }).catch(() => undefined);
@@ -637,21 +637,24 @@ const ProfileScreen = ({
               Open wallet ›
             </TextComponent>
           </Pressable>
-          <Pressable
-            onPress={() => setPage("invite")}
-            accessibilityRole="button"
-            accessibilityLabel="Invite friends"
-            className="flex-1 rounded-2xl p-3.5"
-            style={{ backgroundColor: BRAND.blueTint }}
-          >
-            <TextComponent className="text-xs font-semibold text-zinc-600">Invite friends</TextComponent>
-            <TextComponent numberOfLines={1} className="mt-0.5 text-lg font-extrabold text-zinc-950">
-              {inviteCode ?? "Get credit"}
-            </TextComponent>
-            <TextComponent className="mt-0.5 text-xs font-semibold" style={{ color: BRAND.blueDeep }}>
-              Share your code ›
-            </TextComponent>
-          </Pressable>
+          {/* Invites are for attendees: an organiser's code no longer works. */}
+          {!organiser.isVendor && (
+            <Pressable
+              onPress={() => setPage("invite")}
+              accessibilityRole="button"
+              accessibilityLabel="Invite friends"
+              className="flex-1 rounded-2xl p-3.5"
+              style={{ backgroundColor: BRAND.blueTint }}
+            >
+              <TextComponent className="text-xs font-semibold text-zinc-600">Invite friends</TextComponent>
+              <TextComponent numberOfLines={1} className="mt-0.5 text-lg font-extrabold text-zinc-950">
+                {inviteCode ?? "Get credit"}
+              </TextComponent>
+              <TextComponent className="mt-0.5 text-xs font-semibold" style={{ color: BRAND.blueDeep }}>
+                Share your code ›
+              </TextComponent>
+            </Pressable>
+          )}
         </View>
 
         <View className="mx-5 mt-4 flex-row" style={{ borderBottomWidth: 1, borderBottomColor: "#E3E7ED" }}>

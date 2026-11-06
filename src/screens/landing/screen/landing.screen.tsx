@@ -5,7 +5,6 @@ import AuthTicketLayout from "@/shared/components/auth-ticket/auth-ticket.layout
 import GoogleSignInButton, {
   isGoogleSignInAvailable
 } from "@/shared/components/google-sign-in/google-sign-in-button.component";
-import AppleSignInButton from "@/shared/components/apple-sign-in/apple-sign-in-button.component";
 import TextComponent from "@/shared/components/text/text.component";
 import InputFieldComponent from "@/shared/components/form/input-field/input-field.component";
 import ButtonComponent from "@/shared/components/button/button.component";
@@ -18,6 +17,7 @@ import { joiResolver } from "@hookform/resolvers/joi";
 import { getData, postData } from "@/api";
 import useUserStore, { TUser } from "@/shared/stores/user.store";
 import { useIntroStore } from "@/shared/stores/intro.store";
+import { usePermissionsIntroStore } from "@/shared/stores/permissions-intro.store";
 import useApp from "@/shared/hooks/use-app.hook";
 import { onError } from "@/shared/components/status/toast";
 import {
@@ -97,7 +97,10 @@ const LandingScreen = () => {
   // The email field auto-focuses only once the launch intro is out of the way,
   // so the keyboard doesn't come up over it. Keying it on that remounts the
   // field (still empty: the intro covers it) with autoFocus on.
-  const introDone = useIntroStore((state) => state.introDone);
+  // The one-time permissions step comes after the intro, so it waits for that too.
+  const introPlayed = useIntroStore((state) => state.introDone);
+  const permissionsSeen = usePermissionsIntroStore((state) => state.seen);
+  const introDone = introPlayed && permissionsSeen;
   const {
     control,
     handleSubmit,
@@ -351,7 +354,6 @@ const LandingScreen = () => {
               disabled={isSubmitting}
             />
           )}
-          <AppleSignInButton disabled={isSubmitting} />
         </View>
       </View>
     </AuthTicketLayout>
