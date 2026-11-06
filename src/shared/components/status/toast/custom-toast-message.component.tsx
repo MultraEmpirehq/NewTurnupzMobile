@@ -19,8 +19,9 @@ type TKind = keyof typeof LOOK;
  * A message card at the top of the screen in the colour of what happened.
  * A thin line along its bottom runs down while it's showing, so you can see
  * how long it will stay. Tap it, or the ×, to close it sooner. The line is
- * driven by a plain timer: animations don't run reliably on the new
- * renderer, which once left every toast invisible.
+ * driven by a plain frame loop: animations don't run reliably on the new
+ * renderer, which once left every toast invisible. The website's toast
+ * matches this one (see components/ui/sonner.tsx there).
  */
 const CustomToastMessageComponent = ({ message }: MessageComponentProps) => {
   const insets = useSafeAreaInsets();
@@ -28,17 +29,17 @@ const CustomToastMessageComponent = ({ message }: MessageComponentProps) => {
   const look = LOOK[kind];
   const duration = typeof message?.duration === "number" ? message.duration : 4000;
 
-  // Time left, 1 → 0, ticking a few times a second.
+  // Time left, 1 → 0, updated every frame so the line runs down smoothly.
   const [left, setLeft] = useState(1);
   useEffect(() => {
     const started = Date.now();
     setLeft(1);
-    const timer = setInterval(() => {
+    let frame = requestAnimationFrame(function tick() {
       const next = Math.max(0, 1 - (Date.now() - started) / duration);
       setLeft(next);
-      if (next === 0) clearInterval(timer);
-    }, 250);
-    return () => clearInterval(timer);
+      if (next > 0) frame = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(frame);
   }, [message, duration]);
 
   return (

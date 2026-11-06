@@ -46,7 +46,7 @@ import {
 import { FeaturedBoost } from "@/screens/live/sponsored";
 import OrganiserShellScreen from "@/screens/organiser/organiser-shell.screen";
 import ChooseModeSheet from "@/screens/organiser/choose-mode.sheet";
-import WebOnlySheet, { TWebOnlyTask } from "@/screens/organiser/web-only.sheet";
+import VendorApplicationScreen from "@/screens/organiser/vendor-application.screen";
 import { useOrganiserAccess } from "@/screens/organiser/organiser-api";
 import { useOrganiserStore } from "@/shared/stores/organiser.store";
 
@@ -352,10 +352,10 @@ const RefinedHomeFeedDesignScreen = () => {
   };
   // Signed in on the Organiser side: open as an organiser if they already run
   // events, are on a team or are door staff for an event (the organiser side
-  // has the scanner); else point them at vendor verification on the website.
+  // has the scanner); else straight into applying to host.
   const wantsToHost = useOrganiserStore((state) => state.wantsToHost);
   const setWantsToHost = useOrganiserStore((state) => state.setWantsToHost);
-  const [hostTask, setHostTask] = useState<TWebOnlyTask | null>(null);
+  const [applying, setApplying] = useState(false);
   useEffect(() => {
     if (!wantsToHost || !isSignedIn || !userId || !organiser.ready) return;
     setWantsToHost(false);
@@ -363,11 +363,7 @@ const RefinedHomeFeedDesignScreen = () => {
       chooseMode("organiser");
       return;
     }
-    setHostTask({
-      title: "Vendor verification",
-      reason: "Tell us about your business there, and once you're approved you can create events and sell tickets.",
-      path: "/app/settings/vendor-verification"
-    });
+    setApplying(true);
   }, [wantsToHost, isSignedIn, userId, organiser.ready, organiser.canOrganise]); // eslint-disable-line react-hooks/exhaustive-deps
   const unreadNotifications = useUnreadNotifications(isSignedIn);
   // Your tickets, loaded once when the app opens (all of them), so event pages
@@ -677,9 +673,9 @@ const RefinedHomeFeedDesignScreen = () => {
           onClose={() => setOptionsEvent(null)}
           onOpenEvent={(eventId) => setLiveEventId(eventId)}
         />
-        <WebOnlySheet task={hostTask} onClose={() => setHostTask(null)} />
+        <VendorApplicationScreen visible={applying} onClose={() => setApplying(false)} />
         <ChooseModeSheet
-          visible={askMode && !wantsToHost && !hostTask && !overlay}
+          visible={askMode && !wantsToHost && !applying && !overlay}
           who={organiser.isVendor ? "You run events" : organiser.teams[0] ? `${organiser.teams[0].name} added you to their team` : "You can scan tickets at the door"}
           onChoose={chooseMode}
         />

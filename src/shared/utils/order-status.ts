@@ -3,6 +3,7 @@ export type TOrderStatus =
   | "COMPLETED"
   | "FAILED"
   | "REFUNDED"
+  | "CANCELLED"
   | "NEEDS_REVIEW";
 
 /** What each order outcome tells the buyer. Matches the web's order pages. */
@@ -35,6 +36,12 @@ export const ORDER_OUTCOMES: Record<
     message:
       "We couldn't issue your tickets, so your payment is on its way back to you.",
     tone: "info"
+  },
+  CANCELLED: {
+    badge: "Cancelled",
+    title: "Place cancelled",
+    message: "You cancelled your place, so it went back for someone else.",
+    tone: "wait"
   },
   NEEDS_REVIEW: {
     badge: "Being checked",

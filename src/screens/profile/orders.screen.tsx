@@ -354,6 +354,13 @@ const OrderReceipt = ({ order }: { order: TMyOrder }) => {
             }
           />
         ))}
+        {(order.tax ?? []).map((tax) => (
+          <Line
+            key={tax.label}
+            label={order.taxIncluded ? `Includes ${tax.label}` : tax.label}
+            value={tax.amount?.formatted?.withCurrency ?? ""}
+          />
+        ))}
         <View className="mt-1 border-t border-zinc-100 pt-1">
           <Line
             label="Total"
