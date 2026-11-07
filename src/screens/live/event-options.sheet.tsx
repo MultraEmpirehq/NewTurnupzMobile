@@ -1,12 +1,11 @@
+import ModalKeyboardAvoider from "@/shared/components/modals/modal-keyboard-avoider";
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import { getEventPublicUrl } from "@/screens/home/service/event-actions.service";
 import React, { memo, useEffect, useState } from "react";
 import SafeModal from "@/shared/components/modals/safe-modal";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Linking,
-  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -652,9 +651,8 @@ const EventOptionsSheet = ({
         animationType="slide"
         onRequestClose={onClose}
       >
-        <KeyboardAvoidingView
+        <ModalKeyboardAvoider
           className="flex-1"
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
           <Pressable
             className="flex-1 bg-black/40"
@@ -671,7 +669,7 @@ const EventOptionsSheet = ({
               </View>
             </SafeAreaView>
           )}
-        </KeyboardAvoidingView>
+        </ModalKeyboardAvoider>
         <OverlayToast />
       </SafeModal>
       <ChatThreadScreen

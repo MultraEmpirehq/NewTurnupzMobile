@@ -72,6 +72,14 @@ export const useScanEvents = (enabled = true) =>
     }
   });
 
+/** On now or starting within a day, so the door is what matters. */
+export const isAtTheDoor = (event: TScanEvent) => {
+  const now = Date.now();
+  const start = new Date(event.date).getTime();
+  const end = new Date(event.endDate ?? event.date).getTime() + 12 * 60 * 60 * 1000;
+  return start - now < 24 * 60 * 60 * 1000 && end > now;
+};
+
 export const ALL_PERMISSIONS: TVendorPermission[] = [
   "EVENTS_MANAGE",
   "TICKETS_SCAN",

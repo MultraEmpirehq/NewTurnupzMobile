@@ -1,5 +1,7 @@
-import React, { memo, useEffect, useMemo, useState } from "react";
-import { Linking, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
+import ModalKeyboardAvoider from "@/shared/components/modals/modal-keyboard-avoider";
+import React, { memo, useEffect, useState } from "react";
+import { ActivityIndicator, Image, Linking, Platform, Pressable, ScrollView, View } from "react-native";
+import Svg, { Path } from "react-native-svg";
 import { format } from "date-fns";
 import * as ImagePicker from "expo-image-picker";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,13 +12,19 @@ import { constructErrorMessage } from "@/api/functions";
 import SafeModal from "@/shared/components/modals/safe-modal";
 import TextComponent from "@/shared/components/text/text.component";
 import InputFieldComponent from "@/shared/components/form/input-field/input-field.component";
+import LabelComponent from "@/shared/components/form/label/label.component";
 import ButtonComponent from "@/shared/components/button/button.component";
 import { onError, onSuccess } from "@/shared/components/status/toast";
+import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import useUser from "@/shared/hooks/use-user.hook";
 import useUserStore from "@/shared/stores/user.store";
+import { useOrganiserStore } from "@/shared/stores/organiser.store";
 import { BRAND } from "@/shared/utils/brand-colors";
 import { adultAgeMessage, isAdultBirthDate } from "@/shared/utils/age";
 import { COUNTRIES } from "@/shared/utils/countries";
+import { isValidPhone } from "@/shared/utils/phone";
+import PhoneField from "@/shared/components/form/phone-field/phone-field.component";
+import ListSheet from "@/shared/components/modals/list-sheet";
 import DateModalComponent from "@/screens/onboarding/components/date-modal/date-modal.component";
 
 /* The same steps and endpoints as the website's vendor verification. Hosting
@@ -95,6 +103,14 @@ const stepsFor = (plan: TForm["plan"], vendorType: TVendorType): TStep[] =>
     ? ["vendorType", "identity", "review"]
     : ["vendorType", "identity", ...(vendorType === "business" ? (["business"] as const) : []), "payout", "review"];
 
+const STEP_LABEL: Record<TStep, string> = {
+  vendorType: "Hosting",
+  identity: "You",
+  business: "Business",
+  payout: "Payout",
+  review: "Review"
+};
+
 const STEP_TITLE: Record<TStep, string> = {
   vendorType: "What will you host?",
   identity: "About you",
@@ -103,71 +119,139 @@ const STEP_TITLE: Record<TStep, string> = {
   review: "Check and send"
 };
 
+const stepNote = (step: TStep, isFree: boolean) => {
+  if (step === "vendorType") return "Start with free events if you like. You can verify to sell tickets later.";
+  if (step === "identity") return isFree ? "So people know who's behind your events." : "As they appear on your government ID. We check them against the document.";
+  if (step === "business") return "As they appear on your registration documents.";
+  if (step === "payout") return "Where your ticket money is sent.";
+  return isFree ? "One last look, then you can start hosting." : "One last look before our team checks your details.";
+};
+
 const digits = (value: string) => value.replace(/[\s-]/g, "");
 
-const Choice = ({ title, note, active, onPress }: { title: string; note: string; active: boolean; onPress: () => void }) => (
+const ICONS = {
+  gift: "M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z",
+  ticket: "M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2zM13 5v2M13 17v2M13 11v2",
+  person: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+  business: "M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9v.01M9 12v.01M9 15v.01M9 18v.01",
+  id: "M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM9 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM5.5 16a3.5 3.5 0 0 1 7 0M15 10h4M15 14h4",
+  check: "M5 12l5 5L20 7",
+  clock: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2",
+  close: "M18 6 6 18M6 6l12 12",
+  down: "M6 9l6 6 6-6"
+};
+
+const Icon = ({ name, color = BRAND.ink, size = 22 }: { name: keyof typeof ICONS; color?: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d={ICONS[name]} stroke={color} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+/** Where they are: done steps can be tapped to go back to. */
+const Stepper = ({ steps, index, onJump }: { steps: TStep[]; index: number; onJump: (step: TStep) => void }) => (
+  <View
+    className="flex-row px-3 pb-4 pt-2"
+    accessibilityRole="progressbar"
+    accessibilityLabel={`Step ${index + 1} of ${steps.length}: ${STEP_TITLE[steps[index]]}`}
+  >
+    {steps.map((item, position) => {
+      const done = position < index;
+      const current = position === index;
+      return (
+        <Pressable key={item} onPress={() => done && onJump(item)} disabled={!done} className="flex-1 items-center">
+          {position < steps.length - 1 && (
+            <View
+              style={{ position: "absolute", top: 13, left: "50%", right: "-50%", height: 2, backgroundColor: done ? BRAND.blueDeep : "#E4E4E7" }}
+            />
+          )}
+          <View
+            className="size-7 items-center justify-center rounded-full"
+            style={{
+              backgroundColor: done || current ? BRAND.blueDeep : "#FFFFFF",
+              borderWidth: done || current ? 0 : 2,
+              borderColor: "#E4E4E7"
+            }}
+          >
+            {done ? (
+              <Icon name="check" color="#FFFFFF" size={15} />
+            ) : (
+              <TextComponent className={`text-xs font-bold ${current ? "text-white" : "text-zinc-400"}`}>{position + 1}</TextComponent>
+            )}
+          </View>
+          <TextComponent numberOfLines={1} className={`mt-1.5 text-[11px] ${current ? "font-bold text-zinc-950" : "text-zinc-500"}`}>
+            {STEP_LABEL[item]}
+          </TextComponent>
+        </Pressable>
+      );
+    })}
+  </View>
+);
+
+const Choice = ({ title, note, icon, active, onPress }: { title: string; note: string; icon: keyof typeof ICONS; active: boolean; onPress: () => void }) => (
   <Pressable
     onPress={onPress}
     accessibilityRole="radio"
     accessibilityState={{ selected: active }}
-    className="rounded-2xl p-4"
+    className="flex-row items-center gap-3 rounded-2xl p-4"
     style={{ borderWidth: active ? 2 : 1, borderColor: active ? BRAND.blueDeep : "rgba(0,0,0,0.12)", backgroundColor: active ? BRAND.blueTint : "#fff" }}
   >
-    <TextComponent className="text-base font-bold text-zinc-950">{title}</TextComponent>
-    <TextComponent className="mt-0.5 text-sm leading-5 text-zinc-600">{note}</TextComponent>
+    <View className="size-11 items-center justify-center rounded-xl" style={{ backgroundColor: active ? "#FFFFFF" : BRAND.blueTint }}>
+      <Icon name={icon} color={BRAND.blueDeep} />
+    </View>
+    <View className="flex-1">
+      <TextComponent className="text-base font-bold text-zinc-950">{title}</TextComponent>
+      <TextComponent className="mt-0.5 text-sm leading-5 text-zinc-600">{note}</TextComponent>
+    </View>
+    <View
+      className="size-5 items-center justify-center rounded-full"
+      style={{ borderWidth: 2, borderColor: active ? BRAND.blueDeep : "#D4D4D8", backgroundColor: active ? BRAND.blueDeep : "transparent" }}
+    >
+      {active && <Icon name="check" color="#FFFFFF" size={12} />}
+    </View>
   </Pressable>
+);
+
+/** Related fields, grouped so a long step doesn't read as one long list. */
+const Section = ({ title, children }: { title?: string; children: React.ReactNode }) => (
+  <View className="gap-4 rounded-2xl border border-black/10 bg-white p-4">
+    {!!title && <TextComponent className="text-xs font-bold tracking-widest text-zinc-500">{title.toUpperCase()}</TextComponent>}
+    {children}
+  </View>
 );
 
 /** A field that opens a list. */
 const PickerField = ({ label, value, placeholder, onPress }: { label: string; value?: string; placeholder: string; onPress: () => void }) => (
-  <View>
-    <TextComponent className="mb-1.5 text-sm font-medium text-black">{label}</TextComponent>
-    <Pressable onPress={onPress} accessibilityRole="button" className="h-12 justify-center rounded-xl bg-[#f7f9fc] px-4">
-      <TextComponent className={value ? "text-base text-black" : "text-base text-black/40"}>{value || placeholder}</TextComponent>
+  <View className="gap-3">
+    <LabelComponent label={label} />
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value || placeholder}`}
+      className="min-h-14 flex-row items-center justify-between gap-2 rounded-md border border-black/20 px-4 py-3"
+    >
+      <TextComponent className={`flex-1 text-base ${value ? "text-black" : "text-black/40"}`}>{value || placeholder}</TextComponent>
+      <Icon name="down" color={BRAND.grey} size={18} />
     </Pressable>
   </View>
 );
 
-/** A searchable list in a sheet: countries, banks. */
-const ListSheet = ({ title, items, onPick, onClose }: { title: string; items: { key: string; label: string }[] | null; onPick: (key: string) => void; onClose: () => void }) => {
-  const insets = useSafeAreaInsets();
-  const [search, setSearch] = useState("");
-  const shown = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return (items ?? []).filter((item) => item.label.toLowerCase().includes(query));
-  }, [items, search]);
-  return (
-    <SafeModal visible={!!items} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable className="flex-1" style={{ backgroundColor: "rgba(7,20,29,0.45)" }} onPress={onClose} accessibilityLabel="Close" />
-      <View className="h-[70%] rounded-t-3xl bg-white px-5 pt-4" style={{ paddingBottom: insets.bottom + 8 }}>
-        <TextComponent className="text-xl font-extrabold text-zinc-950">{title}</TextComponent>
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search"
-          placeholderTextColor="#9aa5b1"
-          className="mt-3 h-12 rounded-xl bg-[#f7f9fc] px-4 text-base text-black"
-        />
-        <ScrollView className="mt-2" keyboardShouldPersistTaps="handled">
-          {shown.map((item) => (
-            <Pressable
-              key={item.key}
-              onPress={() => {
-                onPick(item.key);
-                setSearch("");
-                onClose();
-              }}
-              accessibilityRole="button"
-              className="rounded-xl px-3 py-3"
-            >
-              <TextComponent className="text-base text-zinc-950">{item.label}</TextComponent>
-            </Pressable>
-          ))}
-        </ScrollView>
+/** A block of answers on the review step, with a way back to change them. */
+const ReviewCard = ({ title, rows, onEdit }: { title: string; rows: (string | undefined)[][]; onEdit: () => void }) => (
+  <View className="rounded-2xl border border-black/10 bg-white p-4">
+    <View className="mb-1 flex-row items-center justify-between">
+      <TextComponent className="text-xs font-bold tracking-widest text-zinc-500">{title.toUpperCase()}</TextComponent>
+      <Pressable onPress={onEdit} accessibilityRole="button" accessibilityLabel={`Edit ${title}`} hitSlop={10}>
+        <TextComponent className="text-sm font-bold" style={{ color: BRAND.blueDeep }}>Edit</TextComponent>
+      </Pressable>
+    </View>
+    {rows.map(([label, value]) => (
+      <View key={label} className="flex-row justify-between gap-4 py-2">
+        <TextComponent className="text-sm text-zinc-500">{label}</TextComponent>
+        <TextComponent className="flex-1 text-right text-sm font-semibold text-zinc-950">{value || "Not added"}</TextComponent>
       </View>
-    </SafeModal>
-  );
-};
+    ))}
+  </View>
+);
 
 /**
  * Applying to host, in the app: what they'll host, who they are, their
@@ -179,6 +263,7 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
   const queryClient = useQueryClient();
   const user = useUserStore((state) => state.user);
   const { getUserDetails } = useUser();
+  const setOrganiserMode = useOrganiserStore((state) => state.setMode);
 
   const verification = useQuery({
     queryKey: ["vendor-verification"],
@@ -299,7 +384,7 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
     }
     if (step === "identity") {
       if (!form.legalFirstName.trim() || !form.legalLastName.trim()) return "Enter your first and last name";
-      if (!/^\+[\d\s()-]{7,}$/.test(form.phoneNumber.trim())) return "Enter your phone with its country code, e.g. +234 801 234 5678";
+      if (!isValidPhone(form.phoneNumber)) return "Check your phone number. It doesn't look right for that country.";
       if (!form.countryOfResidence) return "Choose your country";
       if (!isFree) {
         if (!form.dateOfBirth) return "Choose your date of birth";
@@ -440,32 +525,32 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
   const canSell = !!verification.data?.canSellTickets;
   const showStatus = !upgrading && (status === "submitted" || status === "approved");
 
-  const body = showStatus ? (
-    <View className="gap-3">
-      <TextComponent className="text-2xl font-extrabold text-zinc-950">
+  // The phone's back button goes back a step before it leaves.
+  const onBack = () => {
+    if (!showStatus && index > 0) setStep(steps[index - 1]);
+    else onClose();
+  };
+  const lastDigits = digits(form.accountNumber || form.iban).slice(-4);
+
+  const statusScreen = (
+    <View className="items-center gap-3 pt-10">
+      <View className="mb-2 size-20 items-center justify-center rounded-full" style={{ backgroundColor: BRAND.blueTint }}>
+        <Icon name={status === "submitted" ? "clock" : "check"} color={BRAND.blueDeep} size={36} />
+      </View>
+      <TextComponent className="text-center text-2xl font-extrabold text-zinc-950">
         {status === "submitted" ? "We're checking your details" : canSell ? "You're verified" : "You can host free events"}
       </TextComponent>
-      <TextComponent className="text-base leading-6 text-zinc-600">
+      <TextComponent className="text-center text-base leading-6 text-zinc-600">
         {status === "submitted"
           ? "We'll let you know the outcome, usually within a couple of days."
           : canSell
             ? "You can create events and sell tickets. Manage events and payouts on the website."
             : "To sell tickets, finish verifying with your ID and bank details."}
       </TextComponent>
-      {status === "approved" && !canSell && (
-        <ButtonComponent
-          onPress={() => {
-            set("plan")("paid");
-            setStep("vendorType");
-            setUpgrading(true);
-          }}
-          className="h-12 rounded-full bg-[#00b2ff] py-0"
-        >
-          Verify to sell tickets
-        </ButtonComponent>
-      )}
     </View>
-  ) : (
+  );
+
+  const formScreen = (
     <View className="gap-4">
       {needsChanges && (
         <View className="rounded-2xl bg-amber-50 p-4">
@@ -477,82 +562,110 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
           </TextComponent>
         </View>
       )}
-      <TextComponent className="text-xs font-bold tracking-widest" style={{ color: BRAND.blueDeep }}>
-        STEP {index + 1} OF {steps.length}
-      </TextComponent>
-      <TextComponent className="text-2xl font-extrabold text-zinc-950">{STEP_TITLE[step]}</TextComponent>
+      <View>
+        <TextComponent className="text-2xl font-extrabold text-zinc-950">{STEP_TITLE[step]}</TextComponent>
+        <TextComponent className="mt-1 text-sm leading-5 text-zinc-600">{stepNote(step, isFree)}</TextComponent>
+      </View>
 
       {step === "vendorType" && (
         <>
-          <Choice active={form.plan === "free"} title="Free events only" note="Your name, phone and country, and you can start hosting straight away." onPress={() => set("plan")("free")} />
-          <Choice active={form.plan === "paid"} title="Sell tickets" note="Full verification with your ID and bank details, checked by our team." onPress={() => set("plan")("paid")} />
+          <Choice icon="gift" active={form.plan === "free"} title="Free events only" note="Your name, phone and country, and you can start hosting straight away." onPress={() => set("plan")("free")} />
+          <Choice icon="ticket" active={form.plan === "paid"} title="Sell tickets" note="Full verification with your ID and bank details, checked by our team." onPress={() => set("plan")("paid")} />
           {form.plan === "paid" && (
             <>
-              <TextComponent className="mt-1 text-sm font-semibold text-zinc-950">Who runs your events?</TextComponent>
-              <Choice active={form.vendorType === "individual"} title="Individual" note="You run events yourself and are paid to a personal account." onPress={() => set("vendorType")("individual")} />
-              <Choice active={form.vendorType === "business"} title="Registered business" note="A company runs them and is paid to a business account." onPress={() => set("vendorType")("business")} />
+              <TextComponent className="mt-2 text-base font-bold text-zinc-950">Who runs your events?</TextComponent>
+              <Choice icon="person" active={form.vendorType === "individual"} title="Individual" note="You run events yourself and are paid to a personal account." onPress={() => set("vendorType")("individual")} />
+              <Choice icon="business" active={form.vendorType === "business"} title="Registered business" note="A company runs them and is paid to a business account." onPress={() => set("vendorType")("business")} />
             </>
           )}
           {!!form.plan && (
-            <View>
-            <InputFieldComponent
-              label="Organiser name"
-              placeholder={form.vendorType === "business" && !isFree ? "e.g. Afrobeat Live" : "e.g. DJ Kemi"}
-              value={form.organiserName}
-              onChangeText={set("organiserName")}
-            />
-            <TextComponent className="mt-1 text-xs text-zinc-500">
-              Shown as "Organised by" on your events. A brand or stage name is fine.
-            </TextComponent>
-            </View>
+            <Section>
+              <InputFieldComponent
+                label="Organiser name"
+                placeholder={form.vendorType === "business" && !isFree ? "e.g. Afrobeat Live" : "e.g. DJ Kemi"}
+                value={form.organiserName}
+                onChangeText={set("organiserName")}
+              />
+              <TextComponent className="-mt-2 text-xs text-zinc-500">
+                Shown as "Organised by" on your events. A brand or stage name is fine.
+              </TextComponent>
+            </Section>
           )}
         </>
       )}
 
       {step === "identity" && (
         <>
-          <InputFieldComponent label={isFree ? "First name" : "Legal first name"} value={form.legalFirstName} onChangeText={set("legalFirstName")} />
-          <InputFieldComponent label={isFree ? "Last name" : "Legal last name"} value={form.legalLastName} onChangeText={set("legalLastName")} />
-          <InputFieldComponent label="Phone number" placeholder="+234 801 234 5678" keyboardType="phone-pad" value={form.phoneNumber} onChangeText={set("phoneNumber")} />
-          <PickerField label="Country of residence" value={form.countryOfResidence} placeholder="Select a country" onPress={() => setSheet("residence")} />
-          {!isFree && (
-            <>
+          <Section title="Your name">
+            <InputFieldComponent label={isFree ? "First name" : "Legal first name"} value={form.legalFirstName} onChangeText={set("legalFirstName")} />
+            <InputFieldComponent label={isFree ? "Last name" : "Legal last name"} value={form.legalLastName} onChangeText={set("legalLastName")} />
+            {!isFree && (
               <PickerField
                 label="Date of birth"
                 value={form.dateOfBirth ? format(form.dateOfBirth, "d MMMM yyyy") : undefined}
                 placeholder="Select your birthday"
                 onPress={() => setPickingDate(true)}
               />
+            )}
+          </Section>
+          <Section title="Contact">
+            <PhoneField value={form.phoneNumber} onChange={set("phoneNumber")} defaultCountry={user?.countryCode ?? user?.country} />
+            <PickerField label="Country of residence" value={form.countryOfResidence} placeholder="Select a country" onPress={() => setSheet("residence")} />
+            {!isFree && (
               <InputFieldComponent label="Residential address" placeholder="House number, street, city" value={form.address} onChangeText={set("address")} />
-              <View>
-                <TextComponent className="mb-1.5 text-sm font-medium text-black">Government ID</TextComponent>
-                <Pressable onPress={() => void pickId()} accessibilityRole="button" className="rounded-xl border border-dashed border-black/20 bg-[#f7f9fc] p-4">
-                  <TextComponent className="text-base font-semibold text-zinc-950">
-                    {idPhoto ? idPhoto.fileName || "Photo added" : idDocumentId ? "On file. Tap to replace" : "Add a photo"}
+            )}
+          </Section>
+          {!isFree && (
+            <Section title="Government ID">
+              <Pressable
+                onPress={() => void pickId()}
+                accessibilityRole="button"
+                accessibilityLabel={idPhoto || idDocumentId ? "Replace your ID photo" : "Add a photo of your ID"}
+                className="flex-row items-center gap-3 rounded-xl border border-dashed border-black/20 p-3"
+              >
+                {idPhoto ? (
+                  <Image source={{ uri: idPhoto.uri }} style={{ width: 64, height: 64, borderRadius: 10 }} accessibilityIgnoresInvertColors />
+                ) : (
+                  <View className="size-16 items-center justify-center rounded-xl" style={{ backgroundColor: BRAND.blueTint }}>
+                    <Icon name={idDocumentId ? "check" : "id"} color={BRAND.blueDeep} size={28} />
+                  </View>
+                )}
+                <View className="flex-1">
+                  <TextComponent className="text-base font-bold text-zinc-950">
+                    {idPhoto ? "Photo added" : idDocumentId ? "ID on file" : "Add a photo"}
                   </TextComponent>
-                  <TextComponent className="mt-0.5 text-xs text-zinc-500">
-                    Passport, national ID, driver's licence or voter's card. The name and date of birth must match.
+                  <TextComponent className="mt-0.5 text-sm font-semibold" style={{ color: BRAND.blueDeep }}>
+                    {idPhoto || idDocumentId ? "Tap to replace" : "Choose from your photos"}
                   </TextComponent>
-                </Pressable>
-              </View>
-            </>
+                </View>
+              </Pressable>
+              <TextComponent className="-mt-1 text-xs leading-4 text-zinc-500">
+                Passport, national ID, driver's licence or voter's card. The name and date of birth must match.
+              </TextComponent>
+            </Section>
           )}
         </>
       )}
 
       {step === "business" && (
         <>
-          <InputFieldComponent label="Registered business name" value={form.businessName} onChangeText={set("businessName")} />
-          <InputFieldComponent label="Registration number" placeholder="e.g. RC 1234567" value={form.businessRegistrationNumber} onChangeText={set("businessRegistrationNumber")} />
-          <InputFieldComponent label="Authorised representative" value={form.authorizedRepresentative} onChangeText={set("authorizedRepresentative")} />
-          <InputFieldComponent label="Registered business address" value={form.businessAddress} onChangeText={set("businessAddress")} />
-          <InputFieldComponent label="Tax ID (optional)" value={form.taxId} onChangeText={set("taxId")} />
+          <Section title="Registration">
+            <InputFieldComponent label="Registered business name" value={form.businessName} onChangeText={set("businessName")} />
+            <InputFieldComponent label="Registration number" placeholder="e.g. RC 1234567" value={form.businessRegistrationNumber} onChangeText={set("businessRegistrationNumber")} />
+            <InputFieldComponent label="Tax ID (optional)" value={form.taxId} onChangeText={set("taxId")} />
+          </Section>
+          <Section title="Contact">
+            <InputFieldComponent label="Authorised representative" value={form.authorizedRepresentative} onChangeText={set("authorizedRepresentative")} />
+            <InputFieldComponent label="Registered business address" value={form.businessAddress} onChangeText={set("businessAddress")} />
+          </Section>
         </>
       )}
 
       {step === "payout" && (
         <>
-          <PickerField label="Country you're paid in" value={form.payoutCountry} placeholder="Select a country" onPress={() => setSheet("payoutCountry")} />
+          <Section>
+            <PickerField label="Country you're paid in" value={form.payoutCountry} placeholder="Select a country" onPress={() => setSheet("payoutCountry")} />
+          </Section>
           {payoutCountry?.stripe && (
             <View className="rounded-2xl p-4" style={{ backgroundColor: BRAND.blueTint }}>
               <TextComponent className="text-sm leading-5 text-zinc-800">
@@ -561,7 +674,7 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
             </View>
           )}
           {payoutCountry && !payoutCountry.stripe && (
-            <>
+            <Section title="Bank account">
               {payoutCountry.direct ? (
                 <PickerField label="Bank" value={form.bankName} placeholder={banks.isLoading ? "Loading banks…" : "Select your bank"} onPress={() => setSheet("bank")} />
               ) : (
@@ -579,45 +692,77 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
                     onChangeText={set(field)}
                   />
                 ))}
-              <View>
-                <InputFieldComponent
-                  label="Name on the account"
-                  value={form.accountHolderName}
-                  onChangeText={set("accountHolderName")}
-                />
-                <TextComponent className="mt-1 text-xs text-zinc-500">
-                  {accountName.isFetching ? "Checking with the bank…" : accountName.data ? `The bank says: ${accountName.data}` : "It must be yours or your business's."}
-                </TextComponent>
-              </View>
-            </>
+              <InputFieldComponent
+                label="Name on the account"
+                value={form.accountHolderName}
+                onChangeText={set("accountHolderName")}
+              />
+              <TextComponent className="-mt-2 text-xs text-zinc-500">
+                {accountName.isFetching ? "Checking with the bank…" : accountName.data ? `The bank says: ${accountName.data}` : "It must be yours or your business's."}
+              </TextComponent>
+            </Section>
           )}
         </>
       )}
 
       {step === "review" && (
         <>
-          {[
-            ["Hosting", isFree ? "Free events only" : "Sell tickets"],
-            ["Organiser name", form.organiserName],
-            ["Name", `${form.legalFirstName} ${form.legalLastName}`],
-            ["Phone", form.phoneNumber],
-            ["Country", form.countryOfResidence],
-            ...(!isFree && form.vendorType === "business" ? [["Business", form.businessName]] : []),
-            ...(!isFree ? [["Paid in", form.payoutCountry]] : [])
-          ].map(([label, value]) => (
-            <View key={label} className="flex-row justify-between gap-4 border-b border-black/5 py-2.5">
-              <TextComponent className="text-sm text-zinc-500">{label}</TextComponent>
-              <TextComponent className="flex-1 text-right text-sm font-semibold text-zinc-950">{value}</TextComponent>
-            </View>
-          ))}
+          <ReviewCard
+            title="Hosting"
+            onEdit={() => setStep("vendorType")}
+            rows={[
+              ["Hosting", isFree ? "Free events only" : "Sell tickets"],
+              ...(!isFree ? [["Run by", form.vendorType === "business" ? "Registered business" : "Individual"]] : []),
+              ["Organiser name", form.organiserName]
+            ]}
+          />
+          <ReviewCard
+            title="About you"
+            onEdit={() => setStep("identity")}
+            rows={[
+              ["Name", `${form.legalFirstName} ${form.legalLastName}`],
+              ...(!isFree && form.dateOfBirth ? [["Date of birth", format(form.dateOfBirth, "d MMMM yyyy")]] : []),
+              ["Phone", form.phoneNumber],
+              ["Country", form.countryOfResidence],
+              ...(!isFree ? [["Address", form.address], ["Government ID", "Added"]] : [])
+            ]}
+          />
+          {!isFree && form.vendorType === "business" && (
+            <ReviewCard
+              title="Business"
+              onEdit={() => setStep("business")}
+              rows={[
+                ["Name", form.businessName],
+                ["Registration", form.businessRegistrationNumber],
+                ["Representative", form.authorizedRepresentative],
+                ["Address", form.businessAddress]
+              ]}
+            />
+          )}
+          {!isFree && (
+            <ReviewCard
+              title="Payout"
+              onEdit={() => setStep("payout")}
+              rows={[
+                ["Paid in", form.payoutCountry],
+                ...(payoutCountry?.stripe
+                  ? [["Bank", "Add with Stripe, once approved"]]
+                  : [
+                      ["Bank", form.bankName],
+                      ["Account", lastDigits ? `•••• ${lastDigits}` : undefined],
+                      ["Name on account", form.accountHolderName]
+                    ])
+              ]}
+            />
+          )}
           <Pressable
             onPress={() => set("acceptedTerms")(!form.acceptedTerms)}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: form.acceptedTerms }}
-            className="flex-row gap-3 rounded-2xl bg-[#f7f9fc] p-4"
+            className="flex-row gap-3 rounded-2xl border border-black/10 bg-white p-4"
           >
             <View className="mt-0.5 size-5 items-center justify-center rounded" style={{ borderWidth: 2, borderColor: BRAND.blueDeep, backgroundColor: form.acceptedTerms ? BRAND.blueDeep : "transparent" }}>
-              {form.acceptedTerms && <TextComponent className="text-xs font-bold text-white">✓</TextComponent>}
+              {form.acceptedTerms && <Icon name="check" color="#FFFFFF" size={13} />}
             </View>
             <TextComponent className="flex-1 text-sm leading-5 text-zinc-700">
               {isFree
@@ -634,35 +779,95 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
           )}
         </>
       )}
-
-      <View className="mt-2 flex-row gap-3">
-        {index > 0 && (
-          <Pressable onPress={() => setStep(steps[index - 1])} accessibilityRole="button" className="h-12 flex-1 items-center justify-center rounded-full border border-black/15">
-            <TextComponent className="text-base font-semibold text-zinc-950">Back</TextComponent>
-          </Pressable>
-        )}
-        <View className="flex-1">
-          <ButtonComponent onPress={() => void next()} disabled={busy} isLoading={busy} className="h-12 rounded-full bg-[#00b2ff] py-0">
-            {step === "review" ? (isFree ? "Start hosting" : "Send for review") : "Continue"}
-          </ButtonComponent>
-        </View>
-      </View>
     </View>
   );
 
   return (
-    <SafeModal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 bg-white" style={{ paddingTop: insets.top + 8 }}>
-        <View className="flex-row items-center justify-between px-5 pb-2">
-          <TextComponent className="text-base font-bold text-zinc-950">Host on Turnupz</TextComponent>
-          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={10}>
-            <TextComponent className="text-sm font-semibold" style={{ color: BRAND.blueDeep }}>Close</TextComponent>
-          </Pressable>
+    <SafeModal visible={visible} animationType="slide" onRequestClose={onBack}>
+      <ModalKeyboardAvoider className="flex-1 bg-zinc-50">
+        <View className="bg-white" style={{ paddingTop: insets.top + 8 }}>
+          <View className="flex-row items-center justify-between px-5 pb-2">
+            <TextComponent className="text-base font-bold text-zinc-950">Host on Turnupz</TextComponent>
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={12}>
+              <Icon name="close" color={BRAND.ink} size={22} />
+            </Pressable>
+          </View>
+          {!showStatus && !verification.isLoading && (
+            <Stepper steps={steps} index={index} onJump={setStep} />
+          )}
+          <View className="h-px bg-black/5" />
         </View>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 32 }}>
-          {verification.isLoading ? <TextComponent className="text-sm text-zinc-500">Loading…</TextComponent> : body}
+
+        {/* Its own for each step, so each starts from the top. */}
+        <ScrollView key={showStatus ? "status" : step} className="flex-1" keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20, paddingBottom: 24 }}>
+          {verification.isLoading ? (
+            <View className="items-center pt-16">
+              <ActivityIndicator color={BRAND.blueDeep} accessibilityLabel="Loading" />
+            </View>
+          ) : showStatus ? (
+            statusScreen
+          ) : (
+            formScreen
+          )}
         </ScrollView>
-      </View>
+
+        {/* Always in reach, above the keyboard, however long the step is. */}
+        {!verification.isLoading && (
+          <View className="flex-row gap-3 border-t border-black/5 bg-white px-5 pt-3" style={{ paddingBottom: insets.bottom + 12 }}>
+            {showStatus ? (
+              <View className="flex-1 gap-2">
+                {status === "approved" && (
+                  <ButtonComponent
+                    onPress={() => {
+                      onClose();
+                      setOrganiserMode("organiser");
+                    }}
+                    className="h-12 rounded-full bg-[#00b2ff] py-0"
+                  >
+                    Open Organiser tools
+                  </ButtonComponent>
+                )}
+                {status === "approved" && !canSell && (
+                  <Pressable
+                    onPress={() => {
+                      set("plan")("paid");
+                      setStep("vendorType");
+                      setUpgrading(true);
+                    }}
+                    accessibilityRole="button"
+                    className="h-12 items-center justify-center rounded-full border border-black/15"
+                  >
+                    <TextComponent className="text-base font-semibold text-zinc-950">Verify to sell tickets</TextComponent>
+                  </Pressable>
+                )}
+                {/* Once approved, the buttons above lead on; Done is only for leaving. */}
+                {status === "approved" ? (
+                  <Pressable onPress={onClose} accessibilityRole="button" className="h-10 items-center justify-center">
+                    <TextComponent className="text-sm font-semibold text-zinc-600">Done</TextComponent>
+                  </Pressable>
+                ) : (
+                  <Pressable onPress={onClose} accessibilityRole="button" className="h-12 items-center justify-center rounded-full border border-black/15">
+                    <TextComponent className="text-base font-semibold text-zinc-950">Done</TextComponent>
+                  </Pressable>
+                )}
+              </View>
+            ) : (
+              <>
+                {index > 0 && (
+                  <Pressable onPress={() => setStep(steps[index - 1])} accessibilityRole="button" className="h-12 flex-1 items-center justify-center rounded-full border border-black/15">
+                    <TextComponent className="text-base font-semibold text-zinc-950">Back</TextComponent>
+                  </Pressable>
+                )}
+                <View style={{ flex: index > 0 ? 2 : 1 }}>
+                  <ButtonComponent onPress={() => void next()} disabled={busy} isLoading={busy} className="h-12 rounded-full bg-[#00b2ff] py-0">
+                    {step === "review" ? (isFree ? "Start hosting" : "Send for review") : "Continue"}
+                  </ButtonComponent>
+                </View>
+              </>
+            )}
+          </View>
+        )}
+      </ModalKeyboardAvoider>
 
       <DateModalComponent
         visible={pickingDate}
@@ -676,7 +881,8 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
           sheet === "residence"
             ? (markets.data ?? []).map((item) => ({ key: item.name, label: item.name }))
             : sheet === "payoutCountry"
-              ? PAYOUT_COUNTRIES.map((item) => ({ key: item.name, label: item.name }))
+              ? // Only where Turnupz is open, as on the website: the api refuses the rest.
+                PAYOUT_COUNTRIES.filter((item) => markets.data?.some((market) => market.code === item.code)).map((item) => ({ key: item.name, label: item.name }))
               : sheet === "bank"
                 ? (banks.data ?? []).map((item) => ({ key: item.code, label: item.name }))
                 : null
@@ -693,6 +899,8 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
         }}
         onClose={() => setSheet(null)}
       />
+      {/* This is its own window: without this, messages show behind it, unseen. */}
+      <OverlayToast />
     </SafeModal>
   );
 };

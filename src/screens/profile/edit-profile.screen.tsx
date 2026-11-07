@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   Switch,
@@ -63,7 +62,7 @@ const EditProfileScreen = ({
   return (
     <View className="flex-1" style={{ backgroundColor: "#F7F8FB" }}>
       <BackHeader title="Edit profile" onBack={leave} />
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 48, gap: 24 }}
