@@ -75,6 +75,7 @@ const ButtonComponent: React.FC<ButtonProps> = forwardRef<View, ButtonProps>(
       disabled,
       onPress,
       className,
+      style,
       ...props
     },
     ref
@@ -82,15 +83,19 @@ const ButtonComponent: React.FC<ButtonProps> = forwardRef<View, ButtonProps>(
     const isString = useMemo(() => typeof children === "string", [children]);
     return (
       <TouchableOpacity
+        // A fresh press animation when this changes: one caught mid-press could
+        // otherwise leave the button looking faded after loading ended.
+        key={isLoading || disabled ? "inactive" : "active"}
         ref={ref}
         {...props}
         activeOpacity={isLoading || disabled ? 0.5 : 0.2}
+        // Set directly: with only the class, it could stay faded after loading ended.
+        style={[{ opacity: isLoading || disabled ? 0.5 : 1 }, style]}
         onPress={isLoading || disabled ? undefined : onPress}
         className={cn(
           buttonClassName({
             variant,
-            size,
-            isDisabled: disabled || isLoading
+            size
           }),
           className
         )}

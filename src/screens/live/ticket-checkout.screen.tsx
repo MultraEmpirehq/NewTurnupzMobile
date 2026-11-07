@@ -8,6 +8,7 @@ import {
   ScrollView,
   Switch,
   StyleSheet,
+  KeyboardAvoidingView,
   TextInput,
   useWindowDimensions,
   View
@@ -555,6 +556,7 @@ const LiveTicketCheckoutScreen = ({
   }
 
   return (
+    <KeyboardAvoidingView behavior="padding" className="flex-1">
     <ScrollView
       className="flex-1 bg-zinc-50"
       stickyHeaderIndices={[0]}
@@ -895,6 +897,7 @@ const LiveTicketCheckoutScreen = ({
         </TextComponent>
       )}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 

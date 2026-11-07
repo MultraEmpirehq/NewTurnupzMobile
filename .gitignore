@@ -28,3 +28,6 @@ expo-env.d.ts
 # @end expo-cli
 # Claude Code settings are per machine, not for the repo.
 .claude/
+
+# Editor settings
+.idea/

@@ -1,10 +1,9 @@
+import ModalKeyboardAvoider from "@/shared/components/modals/modal-keyboard-avoider";
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useEffect, useState } from "react";
 import SafeModal from "@/shared/components/modals/safe-modal";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   TextInput,
   View
@@ -106,7 +105,7 @@ const TransferTicketSheet = ({
         onPress={() => !transfer.isPending && onClose()}
         accessible={false}
       />
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ModalKeyboardAvoider>
         <View className="rounded-t-3xl bg-white px-5 pb-10 pt-5">
           <TextComponent className="text-lg font-bold" style={{ color: INK }}>
             Transfer this ticket
@@ -185,7 +184,7 @@ const TransferTicketSheet = ({
             )}
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
+      </ModalKeyboardAvoider>
       <OverlayToast />
     </SafeModal>
   );

@@ -45,9 +45,9 @@ import {
 } from "@/screens/live/live-api";
 import { FeaturedBoost } from "@/screens/live/sponsored";
 import OrganiserShellScreen from "@/screens/organiser/organiser-shell.screen";
-import ChooseModeSheet from "@/screens/organiser/choose-mode.sheet";
 import VendorApplicationScreen from "@/screens/organiser/vendor-application.screen";
-import { useOrganiserAccess } from "@/screens/organiser/organiser-api";
+import { useOrganiserAccess, isAtTheDoor } from "@/screens/organiser/organiser-api";
+import { BRAND } from "@/shared/utils/brand-colors";
 import { useOrganiserStore } from "@/shared/stores/organiser.store";
 
 type TFeedMediaKind = "image" | "video";
@@ -337,19 +337,16 @@ const RefinedHomeFeedDesignScreen = () => {
   const syncHiddenEvents = useHiddenEventsStore((state) => state.sync);
   const isSignedIn = !!useUserStore((state) => state.userToken);
   const userId = useUserStore((state) => state.user?.id);
-  // Organisers and team members: which app opens, asked once and remembered.
+  // Organisers and team members: the app opens as an attendee, and they can move across.
   const organiser = useOrganiserAccess();
   const mode = useOrganiserStore((state) => state.mode);
   const setMode = useOrganiserStore((state) => state.setMode);
-  const askedFor = useOrganiserStore((state) => state.askedFor);
-  const markAsked = useOrganiserStore((state) => state.markAsked);
+  const setScanEventOnOpen = useOrganiserStore((state) => state.setScanEventOnOpen);
   const inOrganiserMode = mode === "organiser" && organiser.canOrganise;
-  const askMode =
-    isSignedIn && !!userId && organiser.ready && organiser.canOrganise && !askedFor.includes(userId);
-  const chooseMode = (next: "attendee" | "organiser") => {
-    if (userId) markAsked(userId);
-    setMode(next);
-  };
+  // Event day: the one thing worth interrupting the feed for.
+  const doorEvent = organiser.scanEvents
+    .filter(isAtTheDoor)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
   // Signed in on the Organiser side: open as an organiser if they already run
   // events, are on a team or are door staff for an event (the organiser side
   // has the scanner); else straight into applying to host.
@@ -360,7 +357,7 @@ const RefinedHomeFeedDesignScreen = () => {
     if (!wantsToHost || !isSignedIn || !userId || !organiser.ready) return;
     setWantsToHost(false);
     if (organiser.canOrganise) {
-      chooseMode("organiser");
+      setMode("organiser");
       return;
     }
     setApplying(true);
@@ -534,12 +531,32 @@ const RefinedHomeFeedDesignScreen = () => {
               contentContainerStyle={{ paddingTop: 16 }}
               // A boosted event, big and marked Sponsored, where the phone is.
               ListHeaderComponent={
-                <FeaturedBoost
-                  countryCode={place?.countryCode}
-                  city={place?.city}
-                  enabled={homePlace.ready}
-                  onOpenEvent={setLiveEventId}
-                />
+                <>
+                  {doorEvent && (
+                    <Pressable
+                      onPress={() => {
+                        setScanEventOnOpen(doorEvent.id);
+                        setMode("organiser");
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${doorEvent.name}. Open scanner`}
+                      className="mx-4 mb-4 flex-row items-center gap-3 rounded-2xl p-3.5"
+                      style={{ backgroundColor: BRAND.ink }}
+                    >
+                      <View className="flex-1">
+                        <TextComponent className="text-[11px] font-bold tracking-widest text-white/60">YOUR EVENT</TextComponent>
+                        <TextComponent numberOfLines={1} className="mt-0.5 text-sm font-extrabold text-white">{doorEvent.name}</TextComponent>
+                      </View>
+                      <TextComponent className="text-sm font-extrabold" style={{ color: BRAND.blue }}>Open scanner ›</TextComponent>
+                    </Pressable>
+                  )}
+                  <FeaturedBoost
+                    countryCode={place?.countryCode}
+                    city={place?.city}
+                    enabled={homePlace.ready}
+                    onOpenEvent={setLiveEventId}
+                  />
+                </>
               }
               renderItem={({ item }) => (
                 <FeedCard
@@ -674,11 +691,6 @@ const RefinedHomeFeedDesignScreen = () => {
           onOpenEvent={(eventId) => setLiveEventId(eventId)}
         />
         <VendorApplicationScreen visible={applying} onClose={() => setApplying(false)} />
-        <ChooseModeSheet
-          visible={askMode && !wantsToHost && !applying && !overlay}
-          who={organiser.isVendor ? "You run events" : organiser.teams[0] ? `${organiser.teams[0].name} added you to their team` : "You can scan tickets at the door"}
-          onChoose={chooseMode}
-        />
         {/* Someone's profile, their followers, finding people: opened from anywhere. */}
         <PeopleModal />
         {overlay && (

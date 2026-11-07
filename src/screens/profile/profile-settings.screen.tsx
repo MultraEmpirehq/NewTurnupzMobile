@@ -12,7 +12,6 @@ import {
   Alert,
   KeyboardAvoidingView,
   Linking,
-  Platform,
   Pressable,
   ScrollView,
   Switch,
@@ -273,7 +272,7 @@ const Page = ({
 }) => (
   <View className="flex-1" style={{ backgroundColor: TICKET_LIST_BACKGROUND }}>
     <BackHeader title={title} onBack={onBack} />
-    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView className="flex-1" behavior="padding">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
         {children}
       </ScrollView>

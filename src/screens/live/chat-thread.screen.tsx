@@ -1,3 +1,4 @@
+import ModalKeyboardAvoider from "@/shared/components/modals/modal-keyboard-avoider";
 import BadgeCheckIcon from "@/shared/assets/icons/badge-check.icon";
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useMemo, useState } from "react";
@@ -6,8 +7,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   TextInput,
   View
@@ -399,7 +398,7 @@ const ChatThreadScreen = ({
   return (
     <SafeModal visible={!!chatId} animationType="slide" onRequestClose={showInfo ? () => setShowInfo(false) : onClose}>
       <SafeAreaView className="flex-1" style={{ backgroundColor: "#F7F8FB" }} edges={["top", "bottom"]}>
-        <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ModalKeyboardAvoider className="flex-1">
           {/* Header */}
           <View className="flex-row items-center gap-2.5 border-b bg-white px-3 pb-2.5 pt-1" style={{ borderColor: "#EEF0F4" }}>
             <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Go back" hitSlop={10} className="size-9 items-center justify-center">
@@ -564,7 +563,7 @@ const ChatThreadScreen = ({
               </Pressable>
             </View>
           )}
-        </KeyboardAvoidingView>
+        </ModalKeyboardAvoider>
         {showInfo && isGroup && !!chat && (
           <GroupInfo chat={chat} iAmOrganiser={iAmOrganiser} onOpenEvent={onOpenEvent} onClose={() => setShowInfo(false)} />
         )}

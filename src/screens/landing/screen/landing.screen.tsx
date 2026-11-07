@@ -50,10 +50,11 @@ const COPY: Record<TIntent, { eyebrow: string; title: string; subtitle: string }
   }
 };
 
-const SIDES: { value: TIntent; label: string }[] = [
-  { value: "attendee", label: "Attendee" },
-  { value: "organiser", label: "Organiser" }
-];
+// The website's words, so both doors read the same everywhere.
+const OTHER_DOOR: Record<TIntent, { prompt: string; label: string; to: TIntent }> = {
+  attendee: { prompt: "Hosting events?", label: "Organiser sign-in", to: "organiser" },
+  organiser: { prompt: "Just going to events?", label: "Attendee sign-in", to: "attendee" }
+};
 
 const checkIfEmailExistsSchema = joi.object({
   email: joi.string().email().required().messages({
@@ -211,33 +212,6 @@ const LandingScreen = () => {
       }
     >
       <View className="gap-5">
-        {/* Which side they're here for. */}
-        <View
-          className="flex-row rounded-full bg-[#f1f4f9] p-1"
-          accessibilityRole="tablist"
-        >
-          {SIDES.map((side) => {
-            const active = intent === side.value;
-            return (
-              <Pressable
-                key={side.value}
-                onPress={() => setIntent(side.value)}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                className={`h-10 flex-1 items-center justify-center rounded-full ${
-                  active ? "bg-white" : ""
-                }`}
-                style={active ? { elevation: 2, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } } : undefined}
-              >
-                <TextComponent
-                  className={`text-sm font-bold ${active ? "text-black" : "text-black/50"}`}
-                >
-                  {side.label}
-                </TextComponent>
-              </Pressable>
-            );
-          })}
-        </View>
         {canLogin ? (
           // The email is settled by now, so it shows as a chip that can be changed.
           <View className="flex-row items-center gap-3 rounded-2xl bg-[#f7f9fc] px-4 py-3">
@@ -354,6 +328,17 @@ const LandingScreen = () => {
               disabled={isSubmitting}
             />
           )}
+        </View>
+        {/* The other door: same account, it only changes where they start. */}
+        <View className="flex-row flex-wrap items-center justify-center gap-1">
+          <TextComponent className="text-sm text-black/60">{OTHER_DOOR[intent].prompt}</TextComponent>
+          <TouchableOpacity
+            onPress={() => setIntent(OTHER_DOOR[intent].to)}
+            accessibilityRole="button"
+            hitSlop={8}
+          >
+            <TextComponent className="text-sm font-bold text-[#007db3]">{OTHER_DOOR[intent].label}</TextComponent>
+          </TouchableOpacity>
         </View>
       </View>
     </AuthTicketLayout>
