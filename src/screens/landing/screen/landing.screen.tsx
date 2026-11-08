@@ -1,6 +1,5 @@
 import { Pressable, TouchableOpacity, View } from "react-native";
 import React, { memo, useCallback, useState } from "react";
-import { WEB_APP_URL } from "@env";
 import AuthTicketLayout from "@/shared/components/auth-ticket/auth-ticket.layout";
 import GoogleSignInButton, {
   isGoogleSignInAvailable
@@ -14,17 +13,12 @@ import { UnauthenticatedStackParamList } from "@/navigation/unauthenticated-navi
 import { useForm } from "react-hook-form";
 import joi from "joi";
 import { joiResolver } from "@hookform/resolvers/joi";
-import { getData, postData } from "@/api";
-import useUserStore, { TUser } from "@/shared/stores/user.store";
+import { postData } from "@/api";
 import { useIntroStore } from "@/shared/stores/intro.store";
 import { usePermissionsIntroStore } from "@/shared/stores/permissions-intro.store";
 import useApp from "@/shared/hooks/use-app.hook";
 import { onError } from "@/shared/components/status/toast";
-import {
-  EVerificationType,
-  TLoginResponseType,
-  TUserCheckResponseType
-} from "@/shared/utils/types";
+import { EVerificationType, TLoginResponseType } from "@/shared/utils/types";
 import { constructErrorMessage } from "@/api/functions";
 import { Controller } from "react-hook-form";
 import { TAuthBodyType } from "../../../shared/utils/types";
@@ -32,21 +26,27 @@ import useAuth from "../../../shared/hooks/use-auth.hook";
 import { useOrganiserStore } from "@/shared/stores/organiser.store";
 
 type TIntent = "attendee" | "organiser";
+type TMode = "login" | "signup";
 
 // Same account either way; the side only changes the words and, for
 // organisers, where the app goes once they're in (see the home screen).
-const COPY: Record<TIntent, { eyebrow: string; title: string; subtitle: string }> = {
+const COPY: Record<TIntent, { eyebrow: string; title: Record<TMode, string>; subtitle: Record<TMode, string> }> = {
   attendee: {
-    eyebrow: "Log in or sign up",
-    title: "Let's get you in",
-    subtitle:
-      "Enter your email. We'll log you in, or send a link to set up your account if you're new."
+    eyebrow: "Welcome to Turnupz",
+    title: { login: "Welcome back", signup: "Create your account" },
+    subtitle: {
+      login: "",
+      signup: "Enter your email and we'll send you a code to get started."
+    }
   },
   organiser: {
     eyebrow: "For organisers",
-    title: "Host on Turnupz",
-    subtitle:
-      "Enter your email. We'll log you in, or send a link to set up your account. Then tell us about your business and start selling tickets."
+    title: { login: "Organiser log in", signup: "Host on Turnupz" },
+    subtitle: {
+      login: "",
+      signup:
+        "Enter your email and we'll send you a code. Then tell us about your business and start selling tickets."
+    }
   }
 };
 
@@ -56,44 +56,31 @@ const OTHER_DOOR: Record<TIntent, { prompt: string; label: string; to: TIntent }
   organiser: { prompt: "Just going to events?", label: "Attendee sign-in", to: "attendee" }
 };
 
-const checkIfEmailExistsSchema = joi.object({
-  email: joi.string().email().required().messages({
-    "string.email": "Invalid email address",
-    "string.empty": "Email is required",
-    "any.required": "Email is required"
-  })
+const emailRule = joi.string().email({ tlds: false }).required().messages({
+  "string.email": "Enter a valid email address",
+  "string.empty": "Email is required",
+  "any.required": "Email is required"
 });
 
-const checkIfEmailExistsDefaultValues: TAuthBodyType = {
-  email: ""
-};
-
-const authDefaultValues: TAuthBodyType = {
-  email: "",
-  password: undefined
-};
-
-const authSchema = joi.object({
-  email: joi.string().email().required().messages({
-    "string.email": "Invalid email address",
-    "string.empty": "Email is required",
-    "any.required": "Email is required"
-  }),
-  password: joi.string().messages({
+const loginSchema = joi.object({
+  email: emailRule,
+  password: joi.string().required().messages({
     "string.empty": "Password is required",
     "any.required": "Password is required"
   })
 });
 
+const signupSchema = joi.object({ email: emailRule }).unknown(true);
+
 const LandingScreen = () => {
   const navigation =
     useNavigation<NavigationProp<UnauthenticatedStackParamList>>();
-  const [canLogin, setCanLogin] = useState(false);
   const [intent, setIntent] = useState<TIntent>("attendee");
+  const [mode, setMode] = useState<TMode>("login");
+  const [sendingCode, setSendingCode] = useState(false);
   const copy = COPY[intent];
   const setWantsToHost = useOrganiserStore((state) => state.setWantsToHost);
   const { performAuthOperations } = useApp();
-  const setUserDetails = useUserStore((state) => state.setUser);
   const { performAuthVerificationCheck } = useAuth();
   // The email field auto-focuses only once the launch intro is out of the way,
   // so the keyboard doesn't come up over it. Keying it on that remounts the
@@ -106,78 +93,73 @@ const LandingScreen = () => {
     control,
     handleSubmit,
     getValues,
+    trigger,
     resetField,
     formState: { isSubmitting }
   } = useForm<TAuthBodyType>({
-    defaultValues: canLogin
-      ? authDefaultValues
-      : checkIfEmailExistsDefaultValues,
-    resolver: joiResolver(canLogin ? authSchema : checkIfEmailExistsSchema)
+    defaultValues: { email: "", password: undefined },
+    resolver: joiResolver(mode === "login" ? loginSchema : signupSchema)
   });
+
+  const failed = (error: unknown, fallback: string) =>
+    onError(constructErrorMessage(error as TApiErrorResponseType, fallback));
+
+  // The answer is the same whether or not the email has an account, so the
+  // next screen says the same too.
+  const sendCode = useCallback(
+    async (purpose: TMode, email: string) => {
+      const { data } = await postData<{ email: string }, { token: string; expiresAt: string }>(
+        purpose === "login" ? "/auth/login/code/start" : "/auth/signup/start",
+        { email }
+      );
+      const token = data?.data?.token;
+      if (!token) throw new Error("No code was sent");
+      navigation.navigate("verification", {
+        email,
+        token,
+        type: purpose === "login" ? EVerificationType.LOGIN : EVerificationType.ACCOUNT_CREATION
+      });
+    },
+    [navigation]
+  );
+
   const onSubmit = useCallback(
     async (formBody: TAuthBodyType) => {
       // One spelling per address, as on the web, so capitals can't split an account.
-      const body = { ...formBody, email: formBody.email.trim().toLowerCase() };
+      const email = formBody.email.trim().toLowerCase();
       // Kept (it's saved) through any sign-up steps, until home acts on it.
       setWantsToHost(intent === "organiser");
       try {
-        if (!canLogin) {
-          const { data } = await getData<TUserCheckResponseType>(
-            `/auth?email=${body.email}`
-          );
-          if (!data?.data?.exists) {
-            await postData<{ email: string; url: string }, string>(
-              "/auth/register",
-              {
-                email: body.email,
-                // Required by the api, but the app's sign-up uses a code
-                // instead (sent on the next screen), so no link is emailed.
-                url: `${WEB_APP_URL}/auth/register/{{token}}?email=${body.email}`
-              }
-            );
-            navigation.navigate("verification", {
-              email: body.email,
-              type: EVerificationType.ACCOUNT_CREATION
-            });
-            return;
-          }
-          if (data?.data?.shouldRequestPassword) {
-            navigation.navigate("verification", {
-              email: body.email,
-              type: EVerificationType.ACCOUNT_CREATION
-            });
-            return;
-          }
-          if (data?.data?.isAccountDisabled) {
-            onError("Account is disabled! Please contact support to activate");
-            return;
-          }
-
-          if (!data?.data?.isEmailVerified) {
-            navigation.navigate("verification", {
-              email: body.email,
-              type: EVerificationType.EMAIL_VERIFICATION
-            });
-            return;
-          }
-          return setCanLogin(true);
+        if (mode === "signup") {
+          await sendCode("signup", email);
+          return;
         }
-        const { data } = await postData<TAuthBodyType, TLoginResponseType>(
-          "/auth/login",
-          body
-        );
+        const { data } = await postData<TAuthBodyType, TLoginResponseType>("/auth/login", {
+          email,
+          password: formBody.password
+        });
         performAuthOperations(data?.data?.accessToken, true);
         await performAuthVerificationCheck();
       } catch (error) {
-        const errorMessage = constructErrorMessage(
-          error as TApiErrorResponseType,
-          "Failed to login"
-        );
-        onError(errorMessage);
+        failed(error, mode === "signup" ? "We couldn't send a code. Try again." : "We couldn't log you in. Try again.");
       }
     },
-    [canLogin, intent, setWantsToHost, performAuthOperations, performAuthVerificationCheck]
+    [mode, intent, setWantsToHost, sendCode, performAuthOperations, performAuthVerificationCheck]
   );
+
+  const codeInstead = useCallback(async () => {
+    if (!(await trigger("email"))) return;
+    setWantsToHost(intent === "organiser");
+    setSendingCode(true);
+    try {
+      await sendCode("login", getValues("email").trim().toLowerCase());
+    } catch (error) {
+      failed(error, "We couldn't send a code. Try again.");
+    } finally {
+      setSendingCode(false);
+    }
+  }, [trigger, getValues, intent, setWantsToHost, sendCode]);
+
   // Google lands in the same place as a password login.
   const onGoogleToken = useCallback(
     async (accessToken: string) => {
@@ -187,92 +169,72 @@ const LandingScreen = () => {
     },
     [intent, setWantsToHost, performAuthOperations, performAuthVerificationCheck]
   );
+
+  const busy = isSubmitting || sendingCode;
+
   return (
     <AuthTicketLayout
-      eyebrow={
-        canLogin
-          ? intent === "organiser"
-            ? "Organiser log in"
-            : "Log in"
-          : copy.eyebrow
-      }
-      title={canLogin ? "Welcome back" : copy.title}
-      subtitle={
-        canLogin
-          ? "Enter your password to carry on where you left off."
-          : copy.subtitle
-      }
+      eyebrow={copy.eyebrow}
+      title={copy.title[mode]}
+      subtitle={copy.subtitle[mode] || undefined}
       stubKicker={intent === "organiser" ? "ALL ACCESS" : undefined}
       stubTitle={intent === "organiser" ? "Your stage on Turnupz" : undefined}
       footer={
-        <TextComponent className="text-center text-xs text-white/55">
-          By continuing you agree to the Turnupz Terms of Service and Privacy
-          Policy.
-        </TextComponent>
-      }
-    >
-      <View className="gap-5">
-        {canLogin ? (
-          // The email is settled by now, so it shows as a chip that can be changed.
-          <View className="flex-row items-center gap-3 rounded-2xl bg-[#f7f9fc] px-4 py-3">
-            <TextComponent
-              numberOfLines={1}
-              className="flex-1 text-base font-medium text-black"
-            >
-              {getValues("email")?.trim().toLowerCase()}
-            </TextComponent>
-            <Pressable
+        // Kept off the card so the form stays short.
+        <View className="items-center gap-2">
+          <View className="flex-row flex-wrap items-center justify-center gap-1">
+            <TextComponent className="text-sm text-white/65">{OTHER_DOOR[intent].prompt}</TextComponent>
+            <TouchableOpacity
               onPress={() => {
-                resetField("password");
-                setCanLogin(false);
+                const next = OTHER_DOOR[intent].to;
+                setIntent(next);
+                // Organisers mostly come to start hosting.
+                setMode(next === "organiser" ? "signup" : "login");
               }}
               accessibilityRole="button"
               hitSlop={8}
             >
-              <TextComponent className="text-sm font-bold text-[#0577FA]">
-                Change
-              </TextComponent>
-            </Pressable>
+              <TextComponent className="text-sm font-bold text-white">{OTHER_DOOR[intent].label}</TextComponent>
+            </TouchableOpacity>
           </View>
-        ) : (
-          <Controller
-            control={control}
-            name="email"
-            render={({
-              field: { onChange, value, ref },
-              fieldState: { error }
-            }) => (
-              <InputFieldComponent
-                key={introDone ? "email-ready" : "email-waiting"}
-                autoFocus={introDone}
-                label="Email"
-                placeholder="name@example.com"
-                inputMode="email"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-                autoCorrect={false}
-                returnKeyType="next"
-                onSubmitEditing={() => {
-                  handleSubmit(onSubmit)();
-                }}
-                ref={ref}
-                onChangeText={onChange}
-                value={value}
-                error={error?.message}
-              />
-            )}
-          />
-        )}
-        {canLogin && (
+          <TextComponent className="text-center text-xs text-white/45">
+            By continuing you agree to the Terms and Privacy Policy.
+          </TextComponent>
+        </View>
+      }
+    >
+      <View className="gap-5">
+        <Controller
+          control={control}
+          name="email"
+          render={({ field: { onChange, value, ref }, fieldState: { error } }) => (
+            <InputFieldComponent
+              key={introDone ? "email-ready" : "email-waiting"}
+              autoFocus={introDone}
+              label="Email"
+              placeholder="name@example.com"
+              inputMode="email"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              autoCorrect={false}
+              returnKeyType={mode === "login" ? "next" : "done"}
+              onSubmitEditing={() => {
+                if (mode === "signup") handleSubmit(onSubmit)();
+              }}
+              ref={ref}
+              onChangeText={onChange}
+              value={value}
+              error={error?.message}
+            />
+          )}
+        />
+        {mode === "login" && (
           <View className="gap-2">
             <Controller
               control={control}
               name="password"
-              render={({
-                field: { onChange, value, ref },
-                fieldState: { error }
-              }) => (
+              render={({ field: { onChange, value, ref }, fieldState: { error } }) => (
                 <InputFieldComponent
                   label="Password"
                   placeholder="Enter your password"
@@ -280,40 +242,36 @@ const LandingScreen = () => {
                   autoCapitalize="none"
                   autoComplete="password"
                   autoCorrect={false}
-                  autoFocus
                   returnKeyType="done"
                   onSubmitEditing={() => {
                     handleSubmit(onSubmit)();
                   }}
                   ref={ref}
                   onChangeText={onChange}
-                  value={value}
+                  value={value ?? ""}
                   error={error?.message}
                 />
               )}
             />
-            <View className="w-full flex-row items-center justify-end">
-              <TouchableOpacity
-                onPress={() => {
-                  navigation.navigate("forgot-password");
-                }}
-              >
-                <TextComponent className="text-sm font-medium text-black/60">
-                  Forgot password?
-                </TextComponent>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              onPress={() => navigation.navigate("forgot-password")}
+              hitSlop={8}
+              accessibilityRole="button"
+              className="self-end"
+            >
+              <TextComponent className="text-sm font-medium text-black/60">Forgot password?</TextComponent>
+            </TouchableOpacity>
           </View>
         )}
         {/* Always tappable: a wrong or missing entry shows its message under
             the field, rather than leaving a greyed-out button. */}
         <ButtonComponent
           onPress={handleSubmit(onSubmit)}
-          disabled={isSubmitting}
-          isLoading={isSubmitting}
+          disabled={busy}
+          isLoading={busy}
           className="h-12 rounded-full bg-[#00b2ff] py-0"
         >
-          {canLogin ? "Log in" : "Continue with email"}
+          {mode === "login" ? "Log in" : "Email me a code"}
         </ButtonComponent>
         <View className="flex-row items-center gap-3">
           <View className="h-[1px] flex-1 bg-black/10" />
@@ -322,22 +280,37 @@ const LandingScreen = () => {
         </View>
         <View className="gap-3">
           {isGoogleSignInAvailable && (
-            <GoogleSignInButton
-              onToken={onGoogleToken}
-              onError={onError}
-              disabled={isSubmitting}
-            />
+            <GoogleSignInButton onToken={onGoogleToken} onError={onError} disabled={busy} />
+          )}
+          {mode === "login" && (
+            <Pressable
+              onPress={() => void codeInstead()}
+              disabled={busy}
+              accessibilityRole="button"
+              className="h-12 flex-row items-center justify-center gap-3 rounded-full border border-black/15 bg-white"
+              style={({ pressed }) => ({ opacity: pressed || busy ? 0.6 : 1 })}
+            >
+              <TextComponent className="text-base font-medium text-black">Email me a sign-in code</TextComponent>
+            </Pressable>
           )}
         </View>
-        {/* The other door: same account, it only changes where they start. */}
+        {/* Log in and create account are separate screens, so neither one
+            says whether an email already has an account. */}
         <View className="flex-row flex-wrap items-center justify-center gap-1">
-          <TextComponent className="text-sm text-black/60">{OTHER_DOOR[intent].prompt}</TextComponent>
+          <TextComponent className="text-sm text-black/60">
+            {mode === "login" ? "New to Turnupz?" : "Already have an account?"}
+          </TextComponent>
           <TouchableOpacity
-            onPress={() => setIntent(OTHER_DOOR[intent].to)}
+            onPress={() => {
+              setMode(mode === "login" ? "signup" : "login");
+              resetField("password");
+            }}
             accessibilityRole="button"
             hitSlop={8}
           >
-            <TextComponent className="text-sm font-bold text-[#007db3]">{OTHER_DOOR[intent].label}</TextComponent>
+            <TextComponent className="text-sm font-bold text-[#007db3]">
+              {mode === "login" ? "Create an account" : "Log in"}
+            </TextComponent>
           </TouchableOpacity>
         </View>
       </View>

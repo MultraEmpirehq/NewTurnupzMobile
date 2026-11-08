@@ -53,7 +53,8 @@ const CheckParameters: React.FC<{ isValid: boolean; value: string }> = ({
         {isValid && <BadgeCheckIcon color={"#006B99"} color2={"#6FB1FC"} />}
         {!isValid && <CircleExclamationIcon />}
       </View>
-      <TextComponent className={cn(validityTextClassName({ isValid }))}>
+      {/* The whole row's width: measured on its own, Android clipped the last word. */}
+      <TextComponent className={cn(validityTextClassName({ isValid }), "flex-1")}>
         {value}
       </TextComponent>
     </View>
