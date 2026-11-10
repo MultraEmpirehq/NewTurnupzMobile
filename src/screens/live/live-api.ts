@@ -1148,6 +1148,9 @@ export type TMyOrder = {
   payment?: { card: TPrice | null; cardLabel: string | null; credit: TPrice | null };
   refunds?: {
     status: string;
+    kind?: string;
+    reason?: string | null;
+    feeKept?: TPrice;
     tickets: number;
     toCard: TPrice;
     asCredit: TPrice;

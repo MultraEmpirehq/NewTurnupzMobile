@@ -33,6 +33,12 @@
     },
     "plugins": [
       [
+        "onesignal-expo-plugin",
+        {
+          "mode": "production"
+        }
+      ],
+      [
         "expo-dev-client",
         {
           "launchMode": "most-recent"

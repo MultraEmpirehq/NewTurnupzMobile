@@ -21,6 +21,7 @@ import LiveMyTicketsScreen from "@/screens/live/my-tickets.screen";
 import LiveExploreScreen from "@/screens/live/explore.screen";
 import ProfileScreen from "@/screens/profile/profile.screen";
 import NotificationsScreen from "@/screens/notifications/notifications.screen";
+import { usePushTapStore } from "@/shared/push/push";
 import ChatsScreen from "@/screens/chat/chats.screen";
 import PeopleModal from "@/screens/people/people-modal";
 import { useUnreadNotifications } from "@/screens/notifications/notifications-api";
@@ -300,6 +301,13 @@ const FeedCard = ({
 const RefinedHomeFeedDesignScreen = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TBottomNavId>("home");
+  // A tapped phone notification opens My Tickets or Notifications.
+  const pushTab = usePushTapStore((state) => state.tab);
+  useEffect(() => {
+    if (!pushTab) return;
+    setActiveTab(pushTab);
+    usePushTapStore.getState().clear();
+  }, [pushTab]);
   // Tabs opened so far; they stay mounted (hidden) after you leave them.
   const [visitedTabs, setVisitedTabs] = useState<TBottomNavId[]>(["home"]);
   useEffect(() => {
