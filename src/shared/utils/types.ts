@@ -5,7 +5,9 @@ export enum EVerificationType {
   FORGOT_PASSWORD = "FORGOT_PASSWORD",
   CHANGE_EMAIL = "CHANGE_EMAIL",
   CHANGE_MOBILE = "CHANGE_MOBILE",
-  ACCOUNT_CREATION = "ACCOUNT_CREATION"
+  ACCOUNT_CREATION = "ACCOUNT_CREATION",
+  /** Logging in with a code instead of the password. */
+  LOGIN = "LOGIN"
 }
 
 export type TUserCheckResponseType = {

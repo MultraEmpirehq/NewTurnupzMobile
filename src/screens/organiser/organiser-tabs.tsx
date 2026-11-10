@@ -159,7 +159,7 @@ export const TodayTab = memo(
                 onWebOnly({
                   title: "Create an event",
                   reason: "There's a lot to fill in, from tickets to pictures, and it's easier on a bigger screen.",
-                  path: "/app/create"
+                  path: "/app/events/create"
                 })
               }
             />
@@ -344,7 +344,7 @@ export const MeTab = memo(
       <WebRow
         title="Analytics"
         body="Charts, ticket types and where buyers came from"
-        onPress={() => onWebOnly({ title: "Analytics", reason: "The charts and tables need room.", path: "/app/analysis" })}
+        onPress={() => onWebOnly({ title: "Analytics", reason: "The charts and tables need room.", path: "/app/analytics" })}
       />
 
       <Pressable onPress={onAttendee} accessibilityRole="button" className="mx-4 mt-6 h-12 items-center justify-center rounded-full" style={{ backgroundColor: BRAND.ink }}>

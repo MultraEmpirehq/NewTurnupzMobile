@@ -16,6 +16,8 @@ export type UnauthenticatedStackParamList = {
     type: EVerificationType;
     email?: string;
     phoneNumber?: string;
+    /** A code already sent: the screen uses it rather than sending another. */
+    token?: string;
   };
   "reset-password": { token: string };
   "forgot-password": undefined;

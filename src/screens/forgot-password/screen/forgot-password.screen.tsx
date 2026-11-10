@@ -7,11 +7,7 @@ import { Controller, useForm } from "react-hook-form";
 import { joiResolver } from "@hookform/resolvers/joi";
 import InputFieldComponent from "@/shared/components/form/input-field/input-field.component";
 import ButtonComponent from "@/shared/components/button/button.component";
-import { getData, postData } from "@/api";
-import {
-  EVerificationType,
-  TUserCheckResponseType
-} from "../../../shared/utils/types";
+import { EVerificationType } from "../../../shared/utils/types";
 import { onError } from "@/shared/components/status/toast";
 import { constructErrorMessage } from "@/api/functions";
 import { useNavigation } from "@react-navigation/native";
@@ -47,15 +43,10 @@ const ForgotPasswordScreen = () => {
   });
   const onSubmit = useCallback(async (body: TForgotPasswordBodyType) => {
     try {
-      const { data } = await getData<TUserCheckResponseType>(
-        `/auth?email=${body.email}`
-      );
-      if (!data?.data?.exists) {
-        onError("Email does not exist");
-        return;
-      }
+      // Straight on to the code, account or not: saying which would tell
+      // anyone whether an email has an account.
       navigation.navigate("verification", {
-        email: body.email,
+        email: body.email.trim().toLowerCase(),
         type: EVerificationType.FORGOT_PASSWORD
       });
     } catch (error) {

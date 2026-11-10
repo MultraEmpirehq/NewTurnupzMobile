@@ -1,4 +1,5 @@
 import React, { memo, useState } from "react";
+import RefundTracker from "./refund-tracker";
 import { useQueryClient } from "@tanstack/react-query";
 import { postData } from "@/api";
 import { constructErrorMessage } from "@/api/functions";
@@ -185,14 +186,14 @@ const OrderHelp = ({ order }: { order: TMyOrder }) => {
   return (
     <Card title="Get help">
       <TextComponent className="text-sm text-zinc-600">
-        Tell us what went wrong. We'll include your order number {reference},
-        and the Turnupz team will reply in your Messages.
+        Tell us what went wrong, or ask for a refund. We'll include your order
+        number {reference}, and reply in your Messages.
       </TextComponent>
       <TextInput
         value={message}
         onChangeText={setMessage}
         multiline
-        placeholder="e.g. I was charged but didn't get my tickets"
+        placeholder="e.g. I'd like a refund, or I was charged but didn't get my tickets"
         placeholderTextColor="#A1A1AA"
         className="mt-3 min-h-24 rounded-xl border border-zinc-200 p-3 text-base text-zinc-950"
         style={{ textAlignVertical: "top" }}
@@ -400,25 +401,28 @@ const OrderReceipt = ({ order }: { order: TMyOrder }) => {
       {!!order.refunds?.length && (
         <Card title="Refunds">
           {order.refunds.map((refund, index) => {
-            const parts = [
-              refund.toCard.amount > 0 &&
-                `${refund.toCard.formatted?.withCurrency} to your card`,
-              refund.asCredit.amount > 0 &&
-                `${refund.asCredit.formatted?.withCurrency} as Turnupz Credit`
-            ].filter(Boolean);
             return (
-              <View key={index} className="py-1.5">
-                <TextComponent className="text-sm text-zinc-800">
+              <View key={index} className="gap-3 py-2">
+                <TextComponent className="text-sm font-semibold text-zinc-900">
                   {refund.tickets} ticket{refund.tickets === 1 ? "" : "s"}
-                  {parts.length ? `: ${parts.join(" and ")}` : ""}
+                  {refund.kind === "event_cancelled" ? " · event cancelled" : ""}
                 </TextComponent>
-                <TextComponent className="text-xs text-zinc-500">
-                  {refund.status === "completed"
-                    ? `Refunded ${new Date(refund.completedAt ?? refund.requestedAt).toLocaleDateString()}`
-                    : refund.status === "failed"
-                      ? "Delayed, we're on it"
-                      : "On its way · cards usually take 5–10 working days"}
-                </TextComponent>
+                <RefundTracker refund={refund} />
+                <View className="gap-1">
+                  {[
+                    refund.toCard.amount > 0 && ["To your card", refund.toCard.formatted?.withCurrency],
+                    refund.asCredit.amount > 0 && ["As Turnupz Credit", refund.asCredit.formatted?.withCurrency],
+                    !!refund.feeKept?.amount && ["Booking fee, not refunded", refund.feeKept.formatted?.withCurrency],
+                    !!refund.reason && ["Reason", refund.reason]
+                  ]
+                    .filter((row): row is [string, string] => Array.isArray(row))
+                    .map(([label, value]) => (
+                      <View key={label} className="flex-row justify-between gap-4">
+                        <TextComponent className="text-xs text-zinc-500">{label}</TextComponent>
+                        <TextComponent className="flex-1 text-right text-xs font-semibold text-zinc-900">{value}</TextComponent>
+                      </View>
+                    ))}
+                </View>
               </View>
             );
           })}

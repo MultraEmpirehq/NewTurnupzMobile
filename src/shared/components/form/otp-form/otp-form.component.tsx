@@ -24,10 +24,14 @@ const getActiveBoxClassName = cva("!rounded-md", {
 
 const TOTAL_BOX_CONTAINER_GAP = 40;
 
-const getBoxesSize = (count: number) => {
-  const width = WINDOW_WIDTH - TOTAL_BOX_CONTAINER_GAP - 40;
-  const boxSize = width / count;
-  const gapSize = TOTAL_BOX_CONTAINER_GAP / (count - 1);
+/** Largest a box gets on a wide screen. */
+const MAX_BOX_SIZE = 56;
+
+// Sized from the space the boxes actually have, not the whole screen: inside
+// a card, the screen width made the last box spill over the edge.
+const getBoxesSize = (count: number, available: number) => {
+  const gapSize = Math.min(10, TOTAL_BOX_CONTAINER_GAP / (count - 1));
+  const boxSize = Math.min(MAX_BOX_SIZE, (available - gapSize * (count - 1)) / count);
   return { boxSize, gapSize };
 };
 
@@ -64,12 +68,18 @@ const OtpFormComponent: React.FC<{
       setOTP((prevState) => prevState.map((_, index) => value[index] || ""));
     }
   }, [value, otp, totalBoxes]);
-  const boxMeasurement = useMemo(() => getBoxesSize(totalBoxes), [totalBoxes]);
+  // Until it's measured, a safe guess for a phone screen.
+  const [available, setAvailable] = useState(WINDOW_WIDTH - 100);
+  const boxMeasurement = useMemo(() => getBoxesSize(totalBoxes, available), [totalBoxes, available]);
   return (
     <View className="gap-3">
       <View
         style={{ gap: boxMeasurement?.gapSize }}
-        className="flex flex-row items-stretch justify-center"
+        className="flex w-full flex-row items-stretch justify-center"
+        onLayout={(event) => {
+          const width = Math.floor(event.nativeEvent.layout.width);
+          if (width > 0 && width !== available) setAvailable(width);
+        }}
       >
         {otp.map((otpValue, index) => (
           <MemorizedOTPBox
