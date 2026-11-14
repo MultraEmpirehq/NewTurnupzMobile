@@ -1,3 +1,4 @@
+import { isTwoFactorChallenge } from "@/shared/utils/trusted-device";
 import AuthTicketLayout from "@/shared/components/auth-ticket/auth-ticket.layout";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import React, { memo, useCallback, useEffect, useState } from "react";
@@ -115,6 +116,10 @@ const VerificationScreen = () => {
           "/auth/login/code",
           { token, otp }
         );
+        if (isTwoFactorChallenge(data?.data)) {
+          navigation.navigate("two-factor", { challenge: data.data.challenge });
+          return;
+        }
         performAuthOperations(data?.data?.accessToken, true);
         await performAuthVerificationCheck();
         return;

@@ -1,3 +1,4 @@
+import { isTwoFactorChallenge } from "@/shared/utils/trusted-device";
 import React, { memo, useCallback, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
@@ -21,11 +22,13 @@ const IS_AVAILABLE =
   (Platform.OS === "android" ||
     (Platform.OS === "ios" && !!GOOGLE_IOS_CLIENT_ID));
 
-type TSocialAuthResponse = { accessToken?: string };
+type TSocialAuthResponse = { accessToken?: string; twoFactorRequired?: boolean; challenge?: string };
 
 type TGoogleSignInButtonProps = {
   /** Called with the Turnupz access token once the exchange succeeds. */
   onToken: (accessToken: string) => Promise<void> | void;
+  /** Two-factor is on: ask for the code with this challenge. */
+  onChallenge?: (challenge: string) => void;
   onError: (message: string) => void;
   disabled?: boolean;
 };
@@ -39,6 +42,7 @@ let isConfigured = false;
 
 const GoogleSignInButton: React.FC<TGoogleSignInButtonProps> = ({
   onToken,
+  onChallenge,
   onError,
   disabled
 }) => {
@@ -71,6 +75,10 @@ const GoogleSignInButton: React.FC<TGoogleSignInButtonProps> = ({
           { provider: "GOOGLE"; idToken: string },
           TSocialAuthResponse
         >("/auth/social", { provider: "GOOGLE", idToken });
+        if (isTwoFactorChallenge(data?.data)) {
+          onChallenge?.(data.data.challenge);
+          return;
+        }
         const accessToken = data?.data?.accessToken;
         if (!accessToken) {
           onError("We couldn't sign you in with Google. Please try again.");
@@ -92,7 +100,7 @@ const GoogleSignInButton: React.FC<TGoogleSignInButtonProps> = ({
     } finally {
       setIsBusy(false);
     }
-  }, [onError, onToken]);
+  }, [onError, onToken, onChallenge]);
 
   if (!IS_AVAILABLE) return null;
 

@@ -65,6 +65,7 @@ import {
   useSessions,
 } from "./profile-api";
 import { useEmptyCreditText } from "@/shared/hooks/use-empty-credit-text";
+import TwoFactorSettings from "./two-factor-settings";
 
 /**
  * Settings, and the pages behind each row. Every switch and form here talks
@@ -81,6 +82,7 @@ const DANGER = BRAND.danger;
 type TPage =
   | "menu"
   | "password"
+  | "twoFactor"
   | "notifications"
   | "devices"
   | "accessibility"
@@ -199,7 +201,7 @@ export const Field = ({
   multiline?: boolean;
   maxLength?: number;
   secure?: boolean;
-  keyboard?: "default" | "email-address" | "phone-pad" | "url";
+  keyboard?: "default" | "email-address" | "phone-pad" | "url" | "number-pad";
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
   placeholder?: string;
 }) => (
@@ -1045,6 +1047,7 @@ const ProfileSettingsScreen = ({
   const back = () => setPage("menu");
 
   if (page === "password") return <PasswordPage onBack={back} />;
+  if (page === "twoFactor") return <TwoFactorSettings onBack={back} />;
   if (page === "notifications") return <NotificationsPage onBack={back} />;
   if (page === "devices") return <DevicesPage onBack={back} />;
   if (page === "accessibility") return <AccessibilityPage onBack={back} />;
@@ -1112,6 +1115,11 @@ const ProfileSettingsScreen = ({
           />
         </Section>
         <Section title={t("settings.security")}>
+          <Row
+            label={t("settings.twoFactor")}
+            hint={t("settings.twoFactorHint")}
+            onPress={() => setPage("twoFactor")}
+          />
           <Row
             label={t("settings.loginActivity")}
             hint={t("settings.loginActivityHint")}

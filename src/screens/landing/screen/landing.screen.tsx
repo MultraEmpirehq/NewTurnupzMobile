@@ -1,3 +1,4 @@
+import { isTwoFactorChallenge } from "@/shared/utils/trusted-device";
 import { Pressable, TouchableOpacity, View } from "react-native";
 import React, { memo, useCallback, useState } from "react";
 import AuthTicketLayout from "@/shared/components/auth-ticket/auth-ticket.layout";
@@ -138,13 +139,17 @@ const LandingScreen = () => {
           email,
           password: formBody.password
         });
+        if (isTwoFactorChallenge(data?.data)) {
+          navigation.navigate("two-factor", { challenge: data.data.challenge });
+          return;
+        }
         performAuthOperations(data?.data?.accessToken, true);
         await performAuthVerificationCheck();
       } catch (error) {
         failed(error, mode === "signup" ? "We couldn't send a code. Try again." : "We couldn't log you in. Try again.");
       }
     },
-    [mode, intent, setWantsToHost, sendCode, performAuthOperations, performAuthVerificationCheck]
+    [mode, intent, setWantsToHost, sendCode, performAuthOperations, performAuthVerificationCheck, navigation]
   );
 
   const codeInstead = useCallback(async () => {
@@ -280,7 +285,12 @@ const LandingScreen = () => {
         </View>
         <View className="gap-3">
           {isGoogleSignInAvailable && (
-            <GoogleSignInButton onToken={onGoogleToken} onError={onError} disabled={busy} />
+            <GoogleSignInButton
+              onToken={onGoogleToken}
+              onChallenge={(challenge) => navigation.navigate("two-factor", { challenge })}
+              onError={onError}
+              disabled={busy}
+            />
           )}
           {mode === "login" && (
             <Pressable
