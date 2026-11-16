@@ -4,7 +4,9 @@ import CustomImage from "@/shared/components/images/custom-image/custom-image.co
 import TextComponent from "@/shared/components/text/text.component";
 import { formatEventClock, formatEventDay } from "@/shared/utils/event-time";
 import { BRAND } from "@/shared/utils/brand-colors";
-import { TInsights, TInsightsEvent, TScanEvent } from "./organiser-api";
+import { TEarnings, TInsights, TInsightsEvent, TScanEvent } from "./organiser-api";
+import EyeButton from "@/shared/components/privacy/eye-button";
+import { maskAmount, useBalancePrivacyStore } from "@/shared/stores/balance-privacy.store";
 import { TWebOnlyTask } from "./web-only.sheet";
 
 const BG = "#F7F8FB";
@@ -34,6 +36,103 @@ const WebRow = ({ title, body, onPress }: { title: string; body: string; onPress
   </Pressable>
 );
 
+/** "₦12,000" or "₦•••••" while amounts are hidden. */
+const useMoney = () => {
+  const hidden = useBalancePrivacyStore((state) => state.hideBalance);
+  return (formatted?: string | null) => (hidden ? maskAmount(formatted) : (formatted ?? "—").replace(/[.,]00$/, ""));
+};
+
+const Bar = ({ value, top }: { value: number; top: number }) => (
+  <View className="mt-1 h-2 overflow-hidden rounded-full bg-zinc-100">
+    <View className="h-2 rounded-full" style={{ width: `${value ? Math.max((value / Math.max(top, 1)) * 100, 3) : 0}%`, backgroundColor: BRAND.blue }} />
+  </View>
+);
+
+const STEPS = [
+  { key: "views", label: "Saw an event page" },
+  { key: "ticketViews", label: "Opened the tickets" },
+  { key: "started", label: "Started checkout" },
+  { key: "bought", label: "Paid" }
+] as const;
+
+/** This week, from page view to paid, and what brought the orders. */
+const FindYou = ({ insights }: { insights: TInsights }) => {
+  const funnel = insights.funnel;
+  const sources = insights.sources ?? [];
+  if (!funnel || funnel.views + funnel.started === 0) return null;
+  const top = Math.max(funnel.views, funnel.ticketViews, funnel.started, funnel.bought);
+  return (
+    <>
+      {sectionLabel("HOW PEOPLE FIND YOU · THIS WEEK")}
+      <View className="mx-4 rounded-2xl bg-white p-3.5">
+        {STEPS.map((step, index) => {
+          const count = funnel[step.key];
+          const previous = index ? funnel[STEPS[index - 1].key] : 0;
+          return (
+            <View key={step.key} className={index ? "mt-2.5" : undefined}>
+              <View className="flex-row justify-between">
+                <TextComponent className="text-[13px] text-zinc-700">{step.label}</TextComponent>
+                <TextComponent className="text-[13px] font-extrabold text-zinc-950">
+                  {count.toLocaleString()}
+                  {index > 0 && previous > 0 && (
+                    <TextComponent className="text-[11px] font-normal text-zinc-500"> · {Math.min(Math.round((count / previous) * 100), 100)}%</TextComponent>
+                  )}
+                </TextComponent>
+              </View>
+              <Bar value={count} top={top} />
+            </View>
+          );
+        })}
+        {sources.length > 0 && (
+          <View className="mt-4 border-t border-zinc-100 pt-3">
+            <TextComponent className="mb-1 text-[11px] font-extrabold tracking-widest text-zinc-400">WHERE BUYERS COME FROM</TextComponent>
+            {sources.slice(0, 4).map((row) => (
+              <View key={row.key} className="mt-1.5">
+                <View className="flex-row justify-between">
+                  <TextComponent className="text-[13px] text-zinc-700">{row.label}</TextComponent>
+                  <TextComponent className="text-[13px] font-extrabold text-zinc-950">
+                    {row.orders.toLocaleString()}
+                    <TextComponent className="text-[11px] font-normal text-zinc-500"> · {row.share ?? 0}%</TextComponent>
+                  </TextComponent>
+                </View>
+                <Bar value={row.share ?? 0} top={100} />
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </>
+  );
+};
+
+/** What they kept in the last 30 days, after Turnupz's fee and Stripe's. */
+const Earnings = ({ earnings }: { earnings: TEarnings }) => {
+  const money = useMoney();
+  const row = earnings.currencies[0];
+  if (!row) return null;
+  const lines: [string, string][] = [
+    ["Ticket sales", money(row.sales.formatted?.withCurrency)],
+    ["Turnupz fee", `−${money(row.fees.formatted?.withCurrency)}`],
+    ...(row.processingFees?.amount ? ([["Stripe fees", `−${money(row.processingFees.formatted?.withCurrency)}`]] as [string, string][]) : []),
+    ...(row.owed.amount ? ([["Turnupz still owes you", money(row.owed.formatted?.withCurrency)]] as [string, string][]) : [])
+  ];
+  return (
+    <>
+      {sectionLabel("YOUR EARNINGS · 30 DAYS")}
+      <View className="mx-4 rounded-2xl bg-white p-3.5">
+        <TextComponent className="text-2xl font-extrabold text-zinc-950">{money(row.earnings.formatted?.withCurrency)}</TextComponent>
+        <TextComponent className="text-[11px] text-zinc-500">yours after fees</TextComponent>
+        {lines.map(([label, value]) => (
+          <View key={label} className="mt-2 flex-row justify-between">
+            <TextComponent className="text-[13px] text-zinc-500">{label}</TextComponent>
+            <TextComponent className="text-[13px] font-bold text-zinc-950">{value}</TextComponent>
+          </View>
+        ))}
+      </View>
+    </>
+  );
+};
+
 /* ------------------------------------------------------------------ Today */
 
 /**
@@ -50,9 +149,12 @@ export const TodayTab = memo(
     canScan,
     canManage,
     onScan,
-    onWebOnly
+    onWebOnly,
+    earnings
   }: {
     insights: TInsights | null | undefined;
+    /** Only for those who may see the wallet. */
+    earnings?: TEarnings | null;
     loading: boolean;
     refreshing: boolean;
     onRefresh: () => void;
@@ -64,6 +166,7 @@ export const TodayTab = memo(
     onWebOnly: (task: TWebOnlyTask) => void;
   }) => {
     const byId = useMemo(() => new Map((insights?.events ?? []).map((event) => [event.id, event])), [insights]);
+    const money = useMoney();
     const today = insights?.series[insights.series.length - 1]?.tickets ?? 0;
     const revenue = insights?.summary.revenue ?? [];
     const coming = (insights?.events ?? [])
@@ -78,12 +181,16 @@ export const TodayTab = memo(
         contentContainerStyle={{ paddingBottom: 32 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={BRAND.blue} />}
       >
-        <View className="flex-row gap-2 px-4 pt-4">
+        <View className="flex-row items-center justify-between px-4 pt-4">
+          <TextComponent className="text-[11px] font-extrabold tracking-widest text-zinc-400">THIS WEEK</TextComponent>
+          <EyeButton color={BRAND.ink} background="#EEF0F4" />
+        </View>
+        <View className="flex-row gap-2 px-4 pt-2">
           {[
             { value: today.toLocaleString(), label: "tickets today" },
             { value: (insights?.summary.ticketsSold ?? 0).toLocaleString(), label: "this week" },
             {
-              value: revenue[0]?.total.formatted?.withCurrency?.replace(/[.,]00$/, "") ?? "—",
+              value: revenue[0] ? money(revenue[0].total.formatted?.withCurrency) : "—",
               label: revenue.length > 1 ? `sales · +${revenue.length - 1} more` : "sales this week"
             }
           ].map((stat) => (
@@ -97,6 +204,9 @@ export const TodayTab = memo(
             </View>
           ))}
         </View>
+
+        {insights && <FindYou insights={insights} />}
+        {earnings && <Earnings earnings={earnings} />}
 
         {tonight.length > 0 && sectionLabel("ON NOW AND TONIGHT")}
         {tonight.map((event) => {
@@ -201,6 +311,7 @@ export const EventsTab = memo(
     onWebOnly: (task: TWebOnlyTask) => void;
   }) => {
     const events = insights?.events ?? [];
+    const money = useMoney();
     const groups = [
       { title: "LIVE AND UPCOMING", items: events.filter((event) => event.status === "published" && !event.isPast) },
       { title: "DRAFTS", items: events.filter((event) => event.status === "draft") },
@@ -238,7 +349,7 @@ export const EventsTab = memo(
                   </View>
                   <TextComponent className="mt-0.5 text-[11px] text-zinc-500">
                     {formatEventDay(event.date, undefined, { withYear: false })} · {soldLine(event)}
-                    {event.revenue?.amount ? ` · ${event.revenue.formatted?.withCurrency?.replace(/[.,]00$/, "")}` : ""}
+                    {event.revenue?.amount ? ` · ${money(event.revenue.formatted?.withCurrency)}` : ""}
                   </TextComponent>
                   <SoldBar event={event} />
                   <View className="mt-2.5 flex-row gap-2">
@@ -344,7 +455,7 @@ export const MeTab = memo(
       <WebRow
         title="Analytics"
         body="Charts, ticket types and where buyers came from"
-        onPress={() => onWebOnly({ title: "Analytics", reason: "The charts and tables need room.", path: "/app/analytics" })}
+        onPress={() => onWebOnly({ title: "Analytics", reason: "The charts and tables need room.", path: "/app/analysis" })}
       />
 
       <Pressable onPress={onAttendee} accessibilityRole="button" className="mx-4 mt-6 h-12 items-center justify-center rounded-full" style={{ backgroundColor: BRAND.ink }}>

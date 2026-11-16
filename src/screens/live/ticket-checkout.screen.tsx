@@ -1,3 +1,5 @@
+import Venue3DSheet, { type TVenueZoneTicket } from "./venue-3d/venue-3d.sheet";
+import { ZONE_COLOURS, layoutOf } from "./venue-3d/venue-layouts";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -312,6 +314,33 @@ const LiveTicketCheckoutScreen = ({
     });
   };
 
+  // The optional 3D view: each area with its ticket (several in one area are
+  // grouped; "Pick this" takes the cheapest one still on sale).
+  const [showVenue, setShowVenue] = useState(false);
+  const venueLayout = layoutOf(event.venueLayout);
+  const venueZones = useMemo<TVenueZoneTicket[]>(() => {
+    if (!venueLayout) return [];
+    return venueLayout.zones.flatMap((area, position) => {
+      const inArea = tickets.filter((ticket) => ticket.zone === area.value);
+      if (!inArea.length) return [];
+      const open = inArea
+        .filter((ticket) => ticketSaleState(ticket).status === "open" && maxFor(ticket) > 0)
+        .sort((a, b) => (a.price?.amount ?? 0) - (b.price?.amount ?? 0));
+      const pick = open[0] ?? inArea[0];
+      return [
+        {
+          zone: area.value,
+          ticketId: pick.id,
+          title: inArea.length === 1 ? pick.name : area.label,
+          subtitle: `${inArea.length === 1 ? "" : "from "}${formatPrice(pick.price)}`,
+          note: inArea.length > 1 ? inArea.map((ticket) => ticket.name).join(", ") : area.label,
+          color: ZONE_COLOURS[position % ZONE_COLOURS.length],
+          soldOut: open.length === 0
+        }
+      ];
+    });
+  }, [venueLayout, tickets]);
+
   const pay = async () => {
     if (!selected || !selectedOnSale || quantity < 1) return;
     const one = lines.length === 1;
@@ -593,6 +622,31 @@ const LiveTicketCheckoutScreen = ({
         <TextComponent className="mt-4 text-sm text-zinc-500">
           No tickets are available for this event right now.
         </TextComponent>
+      )}
+
+      {!!venueLayout && venueZones.length > 0 && (
+        <Pressable
+          onPress={() => setShowVenue(true)}
+          accessibilityRole="button"
+          className="mt-3 flex-row items-center justify-center gap-2 rounded-full border px-4 py-3"
+          style={{ borderColor: "#00B2FF", backgroundColor: "#E5F7FF" }}
+        >
+          <TextComponent className="text-sm font-bold" style={{ color: "#0577FA" }}>
+            View in 3D: see where each ticket puts you
+          </TextComponent>
+        </Pressable>
+      )}
+      {!!venueLayout && (
+        <Venue3DSheet
+          visible={showVenue}
+          onClose={() => setShowVenue(false)}
+          layout={venueLayout.value}
+          zones={venueZones}
+          onPick={(ticketId) => {
+            const ticket = tickets.find((item) => item.id === ticketId);
+            if (ticket && !(quantities[ticket.id] ?? 0)) setCount(ticket, 1);
+          }}
+        />
       )}
 
       {tickets.map((ticket) => {

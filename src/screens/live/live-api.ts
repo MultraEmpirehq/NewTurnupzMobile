@@ -90,6 +90,8 @@ export type TLiveEvent = {
   performers?: TLivePerformerSummary[];
   isFavorite?: boolean;
   saleMethod?: "on_turnup" | "register" | "external_link" | string;
+  /** The optional 3D ticket view's layout; null: the list only. */
+  venueLayout?: string | null;
   ticketUrl?: string;
   status?: string;
   isOwner?: boolean;
@@ -126,6 +128,8 @@ export type TLiveTicket = {
   isOnSale?: boolean;
   /** For a multi-day event: the days it admits on. Empty means every day. */
   dayIds?: string[];
+  /** Its area in the event's 3D view. */
+  zone?: string | null;
 };
 
 export type TLiveOrder = {

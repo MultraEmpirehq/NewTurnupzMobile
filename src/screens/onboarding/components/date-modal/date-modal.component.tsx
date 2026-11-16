@@ -23,7 +23,8 @@ type TStep = "year" | "day";
  * A birthday picker: the month's calendar, with its month and year as a button
  * that opens a grid of years, so a birthday decades back is two taps away
  * rather than hundreds of swipes. Days that would make someone under 18 can't
- * be picked.
+ * be picked. Given a range and a title it picks other dates too (an ID's
+ * issue or expiry date).
  */
 const DateModalComponent: React.FC<{
   onDateSelected: (date: Date) => void;
@@ -31,18 +32,28 @@ const DateModalComponent: React.FC<{
   onClose: () => void;
   /** The date already chosen, to open on. */
   value?: Date | string | null;
-}> = ({ onDateSelected, visible, onClose, value }) => {
-  const latest = useMemo(() => latestAdultBirthDate(), []);
+  /** Other uses than a birthday (an ID's issue or expiry date): */
+  title?: string;
+  /** The latest date that can be picked (default: 18 years ago today). */
+  latestDate?: Date;
+  /** The earliest date that can be picked (default: 100 years before the latest). */
+  earliestDate?: Date;
+  /** Where it opens with nothing chosen (default: around age 25). */
+  startDate?: Date;
+}> = ({ onDateSelected, visible, onClose, value, title, latestDate, earliestDate, startDate }) => {
+  const latest = useMemo(() => latestDate ?? latestAdultBirthDate(), [latestDate]);
   const maxYear = latest.getFullYear();
+  const minYear = earliestDate ? earliestDate.getFullYear() : maxYear - YEARS_SHOWN + 1;
   const years = useMemo(
-    () => Array.from({ length: YEARS_SHOWN }, (_, index) => maxYear - index),
-    [maxYear]
+    () => Array.from({ length: maxYear - minYear + 1 }, (_, index) => maxYear - index),
+    [maxYear, minYear]
   );
   const chosen = value ? new Date(value) : null;
+  const start = startDate ?? new Date(maxYear - (TYPICAL_AGE - 18), latest.getMonth(), 1);
 
   const [step, setStep] = useState<TStep>("day");
-  const [year, setYear] = useState(maxYear - (TYPICAL_AGE - 18));
-  const [month, setMonth] = useState(latest.getMonth());
+  const [year, setYear] = useState(start.getFullYear());
+  const [month, setMonth] = useState(start.getMonth());
 
   // Each time it opens: on the chosen date's month, or this month some years back.
   useEffect(() => {
@@ -52,8 +63,8 @@ const DateModalComponent: React.FC<{
       setYear(chosen.getFullYear());
       setMonth(chosen.getMonth());
     } else {
-      setYear(maxYear - (TYPICAL_AGE - 18));
-      setMonth(latest.getMonth());
+      setYear(start.getFullYear());
+      setMonth(start.getMonth());
     }
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -77,7 +88,7 @@ const DateModalComponent: React.FC<{
         <View className="w-[90%] rounded-2xl bg-white p-4">
           <View className="mb-3 flex-row items-center justify-between">
             <TextComponent className="text-base font-bold text-zinc-950">
-              {step === "year" ? "Pick the year" : "Your date of birth"}
+              {step === "year" ? "Pick the year" : (title ?? "Your date of birth")}
             </TextComponent>
             {step === "year" && (
               <Pressable onPress={() => setStep("day")} hitSlop={8} accessibilityRole="button">
@@ -127,6 +138,7 @@ const DateModalComponent: React.FC<{
               key={`${year}-${month}`}
               current={`${year}-${pad(month + 1)}-01`}
               maxDate={toCalendarDay(latest)}
+              minDate={earliestDate ? toCalendarDay(earliestDate) : undefined}
               markedDates={
                 chosen && !Number.isNaN(chosen.getTime())
                   ? { [toCalendarDay(chosen)]: { selected: true, selectedColor: BRAND.blueDeep } }

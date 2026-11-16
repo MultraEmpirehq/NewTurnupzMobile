@@ -17,6 +17,7 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useQueryClient } from "@tanstack/react-query";
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
+import { TurnupzIcon } from "@/shared/assets/images";
 import TextComponent from "@/shared/components/text/text.component";
 import { onError } from "@/shared/components/status/toast";
 import useUserStore from "@/shared/stores/user.store";
@@ -406,7 +407,9 @@ const ChatThreadScreen = ({
                 <Path d="M15 5l-7 7 7 7" fill="none" stroke={BRAND.ink} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </Pressable>
-            {isGroup && eventImage ? (
+            {chat?.type === "SUPPORT" && iAmOrganiser ? (
+              <CustomImage className="size-10 rounded-xl" imageClassName="size-full rounded-xl" source={TurnupzIcon} contentFit="cover" />
+            ) : isGroup && eventImage ? (
               <CustomImage className="size-10 rounded-xl" imageClassName="size-full rounded-xl" source={{ uri: eventImage }} contentFit="cover" />
             ) : isPerson && chat?.person?.image ? (
               <CustomImage className="size-10 rounded-full" imageClassName="size-full rounded-full" source={{ uri: chat.person.image }} contentFit="cover" />
