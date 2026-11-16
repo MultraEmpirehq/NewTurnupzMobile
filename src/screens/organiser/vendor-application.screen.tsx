@@ -71,6 +71,15 @@ type TForm = {
   phoneNumber: string;
   countryOfResidence: string;
   address: string;
+  idType: string;
+  /** Typed only to add or change it; blank keeps the one on file. */
+  idNumber: string;
+  /** If printed on the ID. */
+  idIssuedOn: Date | null;
+  /** Passports, licences and permits always have one; a voter's card doesn't. */
+  idExpiresOn: Date | null;
+  representativeRole: string;
+  businessDocumentType: string;
   businessName: string;
   businessRegistrationNumber: string;
   businessAddress: string;
@@ -88,7 +97,9 @@ type TForm = {
   acceptedTerms: boolean;
 };
 
-type TVerification = Partial<Omit<TForm, "dateOfBirth" | "plan">> & {
+type TVerification = Partial<Omit<TForm, "dateOfBirth" | "plan" | "idIssuedOn" | "idExpiresOn">> & {
+  idIssuedOn?: string | null;
+  idExpiresOn?: string | null;
   status?: string;
   plan?: TPlan | null;
   canSellTickets?: boolean;
@@ -96,7 +107,72 @@ type TVerification = Partial<Omit<TForm, "dateOfBirth" | "plan">> & {
   rejectionReason?: string | null;
   needsMoreInfoMessage?: string | null;
   idDocumentDetails?: { id?: string } | null;
+  idNumberLast4?: string | null;
 };
+
+const ID_TYPES = [
+  { value: "passport", label: "Passport" },
+  { value: "drivers_licence", label: "Driver's licence" },
+  { value: "national_id", label: "National ID" },
+  { value: "voters_card", label: "Voter's card" },
+  { value: "residence_permit", label: "Residence permit" },
+  { value: "other", label: "Other" }
+];
+/** Passports, licences and permits always expire; a voter's card never does (as the API). */
+const idNeedsExpiry = (type?: string | null) =>
+  type === "passport" || type === "drivers_licence" || type === "residence_permit";
+const idHasNoExpiry = (type?: string | null) => type === "voters_card";
+
+const REPRESENTATIVE_ROLES = [
+  { value: "director", label: "Director" },
+  { value: "owner", label: "Owner" },
+  { value: "partner", label: "Partner" },
+  { value: "manager", label: "Manager" },
+  { value: "other", label: "Other" }
+];
+const BUSINESS_DOCUMENT_TYPES = [
+  { value: "registration_certificate", label: "Registration certificate" },
+  { value: "status_report", label: "Status report" },
+  { value: "memorandum_and_articles", label: "Memorandum & articles" },
+  { value: "trade_licence", label: "Trade licence" },
+  { value: "other", label: "Other" }
+];
+
+/** Pick one of a few options, as chips. */
+const ChoiceChips = ({
+  label,
+  options,
+  value,
+  onChange
+}: {
+  label: string;
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+}) => (
+  <View className="gap-2">
+    <TextComponent className="text-sm font-semibold text-zinc-800">{label}</TextComponent>
+    <View className="flex-row flex-wrap gap-2" accessibilityRole="radiogroup">
+      {options.map((option) => {
+        const selected = option.value === value;
+        return (
+          <Pressable
+            key={option.value}
+            onPress={() => onChange(option.value)}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: selected }}
+            className="rounded-full border px-3.5 py-2"
+            style={{ borderColor: selected ? BRAND.blueDeep : "rgba(0,0,0,0.15)", backgroundColor: selected ? BRAND.blueTint : "#ffffff" }}
+          >
+            <TextComponent className="text-sm font-semibold" style={{ color: selected ? BRAND.blueDeep : "#3f3f46" }}>
+              {option.label}
+            </TextComponent>
+          </Pressable>
+        );
+      })}
+    </View>
+  </View>
+);
 
 const stepsFor = (plan: TForm["plan"], vendorType: TVendorType): TStep[] =>
   plan === "free"
@@ -287,6 +363,12 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
     phoneNumber: "",
     countryOfResidence: "",
     address: "",
+    idType: "",
+    idNumber: "",
+    idIssuedOn: null,
+    idExpiresOn: null,
+    representativeRole: "",
+    businessDocumentType: "",
     businessName: "",
     businessRegistrationNumber: "",
     businessAddress: "",
@@ -310,6 +392,8 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
   const [idPhoto, setIdPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [idDocumentId, setIdDocumentId] = useState<string | undefined>();
   const [pickingDate, setPickingDate] = useState(false);
+  // The ID's issue or expiry date being picked.
+  const [pickingIdDate, setPickingIdDate] = useState<"idIssuedOn" | "idExpiresOn" | null>(null);
   const [sheet, setSheet] = useState<"residence" | "payoutCountry" | "bank" | null>(null);
   const [upgrading, setUpgrading] = useState(false);
 
@@ -325,12 +409,17 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
       legalFirstName: saved?.legalFirstName || user?.firstName || current.legalFirstName,
       legalLastName: saved?.legalLastName || user?.lastName || current.legalLastName,
       dateOfBirth: saved?.dateOfBirth ? new Date(saved.dateOfBirth) : user?.dateOfBirth ? new Date(user.dateOfBirth) : current.dateOfBirth,
+      idIssuedOn: saved?.idIssuedOn ? new Date(saved.idIssuedOn) : current.idIssuedOn,
+      idExpiresOn: saved?.idExpiresOn ? new Date(saved.idExpiresOn) : current.idExpiresOn,
       phoneNumber: saved?.phoneNumber || user?.phone || current.phoneNumber,
       countryOfResidence:
         saved?.countryOfResidence ||
         COUNTRIES.find((item) => item.code === (user?.countryCode ?? user?.country))?.name ||
         current.countryOfResidence,
       address: saved?.address ?? current.address,
+      idType: (saved?.idType as string) ?? current.idType,
+      representativeRole: (saved?.representativeRole as string) ?? current.representativeRole,
+      businessDocumentType: (saved?.businessDocumentType as string) ?? current.businessDocumentType,
       businessName: saved?.businessName ?? current.businessName,
       businessRegistrationNumber: saved?.businessRegistrationNumber ?? current.businessRegistrationNumber,
       businessAddress: saved?.businessAddress ?? current.businessAddress,
@@ -391,12 +480,19 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
         if (!isAdultBirthDate(form.dateOfBirth)) return adultAgeMessage;
         if (form.address.trim().length < 5) return "Enter your address";
         if (!idPhoto && !idDocumentId) return "Add a photo of your government ID";
+        if (!form.idType) return "Choose the kind of ID";
+        if (!form.idNumber.trim() && !verification.data?.idNumberLast4) return "Enter the number on your ID";
+        if (idNeedsExpiry(form.idType) && !form.idExpiresOn) return "Add the expiry date on your ID";
+        if (form.idExpiresOn && !idHasNoExpiry(form.idType) && form.idExpiresOn.getTime() < Date.now())
+          return "This ID has expired. Use one that's still valid.";
       }
     }
     if (step === "business") {
       if (!form.businessName.trim()) return "Enter the registered business name";
       if (!form.businessRegistrationNumber.trim()) return "Enter the registration number";
       if (!form.authorizedRepresentative.trim()) return "Enter who can act for the business";
+      if (!form.representativeRole) return "Choose your role in the business";
+      if (!form.businessDocumentType) return "Choose the document that proves the business exists";
       if (form.businessAddress.trim().length < 5) return "Enter the business address";
     }
     if (step === "payout") {
@@ -446,7 +542,11 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
           : {
               dateOfBirth: form.dateOfBirth?.toISOString(),
               address: form.address.trim(),
-              idDocumentId: await uploadId()
+              idDocumentId: await uploadId(),
+              idType: form.idType || undefined,
+              ...(form.idNumber.trim() ? { idNumber: form.idNumber.trim() } : {}),
+              ...(form.idIssuedOn ? { idIssuedOn: form.idIssuedOn.toISOString() } : {}),
+              ...(form.idExpiresOn && !idHasNoExpiry(form.idType) ? { idExpiresOn: form.idExpiresOn.toISOString() } : {})
             })
       };
     }
@@ -456,6 +556,8 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
         businessRegistrationNumber: form.businessRegistrationNumber.trim(),
         businessAddress: form.businessAddress.trim(),
         authorizedRepresentative: form.authorizedRepresentative.trim(),
+        representativeRole: form.representativeRole || undefined,
+        businessDocumentType: form.businessDocumentType || undefined,
         ...(form.taxId.trim() ? { taxId: form.taxId.trim() } : {})
       };
     }
@@ -642,6 +744,32 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
               <TextComponent className="-mt-1 text-xs leading-4 text-zinc-500">
                 Passport, national ID, driver's licence or voter's card. The name and date of birth must match.
               </TextComponent>
+              <ChoiceChips label="Type of ID" options={ID_TYPES} value={form.idType} onChange={set("idType")} />
+              <InputFieldComponent
+                label="ID number"
+                placeholder={verification.data?.idNumberLast4 ? `On file: ending ${verification.data.idNumberLast4}` : "As printed on the ID"}
+                value={form.idNumber}
+                onChangeText={set("idNumber")}
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+              <TextComponent className="-mt-2 text-xs leading-4 text-zinc-500">
+                Kept encrypted. Only the last 4 are shown, and only our verification team can see it in full.
+              </TextComponent>
+              <PickerField
+                label="Issue date (valid from)"
+                value={form.idIssuedOn ? format(form.idIssuedOn, "d MMMM yyyy") : undefined}
+                placeholder="If it's printed on the ID"
+                onPress={() => setPickingIdDate("idIssuedOn")}
+              />
+              {!idHasNoExpiry(form.idType) && (
+                <PickerField
+                  label={idNeedsExpiry(form.idType) ? "Expiry date" : "Expiry date (if it has one)"}
+                  value={form.idExpiresOn ? format(form.idExpiresOn, "d MMMM yyyy") : undefined}
+                  placeholder="As printed on the ID"
+                  onPress={() => setPickingIdDate("idExpiresOn")}
+                />
+              )}
             </Section>
           )}
         </>
@@ -653,9 +781,11 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
             <InputFieldComponent label="Registered business name" value={form.businessName} onChangeText={set("businessName")} />
             <InputFieldComponent label="Registration number" placeholder="e.g. RC 1234567" value={form.businessRegistrationNumber} onChangeText={set("businessRegistrationNumber")} />
             <InputFieldComponent label="Tax ID (optional)" value={form.taxId} onChangeText={set("taxId")} />
+            <ChoiceChips label="Registration document" options={BUSINESS_DOCUMENT_TYPES} value={form.businessDocumentType} onChange={set("businessDocumentType")} />
           </Section>
           <Section title="Contact">
-            <InputFieldComponent label="Authorised representative" value={form.authorizedRepresentative} onChangeText={set("authorizedRepresentative")} />
+            <InputFieldComponent label="Authorised representative" placeholder="Your full name, as on your ID" value={form.authorizedRepresentative} onChangeText={set("authorizedRepresentative")} />
+            <ChoiceChips label="Your role in the business" options={REPRESENTATIVE_ROLES} value={form.representativeRole} onChange={set("representativeRole")} />
             <InputFieldComponent label="Registered business address" value={form.businessAddress} onChangeText={set("businessAddress")} />
           </Section>
         </>
@@ -724,7 +854,15 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
               ...(!isFree && form.dateOfBirth ? [["Date of birth", format(form.dateOfBirth, "d MMMM yyyy")]] : []),
               ["Phone", form.phoneNumber],
               ["Country", form.countryOfResidence],
-              ...(!isFree ? [["Address", form.address], ["Government ID", "Added"]] : [])
+              ...(!isFree
+                ? [
+                    ["Address", form.address],
+                    ["Government ID", "Added"],
+                    ...(form.idExpiresOn && !idHasNoExpiry(form.idType)
+                      ? [["ID expires", format(form.idExpiresOn, "d MMMM yyyy")]]
+                      : [])
+                  ]
+                : [])
             ]}
           />
           {!isFree && form.vendorType === "business" && (
@@ -874,6 +1012,16 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
         value={form.dateOfBirth}
         onClose={() => setPickingDate(false)}
         onDateSelected={set("dateOfBirth")}
+      />
+      <DateModalComponent
+        visible={!!pickingIdDate}
+        title={pickingIdDate === "idExpiresOn" ? "When the ID expires" : "When the ID was issued"}
+        value={pickingIdDate ? form[pickingIdDate] : null}
+        latestDate={pickingIdDate === "idExpiresOn" ? new Date(new Date().getFullYear() + 20, 11, 31) : new Date()}
+        earliestDate={pickingIdDate === "idExpiresOn" ? new Date() : new Date(new Date().getFullYear() - 50, 0, 1)}
+        startDate={pickingIdDate === "idExpiresOn" ? new Date(new Date().getFullYear() + 2, new Date().getMonth(), 1) : new Date(new Date().getFullYear() - 3, new Date().getMonth(), 1)}
+        onClose={() => setPickingIdDate(null)}
+        onDateSelected={(date) => pickingIdDate && set(pickingIdDate)(date)}
       />
       <ListSheet
         title={sheet === "bank" ? "Your bank" : "Choose a country"}

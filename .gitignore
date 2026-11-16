@@ -31,3 +31,6 @@ expo-env.d.ts
 
 # Editor settings
 .idea/
+
+# CI placeholders (no real values), committed on purpose.
+!.env.ci

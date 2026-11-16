@@ -66,6 +66,30 @@ export const uploadProfilePhoto = async (photo: {
 export const changePassword = (body: { oldPassword: string; password: string }) =>
   patchData("/user/password", body);
 
+export type TSignInMethods = {
+  email: string;
+  /** Accounts made with Google start without one. */
+  password: boolean;
+  google: { email: string; connectedAt: string } | null;
+};
+
+/** How this account signs in: a password, Google, or both. */
+export const useSignInMethods = () =>
+  useQuery({
+    queryKey: ["sign-in-methods"],
+    queryFn: async () => (await getData<TSignInMethods>("/user/sign-in-methods")).data?.data ?? null
+  });
+
+/** Emails a code, to add a first password to a Google account. */
+export const sendFirstPasswordCode = async () =>
+  (await postData<undefined, { token: string }>("/user/sign-in-methods/password/code", undefined)).data?.data?.token ?? null;
+
+export const setFirstPassword = (body: { token: string; otp: string; password: string }) =>
+  postData("/user/sign-in-methods/password", body);
+
+/** Stops Google opening this account (needs a password first). */
+export const disconnectGoogle = () => deleteData("/user/sign-in-methods/google");
+
 /** Ends this session on the api (it leaves the devices list), then here. */
 export const logOut = async () => {
   try {

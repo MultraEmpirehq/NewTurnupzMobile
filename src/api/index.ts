@@ -5,6 +5,7 @@ import axios, { AxiosRequestConfig } from "axios";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { installId } from "@/shared/utils/device-id";
+import { getTrustedDevice } from "@/shared/utils/trusted-device";
 
 const controller = new AbortController();
 
@@ -42,6 +43,11 @@ api.interceptors.request.use(
     }
     // Which install this is, so credit can't be farmed with several accounts.
     if (Platform.OS !== "web") config.headers["X-Device-Id"] = installId();
+    // Signing in on a phone they trusted skips the two-factor code.
+    if (config.url?.startsWith("/auth/")) {
+      const trusted = getTrustedDevice();
+      if (trusted) config.headers["X-Trusted-Device"] = trusted;
+    }
     return config;
   },
   (error) => {

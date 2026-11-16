@@ -154,7 +154,33 @@ export type TInsights = {
   };
   series: { start: string; tickets: number }[];
   events: TInsightsEvent[];
+  /** Page views to paid orders on their events in the period (newer APIs). */
+  funnel?: { views: number; ticketViews: number; started: number; bought: number };
+  /** What brought each paid order, most first. */
+  sources?: { key: string; label: string; orders: number; tickets: number; share: number | null }[];
 };
+
+export type TEarnings = {
+  currencies: {
+    currency: string;
+    sales: TPrice;
+    fees: TPrice;
+    processingFees?: TPrice;
+    earnings: TPrice;
+    owed: TPrice;
+  }[];
+};
+
+/** What they kept in the last 30 days, after fees (needs "See the wallet"). */
+export const useEarnings = (vendorId: string | null, enabled = true) =>
+  useQuery({
+    queryKey: ["organiser-earnings", vendorId ?? "own"],
+    enabled,
+    queryFn: async () => {
+      const { data } = await getData<TEarnings>("/vendor/wallet?days=30", asWorkspace(vendorId));
+      return data?.data ?? null;
+    }
+  });
 
 /** The last 7 days' sales and every event's numbers, for Today and Events. */
 export const useWeekSales = (vendorId: string | null, enabled = true) =>

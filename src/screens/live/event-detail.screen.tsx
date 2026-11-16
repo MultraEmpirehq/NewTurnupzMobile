@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { Circle, Path, Svg } from "react-native-svg";
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
+import EventHighlights from "./event-highlights";
 import TextComponent from "@/shared/components/text/text.component";
 import ChevronLeftIcon from "@/shared/assets/icons/chevron-left.icon";
 import LocationIcon from "@/shared/assets/icons/location.icon";
@@ -460,6 +461,8 @@ const LiveEventDetailScreen = ({
               </View>
             )}
           </View>
+
+          <EventHighlights eventId={event.id} eventName={event.name} isPast={isPast} />
 
           {held > 0 && (
             <View

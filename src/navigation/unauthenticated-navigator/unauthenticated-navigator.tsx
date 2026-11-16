@@ -8,6 +8,7 @@ import VerificationScreen from "@/screens/verification/screen/verification.scree
 import ForgotPasswordScreen from "@/screens/forgot-password/screen/forgot-password.screen";
 import OnboardingScreen from "@/screens/onboarding/screen/onboarding.screen";
 import ResetPasswordScreen from "@/screens/reset-password/screen/reset-password.screen";
+import TwoFactorScreen from "@/screens/two-factor/screen/two-factor.screen";
 
 export type UnauthenticatedStackParamList = {
   landing: undefined;
@@ -20,6 +21,8 @@ export type UnauthenticatedStackParamList = {
     token?: string;
   };
   "reset-password": { token: string };
+  /** Two-factor is on: the code from their authenticator app. */
+  "two-factor": { challenge: string };
   "forgot-password": undefined;
   onboarding: undefined;
 };
@@ -46,6 +49,7 @@ const UnauthenticatedNavigator = () => {
       <Stack.Screen name="forgot-password" component={ForgotPasswordScreen} />
       <Stack.Screen name="reset-password" component={ResetPasswordScreen} />
       <Stack.Screen name="onboarding" component={OnboardingScreen} />
+      <Stack.Screen name="two-factor" component={TwoFactorScreen} />
     </Stack.Navigator>
   );
 };
