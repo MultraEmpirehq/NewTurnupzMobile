@@ -1,4 +1,7 @@
 import { formatZero, openSupportChat, useCreditBalance } from "@/screens/live/live-api";
+import { SOCIAL_LINKS } from "@/shared/utils/social-links";
+import useUserStore from "@/shared/stores/user.store";
+import VendorApplicationScreen from "@/screens/organiser/vendor-application.screen";
 import OrdersPage from "./orders.screen";
 import { maskAmount, useBalancePrivacyStore } from "@/shared/stores/balance-privacy.store";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
@@ -9,7 +12,6 @@ import {
   Alert,
   KeyboardAvoidingView,
   Linking,
-  Platform,
   Pressable,
   ScrollView,
   Switch,
@@ -54,7 +56,11 @@ import {
   TNotificationPreferences,
   TSession,
   changePassword,
+  disconnectGoogle,
   logOut,
+  sendFirstPasswordCode,
+  setFirstPassword,
+  useSignInMethods,
   signOutDevice,
   signOutOtherDevices,
   updateNotificationPreferences,
@@ -63,6 +69,7 @@ import {
   useSessions,
 } from "./profile-api";
 import { useEmptyCreditText } from "@/shared/hooks/use-empty-credit-text";
+import TwoFactorSettings from "./two-factor-settings";
 
 /**
  * Settings, and the pages behind each row. Every switch and form here talks
@@ -79,6 +86,8 @@ const DANGER = BRAND.danger;
 type TPage =
   | "menu"
   | "password"
+  | "signIn"
+  | "twoFactor"
   | "notifications"
   | "devices"
   | "accessibility"
@@ -197,7 +206,7 @@ export const Field = ({
   multiline?: boolean;
   maxLength?: number;
   secure?: boolean;
-  keyboard?: "default" | "email-address" | "phone-pad" | "url";
+  keyboard?: "default" | "email-address" | "phone-pad" | "url" | "number-pad";
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
   placeholder?: string;
 }) => (
@@ -270,7 +279,7 @@ const Page = ({
 }) => (
   <View className="flex-1" style={{ backgroundColor: TICKET_LIST_BACKGROUND }}>
     <BackHeader title={title} onBack={onBack} />
-    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView className="flex-1" behavior="padding">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
         {children}
       </ScrollView>
@@ -329,6 +338,147 @@ const PasswordPage = ({ onBack }: { onBack: () => void }) => {
         <TextComponent className="px-1 text-xs text-zinc-500">{t("password.social")}</TextComponent>
         <PrimaryButton label={t("settings.changePassword")} onPress={() => void save()} busy={saving} disabled={!canSave} />
       </View>
+    </Page>
+  );
+};
+
+/* -------------------------------------------------------------------- sign-in */
+
+/**
+ * How they sign in: Google (with Disconnect once they have a password) and
+ * their password, or adding a first one with a code from their email.
+ */
+const SignInPage = ({ onBack, onChangePassword }: { onBack: () => void; onChangePassword: () => void }) => {
+  useHardwareBack(onBack);
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const methods = useSignInMethods();
+  const [token, setToken] = useState<string | null>(null);
+  const [otp, setOtp] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const data = methods.data;
+  const strong = PASSWORD_REGEX.test(next);
+  const matches = !!next && next === confirm;
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: ["sign-in-methods"] });
+
+  const sendCode = async () => {
+    setBusy(true);
+    try {
+      setToken(await sendFirstPasswordCode());
+      onSuccess(t("signIn.codeSent", { email: data?.email ?? "" }));
+    } catch (error) {
+      onError(errorText(error, t("signIn.failed")));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addPassword = async () => {
+    if (!token || !otp.trim() || !strong || !matches) return;
+    setBusy(true);
+    try {
+      await setFirstPassword({ token, otp: otp.trim(), password: next });
+      onSuccess(t("signIn.added"));
+      setToken(null);
+      refresh();
+    } catch (error) {
+      onError(errorText(error, t("signIn.failed")));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disconnect = () =>
+    Alert.alert(t("signIn.disconnectTitle"), t("signIn.disconnectBody"), [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("signIn.disconnect"),
+        style: "destructive",
+        onPress: () => {
+          void disconnectGoogle()
+            .then(() => {
+              onSuccess(t("signIn.disconnected"));
+              refresh();
+            })
+            .catch((error) => onError(errorText(error, t("signIn.failed"))));
+        }
+      }
+    ]);
+
+  return (
+    <Page title={t("settings.signIn")} onBack={onBack}>
+      {!data ? (
+        <Loading />
+      ) : (
+        <>
+          <Section title={t("signIn.google")}>
+            <View className="gap-1 px-4 py-4">
+              <TextComponent className="text-base font-semibold" style={{ color: INK }}>
+                {data.google ? t("signIn.googleConnected", { email: data.google.email }) : t("signIn.google")}
+              </TextComponent>
+              <TextComponent className="text-xs text-zinc-500">
+                {data.google
+                  ? data.password
+                    ? t("signIn.googleSince", { date: new Date(data.google.connectedAt).toLocaleDateString() })
+                    : t("signIn.needPassword")
+                  : t("signIn.googleNone", { email: data.email })}
+              </TextComponent>
+              {data.google && data.password && (
+                <Pressable onPress={disconnect} accessibilityRole="button" className="mt-2 h-10 items-center justify-center rounded-xl border border-zinc-200">
+                  <TextComponent className="text-sm font-bold" style={{ color: DANGER }}>
+                    {t("signIn.disconnect")}
+                  </TextComponent>
+                </Pressable>
+              )}
+            </View>
+          </Section>
+
+          <Section title={t("signIn.password")}>
+            {data.password ? (
+              <Row label={t("settings.changePassword")} hint={t("signIn.hasPassword")} onPress={onChangePassword} last />
+            ) : !token ? (
+              <View className="gap-3 px-4 py-4">
+                <TextComponent className="text-sm text-zinc-600">{t("signIn.noPassword")}</TextComponent>
+                <PrimaryButton label={t("signIn.addPassword")} onPress={() => void sendCode()} busy={busy} />
+              </View>
+            ) : (
+              <View className="gap-4 px-4 py-4">
+                <Field label={t("signIn.code")} value={otp} onChange={setOtp} keyboard="number-pad" autoCapitalize="none" maxLength={12} />
+                <Field
+                  label={t("password.new")}
+                  value={next}
+                  onChange={setNext}
+                  secure
+                  autoCapitalize="none"
+                  error={next && !strong ? t("password.rulesError") : undefined}
+                  note={!next ? t("password.rules") : strong ? t("password.strong") : undefined}
+                />
+                <Field
+                  label={t("password.confirm")}
+                  value={confirm}
+                  onChange={setConfirm}
+                  secure
+                  autoCapitalize="none"
+                  error={confirm && !matches ? t("password.mismatch") : undefined}
+                />
+                <PrimaryButton
+                  label={t("signIn.addPassword")}
+                  onPress={() => void addPassword()}
+                  busy={busy}
+                  disabled={!otp.trim() || !strong || !matches}
+                />
+                <Pressable onPress={() => void sendCode()} accessibilityRole="button" className="items-center py-1">
+                  <TextComponent className="text-sm font-semibold" style={{ color: BLUE }}>
+                    {t("signIn.resend")}
+                  </TextComponent>
+                </Pressable>
+              </View>
+            )}
+          </Section>
+        </>
+      )}
     </Page>
   );
 };
@@ -990,6 +1140,21 @@ const HelpPage = ({ onBack }: { onBack: () => void }) => {
           <PrimaryButton label={t("common.send")} onPress={() => void send()} busy={sending} disabled={!message.trim()} />
         </View>
       </Section>
+      <Section title={t("help.followUs")}>
+        {SOCIAL_LINKS.map((link, index) => (
+          <Pressable
+            key={link.label}
+            onPress={() => void Linking.openURL(link.url).catch(() => onError(t("settings.couldntOpen")))}
+            accessibilityRole="link"
+            accessibilityLabel={`Turnupz on ${link.label}`}
+            className={`flex-row items-center gap-3 px-4 py-3.5 ${index === SOCIAL_LINKS.length - 1 ? "" : "border-b border-black/5"}`}
+          >
+            <TextComponent className="flex-1 text-base font-semibold text-zinc-950">{link.label}</TextComponent>
+            <TextComponent className="text-sm text-zinc-500">{link.handle}</TextComponent>
+            <TextComponent className="text-base text-zinc-400">↗</TextComponent>
+          </Pressable>
+        ))}
+      </Section>
     </Page>
   );
 };
@@ -1010,6 +1175,8 @@ const ProfileSettingsScreen = ({
   const queryClient = useQueryClient();
   const { logoutUser } = useUser();
   const [page, setPage] = useState<TPage>("menu");
+  const [applying, setApplying] = useState(false);
+  const user = useUserStore((state) => state.user);
   const credit = useCreditBalance();
   const hideBalance = useBalancePrivacyStore((state) => state.hideBalance);
   const creditRow = credit.data?.find((row) => row.available.amount > 0) ?? credit.data?.[0];
@@ -1026,6 +1193,8 @@ const ProfileSettingsScreen = ({
   const back = () => setPage("menu");
 
   if (page === "password") return <PasswordPage onBack={back} />;
+  if (page === "signIn") return <SignInPage onBack={back} onChangePassword={() => setPage("password")} />;
+  if (page === "twoFactor") return <TwoFactorSettings onBack={back} />;
   if (page === "notifications") return <NotificationsPage onBack={back} />;
   if (page === "devices") return <DevicesPage onBack={back} />;
   if (page === "accessibility") return <AccessibilityPage onBack={back} />;
@@ -1062,7 +1231,7 @@ const ProfileSettingsScreen = ({
       <BackHeader title={t("settings.title")} onBack={onBack} />
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <Section title={t("settings.account")}>
-          <Row label={t("settings.changePassword")} onPress={() => setPage("password")} />
+          <Row label={t("settings.signIn")} hint={t("settings.signInHint")} onPress={() => setPage("signIn")} />
           <Row
             label={t("settings.orders")}
             hint={t("settings.ordersHint")}
@@ -1076,6 +1245,11 @@ const ProfileSettingsScreen = ({
             last
           />
         </Section>
+        {user?.role === "USER" && (
+          <Section title={t("settings.hosting")}>
+            <Row label={t("settings.hostEvents")} hint={t("settings.hostEventsHint")} onPress={() => setApplying(true)} last />
+          </Section>
+        )}
         <Section title={t("settings.preferences")}>
           <Row label={t("settings.notifications")} onPress={() => setPage("notifications")} />
           <Row label={t("settings.privacySettings")} onPress={() => setPage("privacy")} />
@@ -1088,6 +1262,11 @@ const ProfileSettingsScreen = ({
           />
         </Section>
         <Section title={t("settings.security")}>
+          <Row
+            label={t("settings.twoFactor")}
+            hint={t("settings.twoFactorHint")}
+            onPress={() => setPage("twoFactor")}
+          />
           <Row
             label={t("settings.loginActivity")}
             hint={t("settings.loginActivityHint")}
@@ -1117,6 +1296,7 @@ const ProfileSettingsScreen = ({
           <TextComponent className="pt-6 text-center text-xs text-zinc-400">{t("settings.version", { version })}</TextComponent>
         )}
       </ScrollView>
+      <VendorApplicationScreen visible={applying} onClose={() => setApplying(false)} />
     </View>
   );
 };

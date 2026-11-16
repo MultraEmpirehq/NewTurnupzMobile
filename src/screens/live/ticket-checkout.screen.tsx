@@ -1,3 +1,5 @@
+import Venue3DSheet, { type TVenueZoneTicket } from "./venue-3d/venue-3d.sheet";
+import { ZONE_COLOURS, layoutOf } from "./venue-3d/venue-layouts";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -8,6 +10,7 @@ import {
   ScrollView,
   Switch,
   StyleSheet,
+  KeyboardAvoidingView,
   TextInput,
   useWindowDimensions,
   View
@@ -39,7 +42,10 @@ import {
   TPromoCheck,
   TSavedCard,
   useCreateOrder,
+  checkoutTax,
+  recordTicketPageView,
   useCreditBalance,
+  useEventTaxRates,
   useFeatures,
   useLiveTickets,
   useSavedCards
@@ -163,6 +169,9 @@ const LiveTicketCheckoutScreen = ({
   );
   // A promoter's code they arrived with fills itself in.
   useEffect(() => {
+    recordTicketPageView(event.id);
+  }, [event.id]);
+  useEffect(() => {
     const code = readArrival(event.id).code;
     if (code && user && !isRegistration) void applyPromo(code, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -180,7 +189,13 @@ const LiveTicketCheckoutScreen = ({
           return sum + off * line.quantity;
         }, 0);
   const afterPromo = Math.max(orderAmount - promoDiscount, 0);
-  const total = selected ? formatMoney(afterPromo, selected.price) : "";
+  // Tax on the tickets, if any applies here. The api works it out again when paying.
+  const { data: taxRates } = useEventTaxRates(
+    !isFree && !isRegistration ? event.id : undefined,
+    selected?.price?.currency?.code,
+  );
+  const taxed = checkoutTax(afterPromo, taxRates);
+  const total = selected ? formatMoney(taxed.gross, selected.price) : "";
 
   // Turnupz Credit in the ticket's currency, spent first when switched on.
   const { data: credit } = useCreditBalance(!isRegistration);
@@ -193,9 +208,9 @@ const LiveTicketCheckoutScreen = ({
   const { creditSpending } = useFeatures();
   const creditApplied =
     !isFree && !isRegistration && creditSpending && useCredit
-      ? Math.min(creditAvailable, afterPromo)
+      ? Math.min(creditAvailable, taxed.gross)
       : 0;
-  const toPay = Math.max(afterPromo - creditApplied, 0);
+  const toPay = Math.max(taxed.gross - creditApplied, 0);
   const coveredByCredit = creditApplied > 0 && toPay === 0;
 
   // Pay with: a saved card (the one that pays first is picked), or a new card.
@@ -287,7 +302,8 @@ const LiveTicketCheckoutScreen = ({
    * an order can't mix currencies, so either of those starts the order afresh.
    */
   const setCount = (ticket: TLiveTicket, count: number) => {
-    const next = Math.max(0, Math.min(count, maxFor(ticket)));
+    // Registration is one place per person.
+    const next = Math.max(0, Math.min(count, isRegistration ? 1 : maxFor(ticket)));
     setQuantities((current) => {
       const otherCurrency =
         !!currency && ticket.price?.currency?.code?.toUpperCase() !== currency;
@@ -297,6 +313,33 @@ const LiveTicketCheckoutScreen = ({
       return base;
     });
   };
+
+  // The optional 3D view: each area with its ticket (several in one area are
+  // grouped; "Pick this" takes the cheapest one still on sale).
+  const [showVenue, setShowVenue] = useState(false);
+  const venueLayout = layoutOf(event.venueLayout);
+  const venueZones = useMemo<TVenueZoneTicket[]>(() => {
+    if (!venueLayout) return [];
+    return venueLayout.zones.flatMap((area, position) => {
+      const inArea = tickets.filter((ticket) => ticket.zone === area.value);
+      if (!inArea.length) return [];
+      const open = inArea
+        .filter((ticket) => ticketSaleState(ticket).status === "open" && maxFor(ticket) > 0)
+        .sort((a, b) => (a.price?.amount ?? 0) - (b.price?.amount ?? 0));
+      const pick = open[0] ?? inArea[0];
+      return [
+        {
+          zone: area.value,
+          ticketId: pick.id,
+          title: inArea.length === 1 ? pick.name : area.label,
+          subtitle: `${inArea.length === 1 ? "" : "from "}${formatPrice(pick.price)}`,
+          note: inArea.length > 1 ? inArea.map((ticket) => ticket.name).join(", ") : area.label,
+          color: ZONE_COLOURS[position % ZONE_COLOURS.length],
+          soldOut: open.length === 0
+        }
+      ];
+    });
+  }, [venueLayout, tickets]);
 
   const pay = async () => {
     if (!selected || !selectedOnSale || quantity < 1) return;
@@ -542,6 +585,7 @@ const LiveTicketCheckoutScreen = ({
   }
 
   return (
+    <KeyboardAvoidingView behavior="padding" className="flex-1">
     <ScrollView
       className="flex-1 bg-zinc-50"
       stickyHeaderIndices={[0]}
@@ -578,6 +622,31 @@ const LiveTicketCheckoutScreen = ({
         <TextComponent className="mt-4 text-sm text-zinc-500">
           No tickets are available for this event right now.
         </TextComponent>
+      )}
+
+      {!!venueLayout && venueZones.length > 0 && (
+        <Pressable
+          onPress={() => setShowVenue(true)}
+          accessibilityRole="button"
+          className="mt-3 flex-row items-center justify-center gap-2 rounded-full border px-4 py-3"
+          style={{ borderColor: "#00B2FF", backgroundColor: "#E5F7FF" }}
+        >
+          <TextComponent className="text-sm font-bold" style={{ color: "#0577FA" }}>
+            View in 3D: see where each ticket puts you
+          </TextComponent>
+        </Pressable>
+      )}
+      {!!venueLayout && (
+        <Venue3DSheet
+          visible={showVenue}
+          onClose={() => setShowVenue(false)}
+          layout={venueLayout.value}
+          zones={venueZones}
+          onPick={(ticketId) => {
+            const ticket = tickets.find((item) => item.id === ticketId);
+            if (ticket && !(quantities[ticket.id] ?? 0)) setCount(ticket, 1);
+          }}
+        />
       )}
 
       {tickets.map((ticket) => {
@@ -641,7 +710,18 @@ const LiveTicketCheckoutScreen = ({
                       {formatPrice(ticket.price)}
                     </TextComponent>
                   </View>
-                  {isSelected && !unavailable ? (
+                  {isSelected && !unavailable && isRegistration ? (
+                    <Pressable
+                      onPress={() => setCount(ticket, 0)}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${ticket.name}`}
+                    >
+                      <TextComponent className="text-xs font-bold" style={{ color: BRAND.blueDeep }}>
+                        Selected ✓
+                      </TextComponent>
+                    </Pressable>
+                  ) : isSelected && !unavailable ? (
                     <View className="flex-row items-center gap-3">
                       <Pressable
                         onPress={() => setCount(ticket, count - 1)}
@@ -676,7 +756,7 @@ const LiveTicketCheckoutScreen = ({
                 </View>
               }
               note={
-                isSelected && !unavailable && count >= max && max > 0 ? (
+                !isRegistration && isSelected && !unavailable && count >= max && max > 0 ? (
                   <View className="mx-4 mb-3 rounded-lg px-3 py-2" style={{ backgroundColor: BRAND.blueTint }}>
                     <TextComponent className="text-xs leading-4 text-zinc-700">
                       {max === ticket.available
@@ -797,6 +877,16 @@ const LiveTicketCheckoutScreen = ({
               />
             </View>
           )}
+          {taxed.lines.map((line) => (
+            <View key={line.code} className="mt-2 flex-row justify-between">
+              <TextComponent className="text-xs text-zinc-500">
+                {taxed.included ? `Includes ${line.label}` : line.label}
+              </TextComponent>
+              <TextComponent className="text-sm font-bold text-zinc-950">
+                {formatMoney(line.amount, selected.price)}
+              </TextComponent>
+            </View>
+          ))}
           {creditApplied > 0 && (
             <View className="mt-2 flex-row justify-between">
               <TextComponent className="text-xs text-zinc-500">Turnupz Credit</TextComponent>
@@ -861,6 +951,7 @@ const LiveTicketCheckoutScreen = ({
         </TextComponent>
       )}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 

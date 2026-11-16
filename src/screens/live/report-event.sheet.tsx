@@ -1,3 +1,4 @@
+import ModalKeyboardAvoider from "@/shared/components/modals/modal-keyboard-avoider";
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useEffect, useState } from "react";
 import SafeModal from "@/shared/components/modals/safe-modal";
@@ -58,7 +59,8 @@ const ReportEventSheet = ({
   return (
     <SafeModal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable className="flex-1 bg-black/40" onPress={() => !sending && onClose()} />
-      <View className="max-h-[85%] rounded-t-3xl bg-white px-5 pb-8 pt-5">
+      <ModalKeyboardAvoider className="max-h-[85%]">
+      <View className="shrink rounded-t-3xl bg-white px-5 pb-8 pt-5">
         <TextComponent className="text-lg font-bold text-zinc-950">
           Report "{eventName}"
         </TextComponent>
@@ -127,6 +129,7 @@ const ReportEventSheet = ({
           </Pressable>
         </View>
       </View>
+      </ModalKeyboardAvoider>
       <OverlayToast />
     </SafeModal>
   );

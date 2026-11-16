@@ -72,6 +72,14 @@ export const useScanEvents = (enabled = true) =>
     }
   });
 
+/** On now or starting within a day, so the door is what matters. */
+export const isAtTheDoor = (event: TScanEvent) => {
+  const now = Date.now();
+  const start = new Date(event.date).getTime();
+  const end = new Date(event.endDate ?? event.date).getTime() + 12 * 60 * 60 * 1000;
+  return start - now < 24 * 60 * 60 * 1000 && end > now;
+};
+
 export const ALL_PERMISSIONS: TVendorPermission[] = [
   "EVENTS_MANAGE",
   "TICKETS_SCAN",
@@ -146,7 +154,33 @@ export type TInsights = {
   };
   series: { start: string; tickets: number }[];
   events: TInsightsEvent[];
+  /** Page views to paid orders on their events in the period (newer APIs). */
+  funnel?: { views: number; ticketViews: number; started: number; bought: number };
+  /** What brought each paid order, most first. */
+  sources?: { key: string; label: string; orders: number; tickets: number; share: number | null }[];
 };
+
+export type TEarnings = {
+  currencies: {
+    currency: string;
+    sales: TPrice;
+    fees: TPrice;
+    processingFees?: TPrice;
+    earnings: TPrice;
+    owed: TPrice;
+  }[];
+};
+
+/** What they kept in the last 30 days, after fees (needs "See the wallet"). */
+export const useEarnings = (vendorId: string | null, enabled = true) =>
+  useQuery({
+    queryKey: ["organiser-earnings", vendorId ?? "own"],
+    enabled,
+    queryFn: async () => {
+      const { data } = await getData<TEarnings>("/vendor/wallet?days=30", asWorkspace(vendorId));
+      return data?.data ?? null;
+    }
+  });
 
 /** The last 7 days' sales and every event's numbers, for Today and Events. */
 export const useWeekSales = (vendorId: string | null, enabled = true) =>

@@ -3,8 +3,9 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { createMMKV } from "react-native-mmkv";
 
 /**
- * Whether your Turnupz Credit shows as an amount or as ₦•••••, like a banking
- * app. Kept on this phone only.
+ * Whether money shows as an amount or as ₦•••••, like a banking app: your
+ * Turnupz Credit, and an organiser's sales and earnings. Hidden until you tap
+ * the eye. Kept on this phone only; "-v2" starts everyone hidden once.
  */
 type TBalancePrivacyStore = {
   hideBalance: boolean;
@@ -16,11 +17,11 @@ const storage = createMMKV({ id: "turnup-balance-privacy" });
 export const useBalancePrivacyStore = create<TBalancePrivacyStore>()(
   persist(
     (set) => ({
-      hideBalance: false,
+      hideBalance: true,
       toggleHideBalance: () => set((state) => ({ hideBalance: !state.hideBalance }))
     }),
     {
-      name: "balance-privacy",
+      name: "balance-privacy-v2",
       storage: createJSONStorage(() => ({
         getItem: (key) => storage.getString(key) ?? null,
         setItem: (key, value) => storage.set(key, value),

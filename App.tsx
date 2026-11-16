@@ -20,6 +20,12 @@ import PermissionsIntro from "@/shared/components/permissions-intro/permissions-
 import { usePermissionsIntroStore } from "@/shared/stores/permissions-intro.store";
 
 import { queryClient } from "@/shared/query-client";
+import { useEffect } from "react";
+import useUserStore from "@/shared/stores/user.store";
+import { linkPush, startPush, unlinkPush } from "@/shared/push/push";
+
+// Phone notifications start with the app, before anyone signs in.
+startPush();
 
 export default function App() {
   // Hold the first frame until Plus Jakarta Sans is ready so text doesn't flash in the
@@ -30,6 +36,13 @@ export default function App() {
   const finishIntro = useIntroStore((state) => state.setIntroDone);
   // On a new install, permissions come first, straight after the intro.
   const permissionsSeen = usePermissionsIntroStore((state) => state.seen);
+  // This phone gets the signed-in person's alerts, and stops on sign-out.
+  const userId = useUserStore((state) => state.user?.id);
+  const signedIn = useUserStore((state) => !!state.userToken);
+  useEffect(() => {
+    if (userId && signedIn) void linkPush(userId);
+    else unlinkPush();
+  }, [userId, signedIn]);
   if (!fontsLoaded && !fontError) {
     return <View style={{ flex: 1, backgroundColor: "#f7fbff" }} />;
   }

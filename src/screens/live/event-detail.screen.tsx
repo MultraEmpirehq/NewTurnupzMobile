@@ -1,15 +1,21 @@
+import { openInMaps } from "@/shared/utils/open-in-maps";
+import MessageIcon from "@/shared/assets/icons/message.icon";
+import ShareIcon from "@/shared/assets/icons/share.icon";
+import EventOptionsSheet from "./event-options.sheet";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import VerifiedName from "@/shared/components/verified-name/verified-name.component";
 import React, { memo, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
+  FlatList,
   ScrollView,
   useWindowDimensions,
   View
 } from "react-native";
 import { Circle, Path, Svg } from "react-native-svg";
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
+import EventHighlights from "./event-highlights";
 import TextComponent from "@/shared/components/text/text.component";
 import ChevronLeftIcon from "@/shared/assets/icons/chevron-left.icon";
 import LocationIcon from "@/shared/assets/icons/location.icon";
@@ -152,7 +158,7 @@ const SponsorBoard = ({ sponsors }: { sponsors?: TLiveEvent["sponsors"] }) => {
   const items = (sponsors ?? []).filter((sponsor) => sponsor.name?.trim());
   if (!items.length) return null;
   return (
-    <View className="mt-6">
+    <View className="mt-6 border-t border-zinc-200 pt-4">
       <TextComponent className="text-base font-bold text-primary">Sponsors</TextComponent>
       <View className="mt-3 flex-row flex-wrap overflow-hidden rounded-xl border border-zinc-100 bg-white">
         {items.map((sponsor, index) => {
@@ -183,6 +189,9 @@ const SponsorBoard = ({ sponsors }: { sponsors?: TLiveEvent["sponsors"] }) => {
     </View>
   );
 };
+
+/** The space between cards in a sideways row. */
+const SIDE_CARD_GAP = 10;
 
 const TABS = ["Overview", "Media", "Activities", "Blogs"] as const;
 type TTab = (typeof TABS)[number];
@@ -240,11 +249,14 @@ const LiveEventDetailScreen = ({
   const { width } = useWindowDimensions();
   const isCompactPhone = width < 380;
   const horizontalPadding = isCompactPhone ? 12 : 16;
+  // Sideways rows: most of the screen, with the next card peeking in so it's clear there's more.
+  const sideCardWidth = Math.round(width * 0.78);
 
   const [viewing, setViewing] = useState<number | null>(null);
   const [organiserChat, setOrganiserChat] = useState<{ id: string; title: string } | null>(null);
   const [openingChat, setOpeningChat] = useState(false);
   const isSignedIn = !!useUserStore((state) => state.userToken);
+  const [sharing, setSharing] = useState(false);
   const messageOrganiser = async () => {
     if (!event) return;
     if (!isSignedIn) {
@@ -357,15 +369,44 @@ const LiveEventDetailScreen = ({
             />
           )}
 
-          <TextComponent className="mt-4 text-xl font-bold text-primary">
-            {event.name}
-          </TextComponent>
+          <View className="mt-4 flex-row items-start gap-3">
+            <TextComponent className="flex-1 text-xl font-bold text-primary">
+              {event.name}
+            </TextComponent>
+            <Pressable
+              onPress={() => setSharing(true)}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`Share ${event.name}`}
+              className="h-9 w-9 items-center justify-center rounded-full border border-zinc-200"
+            >
+              <ShareIcon size={17} color="#27272a" />
+            </Pressable>
+          </View>
           <View className="mt-3 gap-2">
             <View className="flex-row items-center">
               <LocationIcon size={15} color={ACCENT} />
-              <TextComponent className="ml-2 flex-1 text-sm text-zinc-700">
+              <TextComponent numberOfLines={2} className="ml-2 shrink text-sm text-zinc-700">
                 {eventPlace(event)}
               </TextComponent>
+              {!!(event.venue?.address || eventPlace(event)) && (
+                <Pressable
+                  onPress={() =>
+                    openInMaps(
+                      [event.venue?.name, event.venue?.address].filter(Boolean).join(", ") ||
+                        eventPlace(event)
+                    )
+                  }
+                  hitSlop={8}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Open ${eventPlace(event)} in a maps app`}
+                  className="ml-2"
+                >
+                  <TextComponent className="text-sm font-semibold" style={{ color: ACCENT }}>
+                    Open in…
+                  </TextComponent>
+                </Pressable>
+              )}
             </View>
             <View className="flex-row items-center">
               <CalendarIcon />
@@ -389,8 +430,8 @@ const LiveEventDetailScreen = ({
               )}
             </View>
             {!!event.organizerName && (
-              <View className="flex-row flex-wrap items-center gap-2">
-                <TextComponent className="text-xs text-zinc-500">
+              <View className="flex-row items-center gap-2">
+                <TextComponent numberOfLines={2} className="shrink text-xs text-zinc-500">
                   By <TextComponent className="text-xs font-bold text-zinc-900">{event.organizerName}</TextComponent>
                 </TextComponent>
                 {!event.isOwner && (
@@ -399,19 +440,20 @@ const LiveEventDetailScreen = ({
                       type="PLANNER"
                       id={event.organizerId}
                       name={event.organizerName}
-                      size="sm"
+                      iconOnly
                     />
                     <Pressable
                       onPress={() => void messageOrganiser()}
                       disabled={openingChat}
+                      hitSlop={6}
                       accessibilityRole="button"
                       accessibilityLabel={`Message ${event.organizerName}`}
-                      className="h-7 flex-row items-center rounded-full border border-zinc-200 px-3"
+                      className="h-9 w-9 items-center justify-center rounded-full border border-zinc-200"
                     >
                       {openingChat ? (
                         <ActivityIndicator size="small" />
                       ) : (
-                        <TextComponent className="text-xs font-semibold text-zinc-800">Message</TextComponent>
+                        <MessageIcon size={17} color="#27272a" />
                       )}
                     </Pressable>
                   </>
@@ -419,6 +461,8 @@ const LiveEventDetailScreen = ({
               </View>
             )}
           </View>
+
+          <EventHighlights eventId={event.id} eventName={event.name} isPast={isPast} />
 
           {held > 0 && (
             <View
@@ -515,6 +559,18 @@ const LiveEventDetailScreen = ({
               <TextComponent className="mt-2 text-sm leading-5 text-zinc-950">
                 {event.description || "The organiser hasn't added a description yet."}
               </TextComponent>
+              {!!event.additionalInformation?.length && (
+                <>
+                  <TextComponent className="mt-6 text-base font-bold text-primary">
+                    Additional information
+                  </TextComponent>
+                  {event.additionalInformation.map((item, index) => (
+                    <TextComponent key={index} className="mt-2 text-sm leading-5 text-zinc-950">
+                      {index + 1}. {item}
+                    </TextComponent>
+                  ))}
+                </>
+              )}
               {multiDay && (
                 <EventSchedule
                   days={event.days!}
@@ -561,23 +617,36 @@ const LiveEventDetailScreen = ({
                   </ScrollView>
                 </>
               )}
-              <SponsorBoard sponsors={event.sponsors} />
             </View>
           )}
 
           {activeTab === "Media" && (
-            <View className="mt-4 gap-3">
+            <View className="mt-4">
               {media.length === 0 ? (
                 <TextComponent className="text-sm text-zinc-500">No photos or videos yet.</TextComponent>
               ) : (
-                media.map((item, index) => (
-                  <MediaTile
-                    key={`${item.url}-${index}`}
-                    item={item}
-                    height={isCompactPhone ? 180 : 210}
-                    onPress={() => setViewing(index)}
-                  />
-                ))
+                // Sideways, so a big gallery doesn't push the rest of the page far down.
+                <FlatList
+                  horizontal
+                  data={media}
+                  keyExtractor={(item, index) => `${item.url}-${index}`}
+                  showsHorizontalScrollIndicator={false}
+                  initialNumToRender={3}
+                  windowSize={5}
+                  snapToInterval={sideCardWidth + SIDE_CARD_GAP}
+                  decelerationRate="fast"
+                  style={{ marginHorizontal: -horizontalPadding }}
+                  contentContainerStyle={{ paddingHorizontal: horizontalPadding, gap: SIDE_CARD_GAP }}
+                  renderItem={({ item, index }) => (
+                    <View style={{ width: media.length === 1 ? width - horizontalPadding * 2 : sideCardWidth }}>
+                      <MediaTile
+                        item={item}
+                        height={isCompactPhone ? 180 : 210}
+                        onPress={() => setViewing(index)}
+                      />
+                    </View>
+                  )}
+                />
               )}
             </View>
           )}
@@ -611,13 +680,21 @@ const LiveEventDetailScreen = ({
           )}
 
           {activeTab === "Blogs" && (
-            <View className="mt-4 gap-3">
+            <View className="mt-4">
               {posts.length === 0 ? (
                 <TextComponent className="text-sm text-zinc-500">
                   No blogs yet. The organiser's news and updates will show here.
                 </TextComponent>
               ) : (
-                posts.map((post) => {
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  snapToInterval={sideCardWidth + SIDE_CARD_GAP}
+                  decelerationRate="fast"
+                  style={{ marginHorizontal: -horizontalPadding }}
+                  contentContainerStyle={{ paddingHorizontal: horizontalPadding, gap: SIDE_CARD_GAP }}
+                >
+                {posts.map((post) => {
                   const isNew = !readPostIds.includes(post.id);
                   const cover = post.images?.[0];
                   return (
@@ -627,6 +704,7 @@ const LiveEventDetailScreen = ({
                       accessibilityRole="button"
                       accessibilityLabel={`${isNew ? "New. " : ""}${post.title}. Read more`}
                       className="overflow-hidden rounded-2xl border border-zinc-100 bg-white"
+                      style={{ width: posts.length === 1 ? width - horizontalPadding * 2 : sideCardWidth }}
                     >
                       {!!cover && (
                         <CustomImage className="h-36 w-full" imageClassName="size-full" source={{ uri: cover }} contentFit="cover" />
@@ -654,10 +732,14 @@ const LiveEventDetailScreen = ({
                       </View>
                     </Pressable>
                   );
-                })
+                })}
+                </ScrollView>
               )}
             </View>
           )}
+
+          {/* Under the tabs, so sponsors show whichever tab someone is on. */}
+          <SponsorBoard sponsors={event.sponsors} />
         </ScrollView>
       )}
 
@@ -682,6 +764,24 @@ const LiveEventDetailScreen = ({
         title={organiserChat?.title ?? ""}
         subtitle="Event organiser"
         onClose={() => setOrganiserChat(null)}
+      />
+      {/* Share: the same sheet as the ⋮ menu on Home, straight to sharing. */}
+      <EventOptionsSheet
+        shareOnly
+        event={
+          sharing && event
+            ? {
+                id: event.id,
+                name: event.name,
+                date: event.date,
+                timezone: event.timezone,
+                image: event.medias?.[0] || event.image,
+                place: event.venueName,
+                isFavorite: event.isFavorite
+              }
+            : null
+        }
+        onClose={() => setSharing(false)}
       />
       {!!event && (
         <ReportEventSheet

@@ -11,6 +11,8 @@ import { TUser, UserGender } from "@/shared/stores/user.store";
 import { getData } from "@/api";
 import { constructErrorMessage } from "@/api/functions";
 import { BRAND } from "@/shared/utils/brand-colors";
+import { isValidPhone } from "@/shared/utils/phone";
+import PhoneField from "@/shared/components/form/phone-field/phone-field.component";
 import { Field, PrimaryButton } from "./profile-settings.screen";
 import { TProfileUpdate, updateProfile } from "./profile-api";
 
@@ -112,6 +114,10 @@ const ProfileInfoForm = ({
       next.username = "3 to 30 letters, numbers, dots or underscores";
     }
     if (usernameState === "taken") next.username = "That username is taken";
+    // Left alone, an older number stays as it was. Cleared is fine too.
+    if (changedKeys.includes("phone") && form.phone.trim() && !isValidPhone(form.phone)) {
+      next.phone = "Check your phone number. It doesn't look right for that country.";
+    }
     setErrors(next);
     if (Object.values(next).some(Boolean)) return;
 
@@ -182,7 +188,14 @@ const ProfileInfoForm = ({
             Only you can see these. We use them for your tickets and to keep your account safe.
           </TextComponent>
         </View>
-        <Field label="Phone" value={form.phone} onChange={set("phone")} keyboard="phone-pad" error={errors.phone} placeholder="+234 801 234 5678" />
+        <PhoneField
+          look="settings"
+          label="Phone"
+          value={form.phone}
+          onChange={set("phone")}
+          defaultCountry={user.countryCode ?? user.country}
+          error={errors.phone}
+        />
         <View className="gap-1.5">
           <TextComponent className="px-1 text-sm font-semibold text-zinc-700">Date of Birth</TextComponent>
           <Pressable

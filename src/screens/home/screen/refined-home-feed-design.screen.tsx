@@ -21,6 +21,7 @@ import LiveMyTicketsScreen from "@/screens/live/my-tickets.screen";
 import LiveExploreScreen from "@/screens/live/explore.screen";
 import ProfileScreen from "@/screens/profile/profile.screen";
 import NotificationsScreen from "@/screens/notifications/notifications.screen";
+import { usePushTapStore } from "@/shared/push/push";
 import ChatsScreen from "@/screens/chat/chats.screen";
 import PeopleModal from "@/screens/people/people-modal";
 import { useUnreadNotifications } from "@/screens/notifications/notifications-api";
@@ -45,9 +46,9 @@ import {
 } from "@/screens/live/live-api";
 import { FeaturedBoost } from "@/screens/live/sponsored";
 import OrganiserShellScreen from "@/screens/organiser/organiser-shell.screen";
-import ChooseModeSheet from "@/screens/organiser/choose-mode.sheet";
-import WebOnlySheet, { TWebOnlyTask } from "@/screens/organiser/web-only.sheet";
-import { useOrganiserAccess } from "@/screens/organiser/organiser-api";
+import VendorApplicationScreen from "@/screens/organiser/vendor-application.screen";
+import { useOrganiserAccess, isAtTheDoor } from "@/screens/organiser/organiser-api";
+import { BRAND } from "@/shared/utils/brand-colors";
 import { useOrganiserStore } from "@/shared/stores/organiser.store";
 
 type TFeedMediaKind = "image" | "video";
@@ -300,6 +301,13 @@ const FeedCard = ({
 const RefinedHomeFeedDesignScreen = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TBottomNavId>("home");
+  // A tapped phone notification opens My Tickets or Notifications.
+  const pushTab = usePushTapStore((state) => state.tab);
+  useEffect(() => {
+    if (!pushTab) return;
+    setActiveTab(pushTab);
+    usePushTapStore.getState().clear();
+  }, [pushTab]);
   // Tabs opened so far; they stay mounted (hidden) after you leave them.
   const [visitedTabs, setVisitedTabs] = useState<TBottomNavId[]>(["home"]);
   useEffect(() => {
@@ -337,37 +345,30 @@ const RefinedHomeFeedDesignScreen = () => {
   const syncHiddenEvents = useHiddenEventsStore((state) => state.sync);
   const isSignedIn = !!useUserStore((state) => state.userToken);
   const userId = useUserStore((state) => state.user?.id);
-  // Organisers and team members: which app opens, asked once and remembered.
+  // Organisers and team members: the app opens as an attendee, and they can move across.
   const organiser = useOrganiserAccess();
   const mode = useOrganiserStore((state) => state.mode);
   const setMode = useOrganiserStore((state) => state.setMode);
-  const askedFor = useOrganiserStore((state) => state.askedFor);
-  const markAsked = useOrganiserStore((state) => state.markAsked);
+  const setScanEventOnOpen = useOrganiserStore((state) => state.setScanEventOnOpen);
   const inOrganiserMode = mode === "organiser" && organiser.canOrganise;
-  const askMode =
-    isSignedIn && !!userId && organiser.ready && organiser.canOrganise && !askedFor.includes(userId);
-  const chooseMode = (next: "attendee" | "organiser") => {
-    if (userId) markAsked(userId);
-    setMode(next);
-  };
+  // Event day: the one thing worth interrupting the feed for.
+  const doorEvent = organiser.scanEvents
+    .filter(isAtTheDoor)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
   // Signed in on the Organiser side: open as an organiser if they already run
   // events, are on a team or are door staff for an event (the organiser side
-  // has the scanner); else point them at vendor verification on the website.
+  // has the scanner); else straight into applying to host.
   const wantsToHost = useOrganiserStore((state) => state.wantsToHost);
   const setWantsToHost = useOrganiserStore((state) => state.setWantsToHost);
-  const [hostTask, setHostTask] = useState<TWebOnlyTask | null>(null);
+  const [applying, setApplying] = useState(false);
   useEffect(() => {
     if (!wantsToHost || !isSignedIn || !userId || !organiser.ready) return;
     setWantsToHost(false);
     if (organiser.canOrganise) {
-      chooseMode("organiser");
+      setMode("organiser");
       return;
     }
-    setHostTask({
-      title: "Vendor verification",
-      reason: "Tell us about your business there, and once you're approved you can create events and sell tickets.",
-      path: "/app/settings/vendor-verification"
-    });
+    setApplying(true);
   }, [wantsToHost, isSignedIn, userId, organiser.ready, organiser.canOrganise]); // eslint-disable-line react-hooks/exhaustive-deps
   const unreadNotifications = useUnreadNotifications(isSignedIn);
   // Your tickets, loaded once when the app opens (all of them), so event pages
@@ -538,12 +539,32 @@ const RefinedHomeFeedDesignScreen = () => {
               contentContainerStyle={{ paddingTop: 16 }}
               // A boosted event, big and marked Sponsored, where the phone is.
               ListHeaderComponent={
-                <FeaturedBoost
-                  countryCode={place?.countryCode}
-                  city={place?.city}
-                  enabled={homePlace.ready}
-                  onOpenEvent={setLiveEventId}
-                />
+                <>
+                  {doorEvent && (
+                    <Pressable
+                      onPress={() => {
+                        setScanEventOnOpen(doorEvent.id);
+                        setMode("organiser");
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${doorEvent.name}. Open scanner`}
+                      className="mx-4 mb-4 flex-row items-center gap-3 rounded-2xl p-3.5"
+                      style={{ backgroundColor: BRAND.ink }}
+                    >
+                      <View className="flex-1">
+                        <TextComponent className="text-[11px] font-bold tracking-widest text-white/60">YOUR EVENT</TextComponent>
+                        <TextComponent numberOfLines={1} className="mt-0.5 text-sm font-extrabold text-white">{doorEvent.name}</TextComponent>
+                      </View>
+                      <TextComponent className="text-sm font-extrabold" style={{ color: BRAND.blue }}>Open scanner ›</TextComponent>
+                    </Pressable>
+                  )}
+                  <FeaturedBoost
+                    countryCode={place?.countryCode}
+                    city={place?.city}
+                    enabled={homePlace.ready}
+                    onOpenEvent={setLiveEventId}
+                  />
+                </>
               }
               renderItem={({ item }) => (
                 <FeedCard
@@ -677,12 +698,7 @@ const RefinedHomeFeedDesignScreen = () => {
           onClose={() => setOptionsEvent(null)}
           onOpenEvent={(eventId) => setLiveEventId(eventId)}
         />
-        <WebOnlySheet task={hostTask} onClose={() => setHostTask(null)} />
-        <ChooseModeSheet
-          visible={askMode && !wantsToHost && !hostTask && !overlay}
-          who={organiser.isVendor ? "You run events" : organiser.teams[0] ? `${organiser.teams[0].name} added you to their team` : "You can scan tickets at the door"}
-          onChoose={chooseMode}
-        />
+        <VendorApplicationScreen visible={applying} onClose={() => setApplying(false)} />
         {/* Someone's profile, their followers, finding people: opened from anywhere. */}
         <PeopleModal />
         {overlay && (

@@ -1,3 +1,5 @@
+import ModalKeyboardAvoider from "@/shared/components/modals/modal-keyboard-avoider";
+import BadgeCheckIcon from "@/shared/assets/icons/badge-check.icon";
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
 import React, { memo, useMemo, useState } from "react";
 import SafeModal from "@/shared/components/modals/safe-modal";
@@ -5,8 +7,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   TextInput,
   View
@@ -17,6 +17,7 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useQueryClient } from "@tanstack/react-query";
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
+import { TurnupzIcon } from "@/shared/assets/images";
 import TextComponent from "@/shared/components/text/text.component";
 import { onError } from "@/shared/components/status/toast";
 import useUserStore from "@/shared/stores/user.store";
@@ -375,7 +376,10 @@ const ChatThreadScreen = ({
             >
               {mine && <LinearGradient colors={BRAND_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0 }} />}
               {!mine && isGroup && (
-                <TextComponent className="mb-0.5 text-[11.5px] font-extrabold" style={{ color: BRAND.blueDeep }}>{message.senderName}</TextComponent>
+                <View className="mb-0.5 flex-row items-center gap-1">
+                  <TextComponent className="text-[11.5px] font-extrabold" style={{ color: BRAND.blueDeep }}>{message.senderName}</TextComponent>
+                  {message.senderRole === "admin" && <BadgeCheckIcon size={12} color={BRAND.blue} color2={BRAND.blueDeep} />}
+                </View>
               )}
               <TextComponent className="text-[13.5px] leading-5" style={{ color: mine ? BRAND.white : "#18181b" }}>{caption}</TextComponent>
               <TextComponent className="mt-0.5 text-right text-[10.5px]" style={{ color: mine ? "rgba(255,255,255,0.75)" : "#A1A1AA" }}>
@@ -395,7 +399,7 @@ const ChatThreadScreen = ({
   return (
     <SafeModal visible={!!chatId} animationType="slide" onRequestClose={showInfo ? () => setShowInfo(false) : onClose}>
       <SafeAreaView className="flex-1" style={{ backgroundColor: "#F7F8FB" }} edges={["top", "bottom"]}>
-        <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ModalKeyboardAvoider className="flex-1">
           {/* Header */}
           <View className="flex-row items-center gap-2.5 border-b bg-white px-3 pb-2.5 pt-1" style={{ borderColor: "#EEF0F4" }}>
             <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Go back" hitSlop={10} className="size-9 items-center justify-center">
@@ -403,7 +407,9 @@ const ChatThreadScreen = ({
                 <Path d="M15 5l-7 7 7 7" fill="none" stroke={BRAND.ink} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </Pressable>
-            {isGroup && eventImage ? (
+            {chat?.type === "SUPPORT" && iAmOrganiser ? (
+              <CustomImage className="size-10 rounded-xl" imageClassName="size-full rounded-xl" source={TurnupzIcon} contentFit="cover" />
+            ) : isGroup && eventImage ? (
               <CustomImage className="size-10 rounded-xl" imageClassName="size-full rounded-xl" source={{ uri: eventImage }} contentFit="cover" />
             ) : isPerson && chat?.person?.image ? (
               <CustomImage className="size-10 rounded-full" imageClassName="size-full rounded-full" source={{ uri: chat.person.image }} contentFit="cover" />
@@ -486,6 +492,14 @@ const ChatThreadScreen = ({
           {/* Messages, newest at the bottom */}
           {messages.isLoading ? (
             <ActivityIndicator className="mt-16" color={BRAND.blue} />
+          ) : rows.length === 0 ? (
+            // Not inside the list: it's flipped to keep the newest at the bottom, and
+            // anything in it would need flipping back differently on each platform.
+            <View className="flex-1 items-center justify-end px-10 py-10">
+              <TextComponent className="text-center text-sm text-zinc-500">
+                {isPerson ? "Say hello." : isDirect ? "Ask the organiser anything about the event." : "Say hi to everyone going."}
+              </TextComponent>
+            </View>
           ) : (
             <FlatList
               data={rows}
@@ -502,13 +516,6 @@ const ChatThreadScreen = ({
                 ) : (
                   renderMessage(item.message)
                 )
-              }
-              ListEmptyComponent={
-                <View className="items-center px-10 py-10" style={{ transform: [{ scaleY: -1 }] }}>
-                  <TextComponent className="text-center text-sm text-zinc-500">
-                    {isPerson ? "Say hello." : isDirect ? "Ask the organiser anything about the event." : "Say hi to everyone going."}
-                  </TextComponent>
-                </View>
               }
             />
           )}
@@ -559,7 +566,7 @@ const ChatThreadScreen = ({
               </Pressable>
             </View>
           )}
-        </KeyboardAvoidingView>
+        </ModalKeyboardAvoider>
         {showInfo && isGroup && !!chat && (
           <GroupInfo chat={chat} iAmOrganiser={iAmOrganiser} onOpenEvent={onOpenEvent} onClose={() => setShowInfo(false)} />
         )}

@@ -3,6 +3,7 @@ import { useOpenChatStore } from "@/shared/stores/open-chat.store";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, TextInput, View } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import CustomImage from "@/shared/components/images/custom-image/custom-image.component";
+import { TurnupzIcon } from "@/shared/assets/images";
 import TextComponent from "@/shared/components/text/text.component";
 import { onError, onSuccess } from "@/shared/components/status/toast";
 import { constructErrorMessage } from "@/api/functions";
@@ -313,7 +314,10 @@ const ChatsScreen = ({
                   className="flex-row items-center gap-3 rounded-2xl px-2 py-2.5"
                   style={unread ? { backgroundColor: BRAND.white } : undefined}
                 >
-                  {isGroup && chat.eventImage ? (
+                  {chat.type === "SUPPORT" && chat.vendor?.id === myId ? (
+                    // Your chat with the Turnupz team: the Turnupz logo (the team sees the person).
+                    <CustomImage className="size-[52px] rounded-[14px]" imageClassName="size-full rounded-[14px]" source={TurnupzIcon} contentFit="cover" />
+                  ) : isGroup && chat.eventImage ? (
                     <CustomImage className="size-[52px] rounded-[14px]" imageClassName="size-full rounded-[14px]" source={{ uri: chat.eventImage }} contentFit="cover" />
                   ) : isPerson && chat.person?.image ? (
                     <CustomImage className="size-[52px] rounded-full" imageClassName="size-full rounded-full" source={{ uri: chat.person.image }} contentFit="cover" />

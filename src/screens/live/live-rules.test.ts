@@ -109,8 +109,13 @@ describe("sending tickets", () => {
   const base = {
     id: "ut1",
     status: "UN_USED",
-    ticket: { id: "t1", name: "VIP", price: { amount: 0 }, transferable: true }
+    // A paid ticket: free ones can't be sent on (see below).
+    ticket: { id: "t1", name: "VIP", price: { amount: 500000 }, transferable: true }
   };
+
+  it("never offers sending a free ticket", () => {
+    expect(canTransfer({ ...base, ticket: { ...base.ticket, price: { amount: 0 } } } as never)).toBe(false);
+  });
 
   it("offers sending only when the category allows it", () => {
     expect(canTransfer(base as never)).toBe(true);

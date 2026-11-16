@@ -8,7 +8,7 @@ import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import { useOrganiserStore } from "@/shared/stores/organiser.store";
 import { BRAND } from "@/shared/utils/brand-colors";
 import ChatsScreen from "@/screens/chat/chats.screen";
-import { useOrganiserAccess, useWeekSales } from "./organiser-api";
+import { useOrganiserAccess, useWeekSales, useEarnings, isAtTheDoor } from "./organiser-api";
 import { EventsTab, MeTab, TodayTab } from "./organiser-tabs";
 import ScanTab from "./scan.tab";
 import WebOnlySheet, { TWebOnlyTask } from "./web-only.sheet";
@@ -79,6 +79,7 @@ const OrganiserShellScreen = ({
   });
 
   const sales = useWeekSales(access.workspaceVendorId, canSales);
+  const earnings = useEarnings(access.workspaceVendorId, access.can("FINANCE_VIEW"));
   const [scanEventId, setScanEventId] = useState<string | null>(null);
   const [webTask, setWebTask] = useState<TWebOnlyTask | null>(null);
 
@@ -90,17 +91,21 @@ const OrganiserShellScreen = ({
   // they can scan (their own, their teams', door access), each scanned as the
   // organiser it belongs to.
   const scanEvents = access.scanEvents;
-  const tonight = workspaceScanEvents.filter((event) => {
-    const now = Date.now();
-    const start = new Date(event.date).getTime();
-    const end = new Date(event.endDate ?? event.date).getTime() + 12 * 60 * 60 * 1000;
-    return start - now < 24 * 60 * 60 * 1000 && end > now;
-  });
+  const tonight = workspaceScanEvents.filter(isAtTheDoor);
   const openScan = (eventId: string) => {
     setScanEventId(eventId);
     setTab("scan");
   };
-  const refresh = () => void Promise.all([sales.refetch(), access.refetch()]);
+  // Came here from the event-day banner on Home: straight to that door.
+  const scanEventOnOpen = useOrganiserStore((state) => state.scanEventOnOpen);
+  const setScanEventOnOpen = useOrganiserStore((state) => state.setScanEventOnOpen);
+  useEffect(() => {
+    if (!scanEventOnOpen || !canScan) return;
+    setScanEventOnOpen(null);
+    openScan(scanEventOnOpen);
+  }, [scanEventOnOpen, canScan]); // eslint-disable-line react-hooks/exhaustive-deps
+  const refresh = () =>
+    void Promise.all([sales.refetch(), access.refetch(), access.can("FINANCE_VIEW") ? earnings.refetch() : null]);
 
   const workspaces = [
     ...(access.isVendor ? [{ vendorId: null, name: "Your events", note: "Everything you organise" }] : []),
@@ -115,6 +120,7 @@ const OrganiserShellScreen = ({
     today: (
       <TodayTab
         insights={sales.data}
+        earnings={access.can("FINANCE_VIEW") ? earnings.data : null}
         loading={sales.isLoading}
         refreshing={sales.isRefetching}
         onRefresh={refresh}

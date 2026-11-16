@@ -1,7 +1,6 @@
 import React, { memo, useId } from "react";
 import {
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -98,7 +97,7 @@ const AuthTicketLayout: React.FC<TAuthTicketLayoutProps> = ({
     <NightSky />
 
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior="padding"
       className="flex-1"
     >
       <ScrollView
@@ -124,9 +123,9 @@ const AuthTicketLayout: React.FC<TAuthTicketLayoutProps> = ({
         </View>
 
         <View className="flex-1 justify-center py-6">
-          {/* Shadow outside, clipping inside: iOS drops a shadow on a view
-              that clips. */}
-          <View style={styles.ticketShadow}>
+          {/* Nothing white behind or around it: a white layer or a border shows
+              as a thin line along the blue stub and across the notches. */}
+          <View>
             <View style={styles.ticket}>
               {/* The stub. */}
               <LinearGradient
@@ -160,7 +159,7 @@ const AuthTicketLayout: React.FC<TAuthTicketLayoutProps> = ({
                 <View style={[styles.notch, styles.notchRight]} />
               </View>
 
-              <View className="gap-6 px-6 pb-7 pt-6">
+              <View className="gap-6 bg-white px-6 pb-7 pt-6">
                 <View className="gap-2">
                   <TextComponent style={styles.eyebrow}>
                     {eyebrow.toUpperCase()}
@@ -195,21 +194,9 @@ const styles = StyleSheet.create({
   page: {
     backgroundColor: AUTH_NIGHT
   },
-  ticketShadow: {
-    borderRadius: 28,
-    backgroundColor: "#ffffff",
-    shadowColor: "#0b1d2a",
-    shadowOpacity: 0.12,
-    shadowRadius: 30,
-    shadowOffset: { width: 0, height: 18 },
-    elevation: 6
-  },
   ticket: {
-    backgroundColor: "#ffffff",
     borderRadius: 28,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(11, 29, 42, 0.05)"
+    overflow: "hidden"
   },
   stub: {
     paddingHorizontal: 24,
@@ -230,20 +217,25 @@ const styles = StyleSheet.create({
   tear: {
     height: 0,
     flexDirection: "row",
-    alignItems: "center"
+    alignItems: "center",
+    // Over the white form, or the form hides the notches' lower half.
+    zIndex: 2
   },
   notch: {
     position: "absolute",
     width: NOTCH,
     height: NOTCH,
-    borderRadius: NOTCH / 2,
-    backgroundColor: AUTH_NIGHT
+    borderRadius: NOTCH / 2
   },
+  // The sky's colour either side of the ticket, so the notches read as holes
+  // rather than black circles: the glows make it lighter than AUTH_NIGHT there.
   notchLeft: {
-    left: -NOTCH / 2
+    left: -NOTCH / 2,
+    backgroundColor: "#00334a"
   },
   notchRight: {
-    right: -NOTCH / 2
+    right: -NOTCH / 2,
+    backgroundColor: "#00151f"
   },
   dashes: {
     position: "absolute",
