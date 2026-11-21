@@ -37,6 +37,7 @@ import {
   useLiveUserTickets
 } from "./live-api";
 import GroupInfo from "./group-info";
+import FriendsGroupInfo from "./friends-group-info";
 
 /**
  * One chat, in the redesign. An event's group chat pins your tickets and the
@@ -125,12 +126,15 @@ const ChatThreadScreen = ({
   const [showInfo, setShowInfo] = useState(false);
 
   const isGroup = chat?.type === "EVENT_GROUP";
+  // Friends' own group: senders show, and its Group info opens from the header.
+  const isFriendsGroup = chat?.type === "GROUP";
+  const showsSenders = isGroup || isFriendsGroup;
   // Opened from an event's "Message organiser" before the list has caught up.
   const isDirect = chat?.type === "DIRECT" || (!chat && !!aboutEvent);
   // Two people who follow each other (opened from a profile before the list caught up).
   const isPerson = chat?.type === "PERSON" || (!chat && !aboutEvent);
   const isClosed = chat?.status === "ARCHIVED";
-  const iAmOrganiser = !isPerson && !!myId && chat?.vendor?.id === myId;
+  const iAmOrganiser = !isPerson && !isFriendsGroup && !!myId && chat?.vendor?.id === myId;
   const onlyOrganiser = isGroup && !!chat?.announcementMode && !iAmOrganiser;
   const canPost = !isClosed && !onlyOrganiser;
   const eventId = chat?.eventId ?? aboutEvent?.id ?? null;
@@ -224,7 +228,9 @@ const ChatThreadScreen = ({
 
   const headerSubtitle =
     subtitle ??
-    (isGroup && eventDate
+    (isFriendsGroup
+      ? `Group · ${chat?.memberCount ?? 0} members`
+      : isGroup && eventDate
       ? `${formatEventDay(eventDate, timezone, { withYear: false })} · ${chat?.memberCount ?? 0} going`
       : isPerson
         ? chat?.person?.username
@@ -352,7 +358,7 @@ const ChatThreadScreen = ({
 
     return (
       <View className={mine ? "flex-row-reverse items-end gap-2 px-3 py-1" : "flex-row items-end gap-2 px-3 py-1"}>
-        {!mine && isGroup && <Avatar name={message.senderName} />}
+        {!mine && showsSenders && <Avatar name={message.senderName} />}
         <Pressable {...longPressFor(message.id)} style={{ maxWidth: "80%" }} className={mine ? "items-end" : "items-start"}>
           {!!shared && (
             <View className="mb-1">
@@ -375,7 +381,7 @@ const ChatThreadScreen = ({
               }}
             >
               {mine && <LinearGradient colors={BRAND_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: "absolute", inset: 0 }} />}
-              {!mine && isGroup && (
+              {!mine && showsSenders && (
                 <View className="mb-0.5 flex-row items-center gap-1">
                   <TextComponent className="text-[11.5px] font-extrabold" style={{ color: BRAND.blueDeep }}>{message.senderName}</TextComponent>
                   {message.senderRole === "admin" && <BadgeCheckIcon size={12} color={BRAND.blue} color2={BRAND.blueDeep} />}
@@ -409,7 +415,7 @@ const ChatThreadScreen = ({
             </Pressable>
             {chat?.type === "SUPPORT" && iAmOrganiser ? (
               <CustomImage className="size-10 rounded-xl" imageClassName="size-full rounded-xl" source={TurnupzIcon} contentFit="cover" />
-            ) : isGroup && eventImage ? (
+            ) : showsSenders && eventImage ? (
               <CustomImage className="size-10 rounded-xl" imageClassName="size-full rounded-xl" source={{ uri: eventImage }} contentFit="cover" />
             ) : isPerson && chat?.person?.image ? (
               <CustomImage className="size-10 rounded-full" imageClassName="size-full rounded-full" source={{ uri: chat.person.image }} contentFit="cover" />
@@ -419,16 +425,16 @@ const ChatThreadScreen = ({
             {/* A group chat's name opens who's in it. */}
             <Pressable
               onPress={() => setShowInfo(true)}
-              disabled={!isGroup || !chat}
-              accessibilityRole={isGroup ? "button" : undefined}
-              accessibilityHint={isGroup ? "Shows the members" : undefined}
+              disabled={!showsSenders || !chat}
+              accessibilityRole={showsSenders ? "button" : undefined}
+              accessibilityHint={showsSenders ? "Shows the members" : undefined}
               className="flex-1"
             >
               <TextComponent numberOfLines={1} className="text-[15px] font-extrabold text-zinc-950">{title}</TextComponent>
               {!!headerSubtitle && (
                 <TextComponent numberOfLines={1} className="text-[11.5px] font-semibold text-zinc-500">
                   {headerSubtitle}
-                  {isGroup && chat ? " · Members ›" : ""}
+                  {showsSenders && chat ? " · Members ›" : ""}
                 </TextComponent>
               )}
             </Pressable>
@@ -542,7 +548,7 @@ const ChatThreadScreen = ({
               <TextInput
                 value={draft}
                 onChangeText={setDraft}
-                placeholder={isGroup ? "Message everyone going" : isPerson ? "Message" : iAmOrganiser ? "Reply" : "Message the organiser"}
+                placeholder={isGroup ? "Message everyone going" : isFriendsGroup ? "Message the group" : isPerson ? "Message" : iAmOrganiser ? "Reply" : "Message the organiser"}
                 placeholderTextColor="#9AA3AF"
                 multiline
                 className="max-h-28 min-h-10 flex-1 rounded-[20px] border px-3.5 py-2.5 text-[14px] text-zinc-950"
@@ -567,6 +573,16 @@ const ChatThreadScreen = ({
             </View>
           )}
         </ModalKeyboardAvoider>
+        {showInfo && isFriendsGroup && !!chat && (
+          <FriendsGroupInfo
+            groupId={chat.id}
+            onClose={() => setShowInfo(false)}
+            onLeft={() => {
+              setShowInfo(false);
+              onClose();
+            }}
+          />
+        )}
         {showInfo && isGroup && !!chat && (
           <GroupInfo chat={chat} iAmOrganiser={iAmOrganiser} onOpenEvent={onOpenEvent} onClose={() => setShowInfo(false)} />
         )}

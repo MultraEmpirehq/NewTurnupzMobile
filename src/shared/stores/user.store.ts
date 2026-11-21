@@ -36,6 +36,8 @@ export enum UserGender {
 
 export type TUser = {
   email?: string;
+  /** A business organiser account: it stays on the organiser side (no buying, posting or friends). */
+  isBusiness?: boolean;
   id: string;
   name?: string;
   firstName?: string;

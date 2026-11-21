@@ -107,6 +107,8 @@ export type TNotificationPreferences = {
   orderUpdates: boolean;
   ticketTransfers: boolean;
   creditUpdates: boolean;
+  /** Posts from people you follow. */
+  socialUpdates?: boolean;
   email: boolean;
 };
 

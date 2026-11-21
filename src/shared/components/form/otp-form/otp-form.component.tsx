@@ -46,7 +46,7 @@ const OTPInputBox: React.FC<{
       className={getActiveBoxClassName({ isActive, hasValue: !!value })}
     >
       <View className="items-center justify-center w-full h-full rounded-md">
-        <TextComponent className="text-xl font-bold text-primary">
+        <TextComponent className="text-xl font-bold text-link">
           {value}
         </TextComponent>
       </View>

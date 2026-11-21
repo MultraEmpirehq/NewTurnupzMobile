@@ -30,6 +30,8 @@ import EventOptionsSheet, {
 } from "@/screens/live/event-options.sheet";
 import { useHiddenEventsStore } from "@/shared/stores/hidden-events.store";
 import useUserStore from "@/shared/stores/user.store";
+import { usePeopleNav } from "@/screens/people/people-nav";
+import PostCircles from "@/screens/home/post-circles";
 import { PerformerProfileScreen as LivePerformerProfileScreen } from "@/screens/live/explore-details";
 import BrandRefreshList, {
   TBrandRefreshListHandle
@@ -256,7 +258,7 @@ const PreviewBottomNav = ({
                       ? "mt-1 text-[10px] font-bold text-sky-300"
                       : "mt-1 text-[10px] text-white"
                     : isActive
-                      ? "mt-1 text-[10px] font-bold text-primary"
+                      ? "mt-1 text-[10px] font-bold text-link"
                       : "mt-1 text-[10px] text-zinc-500"
                 }
               >
@@ -350,7 +352,13 @@ const RefinedHomeFeedDesignScreen = () => {
   const mode = useOrganiserStore((state) => state.mode);
   const setMode = useOrganiserStore((state) => state.setMode);
   const setScanEventOnOpen = useOrganiserStore((state) => state.setScanEventOnOpen);
-  const inOrganiserMode = mode === "organiser" && organiser.canOrganise;
+  // A business account is only ever on the organiser side.
+  const isBusiness = !!useUserStore((state) => state.user?.isBusiness);
+  const openPerson = usePeopleNav((state) => state.openPerson);
+  const inOrganiserMode = (mode === "organiser" || isBusiness) && organiser.canOrganise;
+  useEffect(() => {
+    if (isBusiness && mode !== "organiser") setMode("organiser");
+  }, [isBusiness, mode]); // eslint-disable-line react-hooks/exhaustive-deps
   // Event day: the one thing worth interrupting the feed for.
   const doorEvent = organiser.scanEvents
     .filter(isAtTheDoor)
@@ -517,7 +525,7 @@ const RefinedHomeFeedDesignScreen = () => {
       >
         {inOrganiserMode && (
           <ScreenActiveContext.Provider value={!overlay}>
-            <OrganiserShellScreen onOpenEvent={(eventId) => setLiveEventId(eventId)} onAttendee={() => setMode("attendee")} />
+            <OrganiserShellScreen onOpenEvent={(eventId) => setLiveEventId(eventId)} onAttendee={isBusiness ? undefined : () => setMode("attendee")} />
           </ScreenActiveContext.Provider>
         )}
         {!inOrganiserMode && tabSlot(
@@ -540,6 +548,8 @@ const RefinedHomeFeedDesignScreen = () => {
               // A boosted event, big and marked Sponsored, where the phone is.
               ListHeaderComponent={
                 <>
+                  {/* People you follow who posted lately; tap one to see their posts. */}
+                  {isSignedIn && !isBusiness && <PostCircles onOpenEvent={setLiveEventId} onOpenPerson={openPerson} />}
                   {doorEvent && (
                     <Pressable
                       onPress={() => {

@@ -5,13 +5,7 @@ import { sizedImageUri } from "@/shared/utils/cloudinary-image";
 import TextComponent from "@/shared/components/text/text.component";
 import { BRAND } from "@/shared/utils/brand-colors";
 
-const initialsOf = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("") || "?";
+import { initialsOf } from "@/shared/utils/initials";
 
 /**
  * A person's (or place's) picture in a circle, or their initials when there's
@@ -27,8 +21,8 @@ const RoundAvatar = ({
   uri?: string | null;
   name: string;
   size: number;
-  /** A white ring around it, for pictures on a coloured background. */
-  ring?: boolean;
+  /** A ring around it: white (true) for pictures on a coloured background, or a colour (the brand blue for people you follow). */
+  ring?: boolean | string;
 }) => {
   const radius = size / 2;
   return (
@@ -41,8 +35,8 @@ const RoundAvatar = ({
         backgroundColor: BRAND.blueTint,
         alignItems: "center",
         justifyContent: "center",
-        borderWidth: ring ? 3 : 0,
-        borderColor: BRAND.white
+        borderWidth: ring ? (typeof ring === "string" ? 2.5 : 3) : 0,
+        borderColor: typeof ring === "string" ? ring : BRAND.white
       }}
     >
       {uri ? (

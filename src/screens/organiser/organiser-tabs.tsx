@@ -404,7 +404,7 @@ export const MeTab = memo(
     canFinance: boolean;
     isOwner: boolean;
     onPickWorkspace: (vendorId: string | null) => void;
-    onAttendee: () => void;
+    onAttendee?: () => void;
     onWebOnly: (task: TWebOnlyTask) => void;
   }) => (
     <ScrollView className="flex-1" style={{ backgroundColor: BG }} contentContainerStyle={{ paddingBottom: 32 }}>
@@ -426,7 +426,7 @@ export const MeTab = memo(
                   <TextComponent className="text-sm font-bold text-zinc-950">{item.name}</TextComponent>
                   <TextComponent className="text-xs text-zinc-500">{item.note}</TextComponent>
                 </View>
-                {on && <TextComponent style={{ color: BRAND.blue }}>✓</TextComponent>}
+                {on && <TextComponent style={{ color: BRAND.link }}>✓</TextComponent>}
               </Pressable>
             );
           })}
@@ -458,12 +458,24 @@ export const MeTab = memo(
         onPress={() => onWebOnly({ title: "Analytics", reason: "The charts and tables need room.", path: "/app/analysis" })}
       />
 
-      <Pressable onPress={onAttendee} accessibilityRole="button" className="mx-4 mt-6 h-12 items-center justify-center rounded-full" style={{ backgroundColor: BRAND.ink }}>
-        <TextComponent className="text-[15px] font-bold text-white">⇄ Switch to attendee</TextComponent>
-      </Pressable>
-      <TextComponent className="mx-8 mt-2 text-center text-xs text-zinc-500">
-        Buy tickets and explore as usual. Switch back from your profile any time.
-      </TextComponent>
+      {onAttendee ? (
+        <>
+          <Pressable onPress={onAttendee} accessibilityRole="button" className="mx-4 mt-6 h-12 items-center justify-center rounded-full" style={{ backgroundColor: BRAND.ink }}>
+            <TextComponent className="text-[15px] font-bold text-white">⇄ Switch to attendee</TextComponent>
+          </Pressable>
+          <TextComponent className="mx-8 mt-2 text-center text-xs text-zinc-500">
+            Buy tickets and explore as usual. Switch back from your profile any time.
+          </TextComponent>
+        </>
+      ) : (
+        // A business account runs events as the brand; its people attend on their own accounts.
+        <View className="mx-4 mt-6 rounded-2xl bg-white p-4">
+          <TextComponent className="text-[15px] font-bold text-zinc-950">Business account</TextComponent>
+          <TextComponent className="mt-1 text-[13px] leading-[18px] text-zinc-500">
+            This account runs events as your business. To buy tickets, post or join friends, use your personal Turnupz account.
+          </TextComponent>
+        </View>
+      )}
     </ScrollView>
   )
 );

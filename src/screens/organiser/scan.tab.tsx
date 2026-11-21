@@ -7,6 +7,7 @@ import { constructErrorMessage } from "@/api/functions";
 import { formatEventClock, formatEventDay } from "@/shared/utils/event-time";
 import { BRAND } from "@/shared/utils/brand-colors";
 import { useScreenActive } from "@/shared/hooks/use-screen-active";
+import { useScanTriggerStore } from "@/shared/stores/scan-trigger.store";
 import { TScanEvent, TScanResult, readmitTicket, scanTicket, useScanSummary } from "./organiser-api";
 
 const NIGHT = "#05111b";
@@ -69,6 +70,11 @@ const ScanTab = ({ events, initialEventId }: { events: TScanEvent[]; initialEven
   const [typing, setTyping] = useState(false);
   const [typed, setTyped] = useState("");
   const last = useRef<{ code: string; at: number } | null>(null);
+  // Automatic, or the camera reads and staff tap "Check ticket" when ready.
+  const trigger = useScanTriggerStore((state) => state.trigger);
+  const setTrigger = useScanTriggerStore((state) => state.setTrigger);
+  const [seen, setSeen] = useState<string | null>(null);
+  const seenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const check = useCallback(
     async (raw: string, typedIn = false) => {
@@ -202,6 +208,39 @@ const ScanTab = ({ events, initialEventId }: { events: TScanEvent[]; initialEven
             ? `Checked in ${(day?.checkedIn ?? summary.checkedIn).toLocaleString()} of ${(day?.expected ?? summary.total).toLocaleString()}`
             : "Loading the door count…"}
         </TextComponent>
+        {!!summary?.doorsOpenAt && (
+          <TextComponent className="text-xs text-white/60">
+            Doors open {formatEventDay(summary.doorsOpenAt, event?.timezone, { withYear: false })} ·{" "}
+            {formatEventClock(summary.doorsOpenAt, event?.timezone)}
+          </TextComponent>
+        )}
+        <View className="mt-2 flex-row self-start rounded-full p-1" style={{ backgroundColor: "rgba(255,255,255,0.1)" }} accessibilityRole="radiogroup">
+          {(
+            [
+              { value: "auto", label: "Automatic" },
+              { value: "tap", label: "Tap to check" }
+            ] as const
+          ).map((option) => {
+            const on = trigger === option.value;
+            return (
+              <Pressable
+                key={option.value}
+                onPress={() => {
+                  setTrigger(option.value);
+                  setSeen(null);
+                }}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: on }}
+                className="rounded-full px-3 py-1.5"
+                style={{ backgroundColor: on ? BRAND.blue : "transparent" }}
+              >
+                <TextComponent className="text-xs font-bold" style={{ color: on ? "#ffffff" : "rgba(255,255,255,0.7)" }}>
+                  {option.label}
+                </TextComponent>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       {/* The camera, or why it isn't on. */}
@@ -222,7 +261,17 @@ const ScanTab = ({ events, initialEventId }: { events: TScanEvent[]; initialEven
             style={{ flex: 1 }}
             facing="back"
             barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            onBarcodeScanned={pending || result ? undefined : ({ data }) => void check(data)}
+            onBarcodeScanned={
+              pending || (result && trigger === "auto")
+                ? undefined
+                : ({ data }) => {
+                    if (trigger === "auto") return void check(data);
+                    // Tap mode: remember what's in view; out of view a few seconds, forget it.
+                    setSeen(data);
+                    if (seenTimer.current) clearTimeout(seenTimer.current);
+                    seenTimer.current = setTimeout(() => setSeen(null), 4000);
+                  }
+            }
           />
         ) : (
           <View className="flex-1 items-center justify-center">
@@ -238,6 +287,25 @@ const ScanTab = ({ events, initialEventId }: { events: TScanEvent[]; initialEven
           </View>
         )}
       </View>
+
+      {cameraOn && trigger === "tap" && (
+        <Pressable
+          onPress={() => {
+            if (!seen) return;
+            const code = seen;
+            setSeen(null);
+            void check(code);
+          }}
+          disabled={!seen || pending}
+          accessibilityRole="button"
+          className="mx-4 mt-3 h-14 items-center justify-center rounded-2xl"
+          style={{ backgroundColor: seen ? BRAND.blue : "rgba(255,255,255,0.12)" }}
+        >
+          <TextComponent className="text-base font-extrabold text-white">
+            {seen ? "Check ticket" : "Point the camera at a ticket"}
+          </TextComponent>
+        </Pressable>
+      )}
 
       {/* The answer, big enough to read at arm's length. */}
       {result && tone ? (

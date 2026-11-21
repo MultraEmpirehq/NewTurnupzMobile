@@ -20,7 +20,7 @@ const RecentSearchCardComponent: React.FC<{
           addToRecentList(searchText);
         }}
       >
-        <TextComponent className="text-primary text-sm">
+        <TextComponent className="text-link text-sm">
           {searchText}
         </TextComponent>
       </TouchableOpacity>

@@ -127,7 +127,7 @@ const TwoFactorScreen = () => {
             }}
             accessibilityRole="button"
           >
-            <TextComponent className="font-semibold text-[#00b2ff]">
+            <TextComponent className="font-semibold text-link">
               {useBackup ? "Use the app instead" : "Use a backup code"}
             </TextComponent>
           </Pressable>

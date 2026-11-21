@@ -120,7 +120,7 @@ const Action = ({
       <TextComponent
         className={
           selected
-            ? "text-sm font-bold text-primary"
+            ? "text-sm font-bold text-link"
             : "text-sm font-semibold text-zinc-800"
         }
       >
@@ -168,7 +168,7 @@ const Header = ({ title, onBack }: { title: string; onBack?: () => void }) => (
     </TextComponent>
     {!!onBack && (
       <Pressable onPress={onBack} hitSlop={10}>
-        <TextComponent className="text-sm font-semibold text-primary">
+        <TextComponent className="text-sm font-semibold text-link">
           Back
         </TextComponent>
       </Pressable>
@@ -486,7 +486,7 @@ const EventOptionsSheet = ({
                   {sendingTo === chat.id ? (
                     <ActivityIndicator color={BLUE} />
                   ) : (
-                    <TextComponent className="text-sm font-bold text-primary">
+                    <TextComponent className="text-sm font-bold text-link">
                       Send
                     </TextComponent>
                   )}
@@ -508,7 +508,7 @@ const EventOptionsSheet = ({
           >
             <MessageIcon size={18} color={BLUE} />
             <View className="ml-3">
-              <TextComponent className="text-sm font-bold text-primary">
+              <TextComponent className="text-sm font-bold text-link">
                 Share with a Turnupz user
               </TextComponent>
               <TextComponent className="text-xs text-zinc-500">

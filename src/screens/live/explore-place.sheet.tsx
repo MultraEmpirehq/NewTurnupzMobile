@@ -1,4 +1,5 @@
 import OverlayToast from "@/shared/components/status/toast/overlay-toast";
+import { BRAND } from "@/shared/utils/brand-colors";
 import React, { memo, useMemo, useState } from "react";
 import SafeModal from "@/shared/components/modals/safe-modal";
 import { Pressable, ScrollView, TextInput, View } from "react-native";
@@ -55,7 +56,7 @@ const Option = ({
           ? "flex-1 text-base text-zinc-800"
           : "flex-1 text-base font-semibold text-zinc-950"
       }
-      style={selected ? { color: BLUE, fontWeight: "700" } : undefined}
+      style={selected ? { color: BRAND.link, fontWeight: "700" } : undefined}
     >
       {label}
     </TextComponent>

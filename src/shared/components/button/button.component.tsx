@@ -19,7 +19,7 @@ const buttonClassName = cva(
         primary: "bg-primary-700 text-white",
         secondary: "bg-secondary text-white",
         tertiary: "bg-tertiary text-white",
-        outline: "bg-transparent border border-primary text-primary"
+        outline: "bg-transparent border border-primary text-link"
       },
       size: {
         sm: "py-1 px-2",
@@ -48,7 +48,7 @@ const textVariantClassName = cva("font-inter text-center text-white", {
       primary: "text-white",
       secondary: "text-black",
       tertiary: "text-black",
-      outline: "text-primary"
+      outline: "text-link"
     },
     defaultVariants: {
       size: "md",

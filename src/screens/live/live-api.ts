@@ -69,6 +69,11 @@ export type TLiveEvent = {
   endDate?: string | null;
   timezone?: string;
   image?: string;
+  /** The organiser's optional 4:5 phone cover; the banner is used without one. */
+  mobileImage?: string | null;
+  /** Posts from people who were there, and up to three of their photos. */
+  crowdPosts?: number;
+  crowdPreviews?: string[];
   medias?: string[];
   /** The gallery with what each file is (photo or video). */
   mediaDetails?: { url?: string; type?: string | null }[];

@@ -219,6 +219,9 @@ export type TScanSummary = {
   checkedIn: number;
   days: { id: string; name: string; label: string | null; expected: number; checkedIn: number }[];
   todayDayId: string | null;
+  /** When doors open (the organiser's choice, or 6 hours before); earlier scans are refused. */
+  doorsOpenAt?: string;
+  doorsOpenMinutes?: number | null;
 };
 
 export const useScanSummary = (event?: TScanEvent | null) =>

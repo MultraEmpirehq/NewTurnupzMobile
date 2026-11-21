@@ -62,7 +62,7 @@ export type TPickedMedia = {
   fileSize?: number | null;
 };
 
-const uploadOne = async (item: TPickedMedia) => {
+export const uploadOne = async (item: TPickedMedia) => {
   const type = item.mimeType || (item.type === "video" ? "video/mp4" : "image/jpeg");
   const name = item.fileName || `highlight.${type.split("/")[1] || "jpg"}`;
   const form = new FormData();
@@ -91,7 +91,7 @@ export const pickedProblem = (item: TPickedMedia) => {
   return null;
 };
 
-/** Uploads the picks and sends them to the organiser for approval. */
+/** Uploads the picks and posts them to the event (they show straight away). */
 export const sendCrowdPhotos = async (
   eventId: string,
   body: { items: TPickedMedia[]; caption: string; showName: boolean }
@@ -111,6 +111,37 @@ export const sendCrowdPhotos = async (
     caption: body.caption.trim() || undefined,
     showName: body.showName,
     consent: true
+  });
+};
+
+/**
+ * Uploads the picks and makes a post: on your profile, and on the event's
+ * page too when it's linked to one you had a ticket for.
+ */
+export const createPost = async (body: {
+  items: TPickedMedia[];
+  caption: string;
+  eventId?: string;
+  showName: boolean;
+  consent: boolean;
+  /** People tagged in it (who follow you back). */
+  tagUserIds?: string[];
+}) => {
+  const items = [];
+  for (const item of body.items) {
+    const attachmentId = await uploadOne(item);
+    items.push({
+      attachmentId,
+      ...(item.type === "video"
+        ? { durationSeconds: Math.max(1, Math.min(HIGHLIGHT_LIMITS.clipSeconds, Math.round((item.durationMs ?? 1000) / 1000))) }
+        : {})
+    });
+  }
+  return postData("/posts", {
+    items,
+    caption: body.caption.trim() || undefined,
+    ...(body.eventId ? { eventId: body.eventId, showName: body.showName, consent: body.consent } : {}),
+    ...(body.tagUserIds?.length ? { tagUserIds: body.tagUserIds } : {})
   });
 };
 

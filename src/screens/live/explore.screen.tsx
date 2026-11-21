@@ -1,3 +1,4 @@
+import { eventEndsAt } from "@/shared/utils/event-days";
 import VerifiedName from "@/shared/components/verified-name/verified-name.component";
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { BRAND } from "@/shared/utils/brand-colors";
@@ -1615,6 +1616,8 @@ const LiveExploreScreen = ({
             category={item.category?.name}
             place={eventPlace(item)}
             momentum={item.momentum}
+            // An ended event: what people who were there posted.
+            crowd={eventEndsAt(item) < new Date() ? { count: item.crowdPosts ?? 0, previews: item.crowdPreviews ?? [] } : null}
             onPress={() => onOpenEvent(item.id)}
             onMore={() => openCardOptions(item)}
           />
