@@ -1,4 +1,5 @@
 import React, { memo, useMemo, useState } from "react";
+import { initialsOf } from "@/shared/utils/initials";
 import { ActivityIndicator, Alert, FlatList, Pressable, TextInput, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -47,8 +48,6 @@ const useChatMembers = (eventId?: string | null) =>
     }
   });
 
-const initials = (name: string) =>
-  name.replace(/^@/, "").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "?";
 
 /**
  * Group info for an event's chat: the event, who's in it (name, @username and
@@ -210,7 +209,7 @@ const GroupInfo = ({
               ) : (
                 <View className="size-10 items-center justify-center rounded-full" style={{ backgroundColor: item.role === "vendor" ? BRAND.ink : BRAND.blueTint }}>
                   <TextComponent className="text-xs font-extrabold" style={{ color: item.role === "vendor" ? BRAND.blue : BRAND.blueDeep }}>
-                    {initials(item.name)}
+                    {initialsOf(item.name)}
                   </TextComponent>
                 </View>
               )}

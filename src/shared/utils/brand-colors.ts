@@ -8,6 +8,13 @@ export const BRAND = {
   blue: "#00B2FF",
   /** Deeper blue: the far end of the brand gradient, and strong accents. */
   blueDeep: "#0577FA",
+  /**
+   * Blue words (links, prices, times, small labels) on light backgrounds: the
+   * deep blue, which reads at 4.5:1 on white. The bright `blue` is for buttons,
+   * icons, rings and anything on a dark background, never body text on white.
+   * Headings stay `ink`/zinc-950. Class name: `text-link`.
+   */
+  link: "#0577FA",
   /** Soft blue, for quiet accents. */
   blueSoft: "#6FB1FC",
   /** Navy blue, for dark accents. */

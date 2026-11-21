@@ -40,7 +40,7 @@ const QueryErrorComponent: React.FC<TQueryErrorComponent> = ({
         <ButtonComponent
           onPress={retryFunction}
           variant="outline"
-          textClassName="text-primary text-sm"
+          textClassName="text-link text-sm"
         >
           Try again
         </ButtonComponent>

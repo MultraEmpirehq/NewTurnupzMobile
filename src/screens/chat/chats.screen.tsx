@@ -1,4 +1,5 @@
 import React, { memo, useEffect, useMemo, useState } from "react";
+import { initialsOf } from "@/shared/utils/initials";
 import { useOpenChatStore } from "@/shared/stores/open-chat.store";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, TextInput, View } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
@@ -10,6 +11,7 @@ import { constructErrorMessage } from "@/api/functions";
 import useUserStore from "@/shared/stores/user.store";
 import { BRAND } from "@/shared/utils/brand-colors";
 import ChatThreadScreen from "@/screens/live/chat-thread.screen";
+import NewGroupSheet from "@/screens/live/new-group.sheet";
 import {
   TLiveChat,
   answerMessageRequest,
@@ -46,8 +48,6 @@ const when = (iso?: string) => {
   return date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 };
 
-const initials = (name: string) =>
-  name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "?";
 
 const Tag = ({ label, dark }: { label: string; dark?: boolean }) => (
   <View className="ml-1.5 rounded-md px-1.5 py-0.5" style={{ backgroundColor: dark ? "#EEF0F4" : BRAND.blueTint }}>
@@ -60,7 +60,8 @@ const ChatsScreen = ({
   onOpenTickets
 }: {
   onOpenEvent: (eventId: string) => void;
-  onOpenTickets: () => void;
+  /** Left out where there are no tickets to open (a business account). */
+  onOpenTickets?: () => void;
 }) => {
   const isSignedIn = !!useUserStore((state) => state.userToken);
   const myId = useUserStore((state) => state.user?.id);
@@ -103,6 +104,7 @@ const ChatsScreen = ({
     }
   }, [pendingChatId, chats.data, chats.isFetching]); // eslint-disable-line react-hooks/exhaustive-deps
   const openSearch = usePeopleNav((state) => state.openSearch);
+  const [makingGroup, setMakingGroup] = useState(false);
 
   const pending = (received.data ?? []).filter((transfer) => transfer.status === "PENDING");
   const waiting = pending[0];
@@ -114,7 +116,8 @@ const ChatsScreen = ({
       if (chat.type === "SUPPORT" && filter !== "all") return false;
       if (filter === "events" && chat.type !== "EVENT_GROUP") return false;
       if (filter === "organisers" && chat.type !== "DIRECT") return false;
-      if (filter === "friends" && chat.type !== "PERSON") return false;
+      // Friends: one-to-one chats and friends' own groups.
+      if (filter === "friends" && chat.type !== "PERSON" && chat.type !== "GROUP") return false;
       return !needle || `${chat.eventName} ${chat.preview ?? ""}`.toLowerCase().includes(needle);
     });
     return [...list.filter((c) => c.type === "SUPPORT"), ...list.filter((c) => c.type !== "SUPPORT")];
@@ -137,6 +140,21 @@ const ChatsScreen = ({
     <View className="flex-1" style={{ backgroundColor: "#F7F8FB" }}>
       <View className="flex-row items-center justify-between px-5 pb-2 pt-1.5">
         <TextComponent className="text-[26px] font-extrabold text-zinc-950">Messages</TextComponent>
+        <View className="flex-row gap-2">
+        <Pressable
+          onPress={() => setMakingGroup(true)}
+          accessibilityRole="button"
+          accessibilityLabel="New group"
+          className="h-10 flex-row items-center gap-1.5 rounded-xl border bg-white px-3"
+          style={{ borderColor: "#EEF0F4" }}
+        >
+          <Svg width={17} height={17} viewBox="0 0 24 24">
+            <Circle cx={9} cy={8} r={3.2} fill="none" stroke={BRAND.ink} strokeWidth={2} />
+            <Circle cx={17} cy={9} r={2.6} fill="none" stroke={BRAND.ink} strokeWidth={2} />
+            <Path d="M3 20c0-3.3 2.7-5.6 6-5.6s6 2.3 6 5.6M15.5 14.6c2.9 0 5.5 2 5.5 5.4" fill="none" stroke={BRAND.ink} strokeWidth={2} strokeLinecap="round" />
+          </Svg>
+          <TextComponent className="text-[13px] font-bold text-zinc-950">New group</TextComponent>
+        </Pressable>
         <Pressable
           onPress={openSearch}
           accessibilityRole="button"
@@ -149,7 +167,16 @@ const ChatsScreen = ({
             <Path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6M18 8v6M15 11h6" fill="none" stroke={BRAND.ink} strokeWidth={2} strokeLinecap="round" />
           </Svg>
         </Pressable>
+        </View>
       </View>
+      <NewGroupSheet
+        visible={makingGroup}
+        onClose={() => setMakingGroup(false)}
+        onCreated={(groupId) => {
+          setMakingGroup(false);
+          openChatWhenReady(groupId);
+        }}
+      />
       <View className="mx-5 flex-row items-center gap-2 rounded-2xl border bg-white px-3.5" style={{ borderColor: "#EEF0F4", height: 42 }}>
         <Svg width={16} height={16} viewBox="0 0 24 24">
           <Circle cx={11} cy={11} r={7} fill="none" stroke="#9AA3AF" strokeWidth={2.2} />
@@ -193,7 +220,7 @@ const ChatsScreen = ({
               >
                 <TextComponent className="text-[12.5px] font-bold" style={{ color: on ? BRAND.white : "#4B5563" }}>{chip.label}</TextComponent>
                 {chip.id === "events" && unreadEvents > 0 && (
-                  <TextComponent className="ml-1 text-[12.5px] font-bold" style={{ color: BRAND.blue }}>{unreadEvents}</TextComponent>
+                  <TextComponent className="ml-1 text-[12.5px] font-bold" style={{ color: BRAND.link }}>{unreadEvents}</TextComponent>
                 )}
               </Pressable>
             );
@@ -255,7 +282,7 @@ const ChatsScreen = ({
                     <CustomImage className="size-11 rounded-full" imageClassName="size-full rounded-full" source={{ uri: chat.person.image }} contentFit="cover" />
                   ) : (
                     <View className="size-11 items-center justify-center rounded-full" style={{ backgroundColor: BRAND.ink }}>
-                      <TextComponent className="font-extrabold" style={{ color: BRAND.blue }}>{initials(chat.eventName)}</TextComponent>
+                      <TextComponent className="font-extrabold" style={{ color: BRAND.link }}>{initialsOf(chat.eventName)}</TextComponent>
                     </View>
                   )}
                   <View className="flex-1">
@@ -303,8 +330,9 @@ const ChatsScreen = ({
             {shown.map((chat) => {
               const unread = chat.unreadCount ?? 0;
               const isGroup = chat.type === "EVENT_GROUP";
+              const isFriendsGroup = chat.type === "GROUP";
               const isPerson = chat.type === "PERSON";
-              const iAmOrganiser = !isPerson && chat.vendor?.id === myId;
+              const iAmOrganiser = !isPerson && !isFriendsGroup && chat.vendor?.id === myId;
               return (
                 <Pressable
                   key={chat.id}
@@ -317,13 +345,13 @@ const ChatsScreen = ({
                   {chat.type === "SUPPORT" && chat.vendor?.id === myId ? (
                     // Your chat with the Turnupz team: the Turnupz logo (the team sees the person).
                     <CustomImage className="size-[52px] rounded-[14px]" imageClassName="size-full rounded-[14px]" source={TurnupzIcon} contentFit="cover" />
-                  ) : isGroup && chat.eventImage ? (
+                  ) : (isGroup || isFriendsGroup) && chat.eventImage ? (
                     <CustomImage className="size-[52px] rounded-[14px]" imageClassName="size-full rounded-[14px]" source={{ uri: chat.eventImage }} contentFit="cover" />
                   ) : isPerson && chat.person?.image ? (
                     <CustomImage className="size-[52px] rounded-full" imageClassName="size-full rounded-full" source={{ uri: chat.person.image }} contentFit="cover" />
                   ) : (
                     <View className="size-[52px] items-center justify-center rounded-[14px]" style={{ backgroundColor: isGroup || iAmOrganiser ? BRAND.blueTint : BRAND.ink }}>
-                      <TextComponent className="font-extrabold" style={{ color: isGroup || iAmOrganiser ? BRAND.blueDeep : BRAND.blue }}>{initials(chat.eventName)}</TextComponent>
+                      <TextComponent className="font-extrabold" style={{ color: isGroup || iAmOrganiser ? BRAND.blueDeep : BRAND.blue }}>{initialsOf(chat.eventName)}</TextComponent>
                     </View>
                   )}
                   <View className="flex-1">
@@ -331,6 +359,8 @@ const ChatsScreen = ({
                       <TextComponent numberOfLines={1} className="shrink text-[14.5px] font-bold text-zinc-950">{chat.eventName}</TextComponent>
                       {isGroup ? (
                         <Tag label={chat.status === "ARCHIVED" ? "CLOSED" : "EVENT"} dark={chat.status === "ARCHIVED"} />
+                      ) : isFriendsGroup ? (
+                        <Tag label="GROUP" />
                       ) : !isPerson && !iAmOrganiser ? (
                         <Tag label="ORGANISER" dark />
                       ) : chat.request === "outgoing" ? (
@@ -338,7 +368,8 @@ const ChatsScreen = ({
                       ) : null}
                     </View>
                     <TextComponent numberOfLines={1} className="mt-0.5 text-[13px] text-zinc-500">
-                      {chat.preview || (isGroup ? `${chat.memberCount ?? 0} going` : "Say hello")}
+                      {chat.preview ||
+                        (isGroup ? `${chat.memberCount ?? 0} going` : isFriendsGroup ? `${chat.memberCount ?? 0} members` : "Say hello")}
                     </TextComponent>
                   </View>
                   <View className="items-end gap-1.5">
@@ -366,10 +397,14 @@ const ChatsScreen = ({
           setOpen(null);
           onOpenEvent(eventId);
         }}
-        onOpenTickets={() => {
-          setOpen(null);
-          onOpenTickets();
-        }}
+        onOpenTickets={
+          onOpenTickets
+            ? () => {
+                setOpen(null);
+                onOpenTickets();
+              }
+            : undefined
+        }
         onClose={() => {
           setOpen(null);
           void chats.refetch();

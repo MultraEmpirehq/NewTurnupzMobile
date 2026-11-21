@@ -58,7 +58,8 @@ const OrganiserShellScreen = ({
   onAttendee
 }: {
   onOpenEvent: (eventId: string) => void;
-  onAttendee: () => void;
+  /** Left out for a business account: it has no attendee side. */
+  onAttendee?: () => void;
 }) => {
   const insets = useSafeAreaInsets();
   const access = useOrganiserAccess();

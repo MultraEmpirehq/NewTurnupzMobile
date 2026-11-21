@@ -74,7 +74,7 @@ const BlogPostScreen = ({
           <View className="px-5 pt-4">
             <View className="flex-row items-center gap-2.5">
               <View className="size-9 items-center justify-center rounded-[10px]" style={{ backgroundColor: BRAND.ink }}>
-                <TextComponent className="text-xs font-extrabold" style={{ color: BRAND.blue }}>
+                <TextComponent className="text-xs font-extrabold" style={{ color: BRAND.link }}>
                   {by.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("")}
                 </TextComponent>
               </View>

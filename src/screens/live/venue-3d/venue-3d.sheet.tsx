@@ -1,3 +1,4 @@
+import { BRAND } from "@/shared/utils/brand-colors";
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { PanResponder, Pressable, View, useWindowDimensions } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
@@ -111,7 +112,7 @@ const Venue3DSheet = ({
         <View className="flex-row items-center justify-between px-4 pb-3">
           <TextComponent className="text-lg font-bold text-zinc-950">Where you&apos;ll be</TextComponent>
           <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button">
-            <TextComponent className="text-sm font-bold" style={{ color: ACCENT }}>
+            <TextComponent className="text-sm font-bold" style={{ color: BRAND.link }}>
               Done
             </TextComponent>
           </Pressable>

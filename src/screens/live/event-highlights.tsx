@@ -137,7 +137,7 @@ const Viewer = ({ eventId, item, onClose }: { eventId: string; item: THighlight 
   );
 };
 
-/** "Were you there?": pick photos and clips, then send them to the organiser. */
+/** "Were you there?": pick photos and clips, then post them to the event. */
 const AddPhotosSheet = ({
   eventId,
   eventName,
@@ -211,13 +211,10 @@ const AddPhotosSheet = ({
         <View className="shrink rounded-t-3xl bg-white px-5 pb-8 pt-5">
           {sent ? (
             <View className="items-center gap-3 py-4">
-              <TextComponent className="text-xl font-bold text-zinc-950">Sent to the organiser</TextComponent>
+              <TextComponent className="text-xl font-bold text-zinc-950">Posted</TextComponent>
               <TextComponent className="text-center text-sm text-zinc-500">
-                We'll let you know when they're up on the {eventName} page.
+                {sent === 1 ? "It's" : "They're"} on the {eventName} page and your profile.
               </TextComponent>
-              <View className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1">
-                <TextComponent className="text-sm font-semibold text-amber-800">{sent} waiting for approval</TextComponent>
-              </View>
               <Pressable onPress={onClose} className="mt-2 h-12 w-full items-center justify-center rounded-xl" style={{ backgroundColor: ACCENT }}>
                 <TextComponent className="font-bold text-white">Done</TextComponent>
               </Pressable>
@@ -309,12 +306,12 @@ const AddPhotosSheet = ({
                   <ActivityIndicator color="#ffffff" />
                 ) : (
                   <TextComponent className="font-bold text-white">
-                    {picked.length ? `Send ${picked.length} to the organiser` : "Pick photos or clips"}
+                    {picked.length ? `Post ${picked.length}` : "Pick photos or clips"}
                   </TextComponent>
                 )}
               </Pressable>
               <TextComponent className="mt-2 text-center text-xs text-zinc-500">
-                They show on the event page once the organiser approves them.
+                Shows on the event page and your profile straight away. The organiser can take it off their event. If your profile is private, only your followers see it.
               </TextComponent>
             </>
           )}
@@ -372,15 +369,8 @@ const EventHighlights = ({ eventId, eventName, isPast }: { eventId: string; even
         <View>
           <TextComponent className="text-base font-bold text-zinc-950">From the crowd</TextComponent>
           <TextComponent className="mb-3 mt-0.5 text-xs text-zinc-500">
-            From people who were there. The organiser approves each one.
+            From people who were there.
           </TextComponent>
-          {!!data.me?.pending && (
-            <View className="mb-3 self-start rounded-full border border-amber-200 bg-amber-50 px-3 py-1">
-              <TextComponent className="text-xs font-semibold text-amber-800">
-                {data.me.pending} of yours waiting for approval
-              </TextComponent>
-            </View>
-          )}
           <View className="flex-row flex-wrap" style={{ gap: 8 }}>
             {showAdd && (
               <Pressable

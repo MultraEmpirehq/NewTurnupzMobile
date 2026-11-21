@@ -7,6 +7,7 @@ import Svg, { Circle, Path } from "react-native-svg";
 import TextComponent from "@/shared/components/text/text.component";
 import { onError } from "@/shared/components/status/toast";
 import { constructErrorMessage } from "@/api/functions";
+import ProfilePosts from "@/screens/profile/profile-posts";
 import { BRAND } from "@/shared/utils/brand-colors";
 import { ProfilePhoto } from "@/screens/profile/profile-photo";
 import ChatThreadScreen from "@/screens/live/chat-thread.screen";
@@ -240,8 +241,15 @@ const PersonPage = ({ username, onMessage }: { username: string; onMessage: (per
               <TextComponent className="mt-1 text-center text-[13px] leading-[18px] text-zinc-500">
                 {p.requested
                   ? `Your request is waiting for ${p.name.split(" ")[0]} to accept.`
-                  : "Follow them to see who they follow and who follows them."}
+                  : "Follow them to see their posts, who they follow and who follows them."}
               </TextComponent>
+            </View>
+          )}
+
+          {!p.locked && !p.blockedByMe && !!p.username && (
+            <View className="mt-6">
+              <TextComponent className="text-base font-bold text-zinc-950">Posts</TextComponent>
+              <ProfilePosts username={p.username} own={p.isMe} padded={false} />
             </View>
           )}
           </>

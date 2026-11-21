@@ -4,6 +4,7 @@ import ShareIcon from "@/shared/assets/icons/share.icon";
 import EventOptionsSheet from "./event-options.sheet";
 import { useHardwareBack } from "@/shared/hooks/use-hardware-back";
 import VerifiedName from "@/shared/components/verified-name/verified-name.component";
+import { BRAND } from "@/shared/utils/brand-colors";
 import React, { memo, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -85,13 +86,13 @@ const EventSchedule = ({
   onOpenPerformer?: (performerId: string) => void;
 }) => (
   <View className="mt-6">
-    <TextComponent className="text-base font-bold text-primary">Schedule</TextComponent>
+    <TextComponent className="text-base font-bold text-zinc-950">Schedule</TextComponent>
     <View className="mt-3 gap-3">
       {days.map((day, dayIndex) => (
         <View key={day.id} className="rounded-2xl border border-zinc-100 bg-white p-4">
           <View className="flex-row items-center justify-between gap-3">
             <View className="flex-1">
-              <TextComponent className="text-[10px] font-extrabold tracking-widest text-primary">
+              <TextComponent className="text-[10px] font-extrabold tracking-widest" style={{ color: BRAND.blueDeep }}>
                 DAY {dayIndex + 1}
               </TextComponent>
               <TextComponent numberOfLines={1} className="mt-0.5 text-base font-bold text-zinc-950">
@@ -159,7 +160,7 @@ const SponsorBoard = ({ sponsors }: { sponsors?: TLiveEvent["sponsors"] }) => {
   if (!items.length) return null;
   return (
     <View className="mt-6 border-t border-zinc-200 pt-4">
-      <TextComponent className="text-base font-bold text-primary">Sponsors</TextComponent>
+      <TextComponent className="text-base font-bold text-zinc-950">Sponsors</TextComponent>
       <View className="mt-3 flex-row flex-wrap overflow-hidden rounded-xl border border-zinc-100 bg-white">
         {items.map((sponsor, index) => {
           const logo = sponsor.showName ? null : sponsor.imageDetails?.url;
@@ -288,6 +289,8 @@ const LiveEventDetailScreen = ({
   // Tickets you already hold for this event: say so, and offer them first.
   const held = useTicketsHeldFor(event?.id);
   const isRegistration = event?.saleMethod === "register";
+  // A business account doesn't buy or register: its people use personal accounts.
+  const isBusiness = !!useUserStore((state) => state.user?.isBusiness);
   const bookLabel =
     event?.saleMethod === "external_link"
       ? "Get Tickets"
@@ -359,18 +362,29 @@ const LiveEventDetailScreen = ({
             paddingTop: 8
           }}
         >
-          {!!event.image && (
+          {event.mobileImage ? (
+            // The organiser's phone cover: a taller 4:5 image made for phones.
             <CustomImage
               className="w-full rounded-xl"
               imageClassName="size-full rounded-xl"
-              source={{ uri: event.image }}
+              source={{ uri: event.mobileImage }}
               contentFit="cover"
-              style={{ height: isCompactPhone ? 190 : 220 }}
+              style={{ aspectRatio: 4 / 5 }}
             />
+          ) : (
+            !!event.image && (
+              <CustomImage
+                className="w-full rounded-xl"
+                imageClassName="size-full rounded-xl"
+                source={{ uri: event.image }}
+                contentFit="cover"
+                style={{ height: isCompactPhone ? 190 : 220 }}
+              />
+            )
           )}
 
           <View className="mt-4 flex-row items-start gap-3">
-            <TextComponent className="flex-1 text-xl font-bold text-primary">
+            <TextComponent className="flex-1 text-xl font-bold text-zinc-950">
               {event.name}
             </TextComponent>
             <Pressable
@@ -402,7 +416,7 @@ const LiveEventDetailScreen = ({
                   accessibilityLabel={`Open ${eventPlace(event)} in a maps app`}
                   className="ml-2"
                 >
-                  <TextComponent className="text-sm font-semibold" style={{ color: ACCENT }}>
+                  <TextComponent className="text-sm font-semibold" style={{ color: BRAND.blueDeep }}>
                     Open in…
                   </TextComponent>
                 </Pressable>
@@ -418,7 +432,7 @@ const LiveEventDetailScreen = ({
             </View>
             <View className="flex-row items-center">
               <ClockIcon />
-              <TextComponent className="ml-2 text-sm font-semibold text-primary">
+              <TextComponent className="ml-2 text-sm font-semibold" style={{ color: BRAND.blueDeep }}>
                 {multiDay
                   ? `Starts ${formatEventClock(event.date, event.timezone)}`
                   : formatEventClock(event.date, event.timezone)}
@@ -501,10 +515,10 @@ const LiveEventDetailScreen = ({
           )}
 
           <Pressable
-            disabled={isPast || (isRegistration && held > 0)}
+            disabled={isPast || isBusiness || (isRegistration && held > 0)}
             onPress={handleBook}
             className={
-              isPast || (isRegistration && held > 0)
+              isPast || isBusiness || (isRegistration && held > 0)
                 ? "mt-5 h-12 items-center justify-center rounded-lg bg-zinc-300"
                 : held > 0
                   ? "mt-3 h-12 items-center justify-center rounded-lg border-2 border-primary bg-white"
@@ -515,12 +529,15 @@ const LiveEventDetailScreen = ({
               className="font-bold"
               style={{
                 color:
-                  held > 0 && !isPast && !(isRegistration && held > 0) ? "#00B2FF" : "#ffffff"
+                  held > 0 && !isPast && !(isRegistration && held > 0) ? BRAND.blueDeep : "#ffffff"
               }}
             >
-              {isPast ? "This event has ended" : bookLabel}
+              {isPast ? "This event has ended" : isBusiness ? "Business accounts can't book" : bookLabel}
             </TextComponent>
           </Pressable>
+          {isBusiness && !isPast && (
+            <TextComponent className="mt-2 text-center text-xs text-zinc-500">Use your personal Turnupz account to get tickets.</TextComponent>
+          )}
 
           <View className="mt-6 flex-row border-b border-zinc-200">
             {TABS.map((tab) => {
@@ -538,7 +555,7 @@ const LiveEventDetailScreen = ({
                   <TextComponent
                     className={
                       isActive
-                        ? "text-sm font-bold text-primary"
+                        ? "text-sm font-bold text-zinc-950"
                         : "text-sm font-semibold text-zinc-500"
                     }
                   >
@@ -553,7 +570,7 @@ const LiveEventDetailScreen = ({
 
           {activeTab === "Overview" && (
             <View className="mt-4">
-              <TextComponent className="text-lg font-bold text-primary">
+              <TextComponent className="text-lg font-bold text-zinc-950">
                 About this event
               </TextComponent>
               <TextComponent className="mt-2 text-sm leading-5 text-zinc-950">
@@ -561,7 +578,7 @@ const LiveEventDetailScreen = ({
               </TextComponent>
               {!!event.additionalInformation?.length && (
                 <>
-                  <TextComponent className="mt-6 text-base font-bold text-primary">
+                  <TextComponent className="mt-6 text-base font-bold text-zinc-950">
                     Additional information
                   </TextComponent>
                   {event.additionalInformation.map((item, index) => (
@@ -580,7 +597,7 @@ const LiveEventDetailScreen = ({
               )}
               {!multiDay && !!event.performers?.length && (
                 <>
-                  <TextComponent className="mt-6 text-base font-bold text-primary">
+                  <TextComponent className="mt-6 text-base font-bold text-zinc-950">
                     Line-up
                   </TextComponent>
                   <ScrollView
@@ -661,7 +678,7 @@ const LiveEventDetailScreen = ({
                 (event.activities ?? []).map((activity, index) => (
                   <View key={`${activity.name}-${index}`} className="rounded-xl bg-white p-4 shadow-sm">
                     {!!activity.date && (
-                      <TextComponent className="text-[10px] font-bold text-primary">
+                      <TextComponent className="text-[10px] font-bold" style={{ color: BRAND.blueDeep }}>
                         {formatEventTime(activity.date, event.timezone)}
                       </TextComponent>
                     )}
@@ -748,7 +765,7 @@ const LiveEventDetailScreen = ({
           post={openPost}
           event={event}
           bookLabel={bookLabel}
-          canBook={!isPast}
+          canBook={!isPast && !isBusiness}
           onBook={() => {
             setOpenPostId(null);
             // After the post has slid away (one modal at a time on iOS).
