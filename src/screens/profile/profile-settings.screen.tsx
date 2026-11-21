@@ -470,7 +470,7 @@ const SignInPage = ({ onBack, onChangePassword }: { onBack: () => void; onChange
                   disabled={!otp.trim() || !strong || !matches}
                 />
                 <Pressable onPress={() => void sendCode()} accessibilityRole="button" className="items-center py-1">
-                  <TextComponent className="text-sm font-semibold" style={{ color: BLUE }}>
+                  <TextComponent className="text-sm font-semibold" style={{ color: BRAND.link }}>
                     {t("signIn.resend")}
                   </TextComponent>
                 </Pressable>
@@ -486,7 +486,7 @@ const SignInPage = ({ onBack, onChangePassword }: { onBack: () => void; onChange
 /* ----------------------------------------------------------------- notifications */
 
 // Each row's words are notificationSettings.<key> and <key>Hint.
-const NOTIFICATION_ROWS = ["orderUpdates", "ticketTransfers", "eventUpdates", "creditUpdates"] as const;
+const NOTIFICATION_ROWS = ["orderUpdates", "ticketTransfers", "eventUpdates", "socialUpdates", "creditUpdates"] as const;
 
 export const NotificationsPage = ({ onBack }: { onBack: () => void }) => {
   useHardwareBack(onBack);
@@ -530,7 +530,7 @@ export const NotificationsPage = ({ onBack }: { onBack: () => void }) => {
                 key={key}
                 label={t(`notificationSettings.${key}`)}
                 hint={t(`notificationSettings.${key}Hint`)}
-                value={value[key]}
+                value={value[key] ?? true}
                 onChange={(next) => void change(key, next)}
                 last={index === NOTIFICATION_ROWS.length - 1}
               />
@@ -649,7 +649,7 @@ const DevicesPage = ({ onBack }: { onBack: () => void }) => {
                   </TextComponent>
                   {session.isCurrent && (
                     <View className="rounded-full bg-[#e3f6ff] px-2 py-0.5">
-                      <TextComponent className="text-[10px] font-bold" style={{ color: BLUE }}>{t("devices.thisDevice")}</TextComponent>
+                      <TextComponent className="text-[10px] font-bold" style={{ color: BRAND.link }}>{t("devices.thisDevice")}</TextComponent>
                     </View>
                   )}
                 </View>
@@ -757,6 +757,9 @@ const PrivacyPage = ({ onBack, onOpenBlocked }: { onBack: () => void; onOpenBloc
   if (saved && draft.messagePolicy && draft.messagePolicy !== saved.messagePolicy) {
     changes.messagePolicy = draft.messagePolicy;
   }
+  if (saved && draft.allowTags !== undefined && draft.allowTags !== (saved.allowTags ?? true)) {
+    changes.allowTags = draft.allowTags;
+  }
   const dirty = Object.keys(changes).length > 0;
 
   const save = async () => {
@@ -819,6 +822,16 @@ const PrivacyPage = ({ onBack, onOpenBlocked }: { onBack: () => void; onOpenBloc
             )}
           </Section>
           <TextComponent className="px-6 pt-2 text-xs italic text-zinc-500">{t("privacy.privateNote")}</TextComponent>
+
+          <Section title={t("privacy.tags")}>
+            <Toggle
+              label={t("privacy.allowTags")}
+              hint={t("privacy.allowTagsHint")}
+              value={value.allowTags ?? true}
+              onChange={(next) => setDraft((current) => ({ ...current, allowTags: next }))}
+              last
+            />
+          </Section>
 
           <Section title={t("privacy.messages")}>
             {MESSAGE_POLICIES.map((policy, index) => {

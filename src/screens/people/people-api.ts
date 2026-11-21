@@ -87,7 +87,13 @@ export const useFollowPerson = () => {
 /* ------------------------------------------------------------------ privacy */
 
 export type TMessagePolicy = "EVERYONE" | "MUTUALS" | "NOBODY";
-export type TPrivacy = { isPrivate: boolean; messagePolicy: TMessagePolicy; blockedCount: number };
+export type TPrivacy = {
+  isPrivate: boolean;
+  messagePolicy: TMessagePolicy;
+  /** People who follow each other with you can tag you in posts. */
+  allowTags?: boolean;
+  blockedCount: number;
+};
 
 export const usePrivacy = () =>
   useQuery({
@@ -98,7 +104,7 @@ export const usePrivacy = () =>
 /** Changes privacy settings, showing the change straight away. */
 export const useUpdatePrivacy = () => {
   const queryClient = useQueryClient();
-  return async (change: Partial<Pick<TPrivacy, "isPrivate" | "messagePolicy">>) => {
+  return async (change: Partial<Pick<TPrivacy, "isPrivate" | "messagePolicy" | "allowTags">>) => {
     const before = queryClient.getQueryData<TPrivacy>(["privacy"]);
     if (before) queryClient.setQueryData(["privacy"], { ...before, ...change });
     try {

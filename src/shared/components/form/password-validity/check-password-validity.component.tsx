@@ -35,7 +35,7 @@ const validityTextClassName = cva("text-xs", {
   variants: {
     isValid: {
       false: null,
-      true: "text-primary"
+      true: "text-link"
     }
   },
   defaultVariants: {

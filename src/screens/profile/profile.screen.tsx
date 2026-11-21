@@ -52,6 +52,8 @@ import ProfileSettingsScreen from "./profile-settings.screen";
 import EditProfileScreen from "./edit-profile.screen";
 import WalletScreen from "./wallet.screen";
 import { ProfilePhoto } from "./profile-photo";
+import ProfilePosts from "./profile-posts";
+import { useProfilePosts } from "./posts-api";
 import { usePeopleNav } from "@/screens/people/people-nav";
 import { usePerson } from "@/screens/people/people-api";
 import { maskAmount, useBalancePrivacyStore } from "@/shared/stores/balance-privacy.store";
@@ -168,6 +170,10 @@ const ProfileScreen = ({
   const me = useMe();
   const user = me.data;
   const hiddenEventIds = useHiddenEventsStore((state) => state.hiddenEventIds);
+  const postPages = useProfilePosts(user?.username);
+  const postCount = postPages.data?.pages[0]?.total ?? 0;
+  const taggedPages = useProfilePosts(user?.username, "tagged");
+  const taggedCount = taggedPages.data?.pages[0]?.total ?? 0;
 
   const [showSettings, setShowSettings] = useState(false);
   const [page, setPage] = useState<TPage | null>(null);
@@ -413,7 +419,7 @@ const ProfileScreen = ({
                   {item.subtitle || FOLLOW_LABEL[item.targetType]}
                 </TextComponent>
                 {item.targetType !== "PERSON" && (
-                  <TextComponent className="mt-0.5 text-xs font-semibold" style={{ color: BRAND.blue }}>
+                  <TextComponent className="mt-0.5 text-xs font-semibold" style={{ color: BRAND.link }}>
                     {item.upcomingEvents
                       ? `${item.upcomingEvents} upcoming ${item.upcomingEvents === 1 ? "event" : "events"}`
                       : "No upcoming events"}
@@ -497,8 +503,8 @@ const ProfileScreen = ({
   const emptyTab = {
     tickets: { title: "No tickets yet", body: "Tickets you buy and free events you register for will show here." },
     saved: { title: "Nothing saved yet", body: "Tap ⋯ on any event and choose Save event." },
-    posts: { title: "Posts are coming soon", body: "You'll be able to share photos from events you went to." },
-    tagged: { title: "Tagged is coming soon", body: "Photos friends tag you in will show here." }
+    posts: { title: "", body: "" },
+    tagged: { title: "", body: "" }
   }[eventsTab];
 
   return (
@@ -608,7 +614,7 @@ const ProfileScreen = ({
                   ? creditRow.available.formatted?.withCurrency
                   : creditRow?.available.formatted?.withCurrency ?? emptyCredit}
             </TextComponent>
-            <TextComponent className="mt-0.5 text-xs font-semibold" style={{ color: BRAND.blue }}>
+            <TextComponent className="mt-0.5 text-xs font-semibold" style={{ color: BRAND.link }}>
               Open wallet ›
             </TextComponent>
           </Pressable>
@@ -652,8 +658,8 @@ const ProfileScreen = ({
         <View className="mx-5 mt-4 flex-row" style={{ borderBottomWidth: 1, borderBottomColor: "#E3E7ED" }}>
           {(
             [
-              { id: "posts", label: "Posts", count: "0" },
-              { id: "tagged", label: "Tagged", count: "0" },
+              { id: "posts", label: "Posts", count: String(postCount) },
+              { id: "tagged", label: "Tagged", count: String(taggedCount) },
               { id: "tickets", label: "Tickets", count: `${ticketCount}${more}` },
               { id: "saved", label: "Saved", count: String(savedTotal) }
             ] as const
@@ -683,7 +689,17 @@ const ProfileScreen = ({
           })}
         </View>
 
-        {(eventsTab === "saved" ? saved.isLoading : eventsTab === "tickets" ? tickets.isLoading : false) ? (
+        {eventsTab === "tagged" ? (
+          <ProfilePosts username={user.username} which="tagged" />
+        ) : eventsTab === "posts" ? (
+          <ProfilePosts
+            username={user.username}
+            // Ticket holders can post to an event for 14 days after it ends.
+            events={past
+              .filter((item) => Date.now() - new Date(item.event.endDate ?? item.event.date).getTime() < 14 * 86_400_000)
+              .map((item) => ({ id: item.event.id, name: item.event.name }))}
+          />
+        ) : (eventsTab === "saved" ? saved.isLoading : eventsTab === "tickets" ? tickets.isLoading : false) ? (
           <Loading />
         ) : tabEvents.length ? (
           tabEvents.map(({ event, note, past: isPastRow }, index) => (

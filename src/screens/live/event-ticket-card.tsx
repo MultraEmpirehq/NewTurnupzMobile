@@ -1,3 +1,4 @@
+import ListCard from "@/shared/components/cards/list-card";
 import React, { memo } from "react";
 import { TEventMomentum, useTicketsHeldFor } from "./live-api";
 import { Pressable, View } from "react-native";
@@ -32,6 +33,8 @@ type TEventTicketCardProps = {
   momentum?: TEventMomentum | null;
   /** A paid boost: outlined and marked Sponsored. */
   sponsored?: boolean;
+  /** An ended event's posts from people who were there: a strip under the card. */
+  crowd?: { count: number; previews: string[] } | null;
 };
 
 /** The one selling label worth showing, strongest first. */
@@ -50,6 +53,7 @@ const momentumLabel = (momentum?: TEventMomentum | null) =>
  * home feed, Explore's lists and its side-scrolling rails, and the profile.
  */
 const EventTicketCard: React.FC<TEventTicketCardProps> = ({
+  crowd,
   name,
   date,
   timezone,
@@ -68,28 +72,13 @@ const EventTicketCard: React.FC<TEventTicketCardProps> = ({
   const selling = momentumLabel(momentum);
   const dateBlock = formatEventDateBlock(date, timezone);
   return (
-    <Pressable
-      accessibilityRole="button"
+    <ListCard
       accessibilityLabel={`Open details for ${name}${sponsored ? ", sponsored" : ""}`}
       onPress={onPress}
-      className={width ? "mb-5 rounded-3xl bg-white" : "mx-4 mb-5 rounded-3xl bg-white"}
-      style={{
-        width,
-        shadowColor: "#0f172a",
-        shadowOpacity: 0.1,
-        shadowRadius: 18,
-        shadowOffset: { width: 0, height: 10 },
-        elevation: 3
-      }}
+      width={width}
+      thickBorder={sponsored}
+      borderColor={sponsored ? "rgba(5,119,250,0.6)" : undefined}
     >
-      <View
-        className={
-          sponsored
-            ? "overflow-hidden rounded-3xl border-2"
-            : "overflow-hidden rounded-3xl border border-black/5"
-        }
-        style={sponsored ? { borderColor: "rgba(5,119,250,0.6)" } : undefined}
-      >
         <View className="relative aspect-[4/3] w-full bg-[#eef6ff]">
           {!!image && (
             <CustomImage
@@ -228,8 +217,27 @@ const EventTicketCard: React.FC<TEventTicketCardProps> = ({
             </Pressable>
           )}
         </View>
-      </View>
-    </Pressable>
+        {!!crowd?.count && (
+          <View className="flex-row items-center gap-3 border-t border-zinc-100 px-5 py-3">
+            <View className="flex-row">
+              {crowd.previews.slice(0, 3).map((url, index) => (
+                <CustomImage
+                  key={url + index}
+                  className="size-9 rounded-lg border-2 border-white"
+                  imageClassName="size-full rounded-lg"
+                  source={{ uri: url }}
+                  contentFit="cover"
+                  style={{ marginLeft: index ? -10 : 0 }}
+                />
+              ))}
+            </View>
+            <TextComponent className="flex-1 text-[13px] font-bold text-zinc-950">
+              {crowd.count} {crowd.count === 1 ? "post" : "posts"} from the crowd
+            </TextComponent>
+            <TextComponent className="text-xs font-bold" style={{ color: "#0577FA" }}>View ›</TextComponent>
+          </View>
+        )}
+    </ListCard>
   );
 };
 

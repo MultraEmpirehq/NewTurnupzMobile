@@ -1,3 +1,4 @@
+import { BRAND } from "@/shared/utils/brand-colors";
 import React, { memo, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, Share, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
@@ -23,7 +24,7 @@ const Card = ({ children }: { children: React.ReactNode }) => (
 
 const LinkButton = ({ label, onPress, danger }: { label: string; onPress: () => void; danger?: boolean }) => (
   <Pressable onPress={onPress} accessibilityRole="button" className="py-2">
-    <TextComponent className="font-semibold" style={{ color: danger ? "#dc2626" : "#00b2ff" }}>
+    <TextComponent className="font-semibold" style={{ color: danger ? BRAND.danger : BRAND.link }}>
       {label}
     </TextComponent>
   </Pressable>

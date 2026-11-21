@@ -47,7 +47,7 @@ const OTPCountdown: React.FC<TOTPCountdown> = ({
       {msRemaining > 0 && (
         <TextComponent className="text-sm">
           Resend in{" "}
-          <TextComponent className="text-primary text-sm font-medium">
+          <TextComponent className="text-link text-sm font-medium">
             {timing?.hours ? `${timing?.hours}:` : ""}
             {timing?.minutes}:{timing.seconds}
           </TextComponent>

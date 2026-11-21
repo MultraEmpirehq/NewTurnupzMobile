@@ -76,10 +76,18 @@ function BrandRefreshList<T>({
   );
 
   // Android: read the drag alongside the list's own scrolling (and its refresh).
+  // Only a downward drag that starts with the list at its top is a pull; a drag
+  // that starts anywhere else is left entirely to the list. (Before, any
+  // downward drag became a pull and took the gesture away from the list, so it
+  // couldn't scroll back up from the end.)
   const gesture = useMemo(() => {
     if (!IS_ANDROID || !onRefresh) return null;
     const pan = Gesture.Pan()
       .activeOffsetY(8)
+      .failOffsetY(-8)
+      .onTouchesDown((_event, state) => {
+        if (!atTop.value) state.fail();
+      })
       .onUpdate((event) => {
         // Half the finger's travel, like a rubber band; only from the top.
         pull.value = atTop.value ? Math.max(0, event.translationY * 0.5) : 0;

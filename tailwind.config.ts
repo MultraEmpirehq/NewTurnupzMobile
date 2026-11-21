@@ -51,6 +51,8 @@ module.exports = {
           900: "rgb(var(--background-900)  / <alpha-value>)",
           950: "rgb(var(--background-950)  / <alpha-value>)"
         },
+        // Blue words on light backgrounds (see BRAND.link): readable, unlike the bright primary.
+        link: "#0577FA",
         primary: {
           DEFAULT: "rgb(var(--primary-default)  / <alpha-value>)",
           50: "rgb(var(--primary-50)  / <alpha-value>)",
