@@ -24,11 +24,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    env:
-      # Each run is one higher than the last; 3 is the first after the hand-built 2.
-      ANDROID_VERSION_CODE: ${{ github.run_number + 2 }}
     steps:
       - uses: actions/checkout@v4
+
+      # Each run is one higher than the last; 3 is the first after the hand-built 2.
+      # (Workflow expressions can't add, so the shell does.)
+      - name: Set the build number
+        run: echo "ANDROID_VERSION_CODE=$(( ${{ github.run_number }} + 2 ))" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v4
         with:
