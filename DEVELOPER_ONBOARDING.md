@@ -149,7 +149,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 cd .. && npx expo start --dev-client --port 8081
 adb shell am start -a android.intent.action.VIEW \
-  -d "exp+turn-up-mobile://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081"
+  -d "exp+turnupz://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081"
 ```
 
 - The first debug build takes 30+ minutes; after that, JS changes reload live.

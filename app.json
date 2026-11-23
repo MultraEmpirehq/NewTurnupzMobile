@@ -1,8 +1,17 @@
 {
   "expo": {
     "name": "Turnupz",
-    "slug": "turn-up-mobile",
+    "owner": "turnupz",
+    "slug": "turnupz",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/65d8cfb7-9222-4f1f-bf8a-e7289613f888",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "icon": "./src/shared/assets/images/icon.png",
     "userInterfaceStyle": "light",
@@ -58,6 +67,11 @@
       ],
       "./plugins/with-pod-deployment-target",
       "./plugins/with-android-release-signing"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "65d8cfb7-9222-4f1f-bf8a-e7289613f888"
+      }
+    }
   }
 }

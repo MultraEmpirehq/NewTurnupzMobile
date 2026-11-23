@@ -1,0 +1,44 @@
+name: OTA update
+
+# One click (Actions → OTA update → Run workflow): publishes the current
+# JavaScript and images to phones already running a matching build, without a
+# store review. Native changes (new libraries, permissions) still need a release.
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Channel"
+        type: choice
+        options: [production, preview]
+        default: production
+      message:
+        description: "What changed (shown in the Expo dashboard)"
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Write .env
+        env:
+          ENV_FILE: ${{ secrets.MOBILE_ENV_PRODUCTION }}
+        run: printf '%s\n' "$ENV_FILE" > .env
+
+      - name: Publish the update
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          MESSAGE: ${{ inputs.message }}
+        run: npx eas-cli@27 update --channel "${{ inputs.channel }}" --message "$MESSAGE" --non-interactive
+
+      - if: always()
+        run: rm -f .env
