@@ -71,11 +71,16 @@ jobs:
       - run: npx expo prebuild --platform android --no-install
 
       # Prebuild caps Gradle at 512 MB of Metaspace, which release lint runs out of
-      # with this many native modules. The runner has 16 GB.
-      - name: Give Gradle more memory
+      # with this many native modules. The runner has 16 GB, shared with the Kotlin
+      # compiler's own JVM and the native (C++) builds, so everything is capped.
+      - name: Size Gradle's memory for the runner
         run: |
-          sed -i '/^org.gradle.jvmargs=/d' android/gradle.properties
-          echo "org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=2g -Dfile.encoding=UTF-8" >> android/gradle.properties
+          sed -i '/^org.gradle.jvmargs=/d;/^kotlin.daemon.jvmargs=/d;/^org.gradle.workers.max=/d' android/gradle.properties
+          {
+            echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
+            echo "kotlin.daemon.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m"
+            echo "org.gradle.workers.max=2"
+          } >> android/gradle.properties
 
       - name: Build the signed .aab
         working-directory: android
