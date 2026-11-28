@@ -1279,3 +1279,48 @@ export const checkoutTax = (priced: number, tax?: TEventTaxRates | null) => {
   }
   return { gross: priced, lines, included: true };
 };
+
+/** A pass (Sponsor, Crew…) given to me: free entry, opened like a ticket. */
+export type TMyPass = {
+  token: string;
+  passName: string;
+  holderName: string | null;
+  checkedInAt: string | null;
+  event: { id: string; name: string; date: string; timezone: string; venue: string | null };
+};
+
+/** A pass opened for the door: its code and the secret that makes it live. */
+export type TOpenPass = Omit<TMyPass, "token"> & {
+  code: string;
+  liveCode: { secret: string; windowSeconds: number; serverTime: string };
+};
+
+export const useMyPasses = (enabled = true) =>
+  useQuery({
+    queryKey: ["my-passes"],
+    queryFn: async () => (await getData<TMyPass[]>("/passes/mine")).data?.data ?? [],
+    enabled,
+    staleTime: 60_000,
+  });
+
+export const useOpenPass = (token: string | null) =>
+  useQuery({
+    queryKey: ["pass", token],
+    queryFn: async () => {
+      const pass = (await getData<TOpenPass>(`/passes/${token}`)).data?.data;
+      if (pass?.liveCode?.serverTime) rememberServerTime(pass.liveCode.serverTime);
+      return pass ?? null;
+    },
+    enabled: !!token,
+  });
+
+export const useNamePass = (token: string | null) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => patchData(`/passes/${token}/name`, { name }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["pass", token] });
+      void queryClient.invalidateQueries({ queryKey: ["my-passes"] });
+    },
+  });
+};

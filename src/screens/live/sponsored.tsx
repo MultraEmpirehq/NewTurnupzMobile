@@ -156,7 +156,8 @@ export const FeaturedBoost = memo(
     const event = useMemo(() => events[index % Math.max(events.length, 1)], [events, index]);
     if (!event) return null;
     const price = fromPrice(event);
-    const image = event.image ?? event.medias?.[0];
+    // The organiser's 4:5 phone cover when there is one: this card is made for phones.
+    const image = event.mobileImage ?? event.image ?? event.medias?.[0];
 
     return (
       <Pressable
@@ -167,7 +168,7 @@ export const FeaturedBoost = memo(
           onOpenEvent(event.id);
         }}
         className="mx-4 mb-5 overflow-hidden rounded-[28px] bg-[#06142e]"
-        style={{ height: 300 }}
+        style={event.mobileImage ? { aspectRatio: 4 / 5 } : { height: 300 }}
       >
         {!!image && (
           <CustomImage
