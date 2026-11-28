@@ -31,6 +31,8 @@ import {
 } from "@/shared/utils/event-days";
 import { TICKET_LIST_BACKGROUND } from "./event-ticket-card";
 import TransferTicketSheet from "./transfer-ticket.sheet";
+import PassSheet from "./pass.sheet";
+import { useMyPasses } from "./live-api";
 import { OrderSheet } from "@/screens/profile/orders.screen";
 import { ReceivedTransferRow, SentTransferRow } from "./sent-transfers";
 import { BackHeader, EmptyNote, Loading } from "./explore-details";
@@ -768,6 +770,14 @@ const LiveMyTicketsScreen = ({
     hasNextPage,
     isFetchingNextPage
   } = useLiveUserTickets();
+  // Passes (Sponsor, Crew…) for events that haven't ended, with a day's grace.
+  const myPasses = useMyPasses();
+  const [passToken, setPassToken] = useState<string | null>(null);
+  const [openedAt] = useState(() => Date.now());
+  const upcomingPasses = useMemo(
+    () => (myPasses.data ?? []).filter((pass) => new Date(pass.event.date).getTime() > openedAt - 24 * 60 * 60 * 1000),
+    [myPasses.data, openedAt]
+  );
   const [tab, setTab] = useState<"upcoming" | "past" | "transfers" | "refunds">(
     "upcoming"
   );
@@ -849,8 +859,39 @@ const LiveMyTicketsScreen = ({
     fetchNextPage
   ]);
 
+  const passesRow = tab === "upcoming" && upcomingPasses.length > 0 && (
+    <View className="mb-3 gap-2 px-4">
+      <TextComponent className="text-sm font-semibold text-zinc-500">Passes</TextComponent>
+      {upcomingPasses.map((pass) => (
+        <Pressable
+          key={pass.token}
+          onPress={() => setPassToken(pass.token)}
+          accessibilityRole="button"
+          accessibilityLabel={`${pass.passName} pass for ${pass.event.name}`}
+          className="flex-row items-center gap-3 rounded-2xl bg-white p-4"
+        >
+          <View className="size-11 items-center justify-center rounded-2xl" style={{ backgroundColor: BRAND.blueDeep }}>
+            <TextComponent className="text-base font-extrabold text-white">✓</TextComponent>
+          </View>
+          <View className="flex-1">
+            <TextComponent className="text-xs font-bold uppercase" style={{ color: BRAND.blueDeep, letterSpacing: 1 }}>
+              {pass.passName} pass
+            </TextComponent>
+            <TextComponent className="text-base font-bold" style={{ color: INK }} numberOfLines={1}>
+              {pass.event.name}
+            </TextComponent>
+            <TextComponent className="text-xs text-zinc-500">
+              {pass.checkedInAt ? "Checked in" : formatEventDay(pass.event.date, pass.event.timezone, { withYear: false })}
+            </TextComponent>
+          </View>
+        </Pressable>
+      ))}
+    </View>
+  );
+
   const tabsHeader = (
-    // Four tabs don't fit every phone, so the row scrolls sideways.
+    <View>
+    {/* Four tabs don't fit every phone, so the row scrolls sideways. */}
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
@@ -901,6 +942,8 @@ const LiveMyTicketsScreen = ({
         ))}
       </View>
     </ScrollView>
+    {passesRow}
+    </View>
   );
 
   return (
@@ -1048,6 +1091,7 @@ const LiveMyTicketsScreen = ({
         }}
       />
       <OrderSheet orderId={viewingOrderId} onClose={() => setViewingOrderId(null)} />
+      <PassSheet token={passToken} onClose={() => setPassToken(null)} />
       <TransferTicketSheet
         ticket={sending}
         eventName={sendingEventName}

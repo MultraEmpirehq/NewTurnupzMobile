@@ -181,7 +181,7 @@ const OnboardingScreen = () => {
       title="Tell us about you"
       subtitle={
         wantsToHost
-          ? "Your own details first. Your business comes next, so you can start selling tickets."
+          ? "Your own details first. Next, how you'll host."
           : "A few details so we can show you events that fit. Takes a minute."
       }
       stubKicker={wantsToHost ? "ALL ACCESS" : undefined}

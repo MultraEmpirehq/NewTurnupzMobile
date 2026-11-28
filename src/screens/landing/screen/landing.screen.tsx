@@ -46,7 +46,7 @@ const COPY: Record<TIntent, { eyebrow: string; title: Record<TMode, string>; sub
     subtitle: {
       login: "",
       signup:
-        "Enter your email and we'll send you a code. Then tell us about your business and start selling tickets."
+        "Enter your email and we'll send you a code. Then choose how you'll host: free events, or selling tickets."
     }
   }
 };

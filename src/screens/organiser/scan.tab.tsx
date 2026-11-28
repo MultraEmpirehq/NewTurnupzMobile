@@ -208,6 +208,11 @@ const ScanTab = ({ events, initialEventId }: { events: TScanEvent[]; initialEven
             ? `Checked in ${(day?.checkedIn ?? summary.checkedIn).toLocaleString()} of ${(day?.expected ?? summary.total).toLocaleString()}`
             : "Loading the door count…"}
         </TextComponent>
+        {!!summary?.passes?.total && (
+          <TextComponent className="text-xs font-bold text-white/70">
+            Passes {(day ? (day.passesCheckedIn ?? 0) : summary.passes.checkedIn).toLocaleString()} of {summary.passes.total.toLocaleString()}
+          </TextComponent>
+        )}
         {!!summary?.doorsOpenAt && (
           <TextComponent className="text-xs text-white/60">
             Doors open {formatEventDay(summary.doorsOpenAt, event?.timezone, { withYear: false })} ·{" "}

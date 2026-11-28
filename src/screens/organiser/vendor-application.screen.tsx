@@ -799,7 +799,7 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
           {payoutCountry?.stripe && (
             <View className="rounded-2xl p-4" style={{ backgroundColor: BRAND.blueTint }}>
               <TextComponent className="text-sm leading-5 text-zinc-800">
-                In {payoutCountry.name} you add your bank with Stripe, on the website, once you're approved.
+                In {payoutCountry.name} you add your bank on the website, once you're approved.
               </TextComponent>
             </View>
           )}
@@ -884,7 +884,7 @@ const VendorApplicationScreen = ({ visible, onClose }: { visible: boolean; onClo
               rows={[
                 ["Paid in", form.payoutCountry],
                 ...(payoutCountry?.stripe
-                  ? [["Bank", "Add with Stripe, once approved"]]
+                  ? [["Bank", "Added on the website, once approved"]]
                   : [
                       ["Bank", form.bankName],
                       ["Account", lastDigits ? `•••• ${lastDigits}` : undefined],
