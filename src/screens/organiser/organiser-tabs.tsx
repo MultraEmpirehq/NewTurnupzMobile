@@ -113,7 +113,7 @@ const Earnings = ({ earnings }: { earnings: TEarnings }) => {
   const lines: [string, string][] = [
     ["Ticket sales", money(row.sales.formatted?.withCurrency)],
     ["Turnupz fee", `−${money(row.fees.formatted?.withCurrency)}`],
-    ...(row.processingFees?.amount ? ([["Stripe fees", `−${money(row.processingFees.formatted?.withCurrency)}`]] as [string, string][]) : []),
+    ...(row.processingFees?.amount ? ([["Card fees", `−${money(row.processingFees.formatted?.withCurrency)}`]] as [string, string][]) : []),
     ...(row.owed.amount ? ([["Turnupz still owes you", money(row.owed.formatted?.withCurrency)]] as [string, string][]) : [])
   ];
   return (

@@ -217,7 +217,9 @@ export type TScanSummary = {
   eventName: string;
   total: number;
   checkedIn: number;
-  days: { id: string; name: string; label: string | null; expected: number; checkedIn: number }[];
+  days: { id: string; name: string; label: string | null; expected: number; checkedIn: number; passesCheckedIn?: number }[];
+  /** Free passes (Sponsor, Crew…), counted apart from tickets. */
+  passes?: { total: number; checkedIn: number };
   todayDayId: string | null;
   /** When doors open (the organiser's choice, or 6 hours before); earlier scans are refused. */
   doorsOpenAt?: string;
